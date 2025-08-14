@@ -1,0 +1,137 @@
+import React, { useState, useRef } from 'react';
+import { Send, Paperclip, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+
+const MessageInput = ({ onSendMessage, isLoading, disabled }) => {
+  const [message, setMessage] = useState('');
+  const [attachedFiles, setAttachedFiles] = useState([]);
+  const fileInputRef = useRef(null);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (message.trim() || attachedFiles.length > 0) {
+      onSendMessage(message.trim(), attachedFiles);
+      setMessage('');
+      setAttachedFiles([]);
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setAttachedFiles(prev => [...prev, ...files]);
+    e.target.value = '';
+  };
+
+  const removeFile = (index) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  return (
+    <div className="border-t border-border bg-background">
+      <div className="max-w-4xl mx-auto p-4">
+        {attachedFiles.length > 0 && (
+          <div className="mb-3 space-y-2">
+            {attachedFiles.map((file, index) => (
+              <div
+                key={index}
+                className="flex items-center gap-3 bg-muted/50 rounded-lg p-3 border border-border/50"
+              >
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-sm font-medium truncate">{file.name}</span>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {formatFileSize(file.size)}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => removeFile(index)}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="relative">
+          <div className="relative flex items-end gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Message AskHole..."}
+                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 text-base leading-relaxed"
+                disabled={disabled || isLoading}
+                rows={1}
+                style={{
+                  height: 'auto',
+                  minHeight: '52px',
+                }}
+                onInput={(e) => {
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
+                }}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || isLoading}
+              >
+                <Paperclip className="h-4 w-4" />
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+                accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.html,.css,.xml"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
+              className="btn-primary h-[52px] px-4 flex-shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
+        </form>
+        
+        {disabled && (
+          <div className="mt-3 text-center">
+            <p className="text-sm text-muted-foreground">
+              Configure your API keys in settings to start using AskHole
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default MessageInput;
+
