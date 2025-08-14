@@ -258,3 +258,7 @@ For issues and questions:
 
 **Note**: This application requires valid API keys from Google Gemini and/or OpenRouter to function. The application will work with either or both services configured.
 
+For all questions please contact: one_point_0@icloud.com
+
+Enjoy using this app! 🚀
+
