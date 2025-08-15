@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
+import AuthComponent from './components/AuthComponent';
 import ChatTabs from './components/ChatTabs';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -8,10 +9,18 @@ import Sidebar from './components/Sidebar';
 import SettingsDialog from './components/SettingsDialog';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { configAPI, sessionsAPI, promptsAPI, filesAPI } from './services/api';
+import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 
+// Remove the session clearing code - let the backend handle session validation
+// This was causing the session to be reset on every page load
+
 function App() {
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
   // State management
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
@@ -36,10 +45,17 @@ function App() {
     maxTokens: 4096,
   });
 
-  // Initialize app
+  // Check authentication on app load
   useEffect(() => {
-    initializeApp();
+    checkAuthStatus();
   }, []);
+
+  // Initialize app after authentication
+  useEffect(() => {
+    if (isAuthenticated) {
+      initializeApp();
+    }
+  }, [isAuthenticated]);
 
   // Apply theme
   useEffect(() => {
@@ -59,10 +75,63 @@ function App() {
     }
   }, [settings.theme]);
 
+  const checkAuthStatus = async () => {
+    try {
+      const response = await authAPI.checkAuth();
+      
+      if (response.data.authenticated) {
+        setIsAuthenticated(true);
+        setCurrentUser(response.data.user);
+        console.log('User authenticated:', response.data.user.username);
+      } else {
+        console.log('User not authenticated');
+        setIsAuthenticated(false);
+        setCurrentUser(null);
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error);
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+    } finally {
+      setIsCheckingAuth(false);
+    }
+  };
+
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    console.log('Authentication successful for:', user.username);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+      
+      // Clear all session data
+      localStorage.removeItem('session_id');
+      document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
+      
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      setSessions([]);
+      setActiveSessionId(null);
+      setCurrentMessages([]);
+      setPrompts([]);
+      
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Even if logout fails on server, clear client-side data
+      localStorage.removeItem('session_id');
+      document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      toast.error('Logout failed, but you have been logged out locally');
+    }
+  };
+
   const initializeApp = async () => {
     try {
-      // **REPLACE**: Add better error handling and don't require API keys for basic initialization
-      
       // Only configure API if we have keys
       if (settings.geminiApiKey || settings.openrouterApiKey) {
         try {
@@ -125,8 +194,13 @@ function App() {
       }
     } catch (error) {
       console.error('Failed to load sessions:', error);
-      // **REPLACE**: Don't create new session if API is not working
       setSessions([]);
+      // Try to create a new session if none exist
+      try {
+        await createNewSession();
+      } catch (createError) {
+        console.error('Failed to create new session:', createError);
+      }
     }
   };
 
@@ -180,7 +254,10 @@ function App() {
 
   const closeSession = async (sessionId) => {
     try {
-      await sessionsAPI.deleteSession(sessionId);
+      // Close the tab (mark as closed) instead of deleting
+      await sessionsAPI.closeSession(sessionId);
+      
+      // Remove from sessions list (it's now closed)
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       
       // If closing active session, switch to another or create new
@@ -193,14 +270,19 @@ function App() {
         }
       }
       
-      toast.success("Chat session has been deleted.");
+      toast.success("Chat tab closed. You can find it in your history.");
     } catch (error) {
-      console.error('Failed to delete session:', error);
-      toast.error("Failed to delete chat session.");
+      console.error('Failed to close session:', error);
+      toast.error("Failed to close chat tab.");
     }
   };
 
   const sendMessage = async (message, files = []) => {
+    if (!message || !message.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+
     if (!activeSessionId) {
       // Try to create a new session if none exists
       const newSession = await createNewSession();
@@ -227,7 +309,7 @@ function App() {
 
       // Send message
       const response = await sessionsAPI.sendMessage(activeSessionId, {
-        message,
+        message: message.trim(),
         files: uploadedFileIds, // Send file IDs instead of paths
       });
 
@@ -245,7 +327,16 @@ function App() {
 
     } catch (error) {
       console.error('Failed to send message:', error);
-      toast.error("Failed to send message. Please check your API keys and backend connection.");
+      
+      // More specific error messages
+      if (error.message.includes('Authentication required')) {
+        toast.error("Session expired. Please log in again.");
+        setIsAuthenticated(false);
+      } else if (error.message.includes('not configured')) {
+        toast.error("Please configure your API keys in settings before sending messages.");
+      } else {
+        toast.error(`Failed to send message: ${error.message}`);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -314,7 +405,6 @@ function App() {
   const updateSettings = async (newSettings) => {
     setSettings(newSettings);
     
-    // **REPLACE**: Improve API configuration update with better error handling
     try {
       if (newSettings.geminiApiKey || newSettings.openrouterApiKey) {
         await configAPI.setConfig({
@@ -342,55 +432,77 @@ function App() {
     }
   };
 
+  // Show loading spinner while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication component if not logged in
+  if (!isAuthenticated) {
+    return <AuthComponent onAuthSuccess={handleAuthSuccess} />;
+  }
+
   const isConfigured = Boolean(settings.geminiApiKey || settings.openrouterApiKey);
 
   return (
-    <div className="h-screen flex bg-background text-foreground">
-      <Sidebar
-        sessions={sessions}
-        prompts={prompts}
-        onSessionSelect={selectSession}
-        onNewSession={createNewSession}
-        onDeleteSession={closeSession}
-        onRenameSession={renameSession} 
-        onNewPrompt={createPrompt}
-        onUsePrompt={usePrompt}
-        onDeletePrompt={deletePrompt}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
-      
-      <div className="flex-1 flex flex-col main-content">
-        <ChatTabs
+    <ErrorBoundary>
+      <div className="h-screen flex bg-background text-foreground">
+        <Sidebar
           sessions={sessions}
-          activeSessionId={activeSessionId}
+          prompts={prompts}
+          currentUser={currentUser}
           onSessionSelect={selectSession}
           onNewSession={createNewSession}
-          onCloseSession={closeSession}
-          onRenameSession={renameSession}
+          onDeleteSession={closeSession}  // This now closes tabs
+          onRenameSession={renameSession} 
+          onNewPrompt={createPrompt}
+          onUsePrompt={usePrompt}
+          onDeletePrompt={deletePrompt}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          onLogout={handleLogout}
         />
         
-        <MessageList
-          messages={currentMessages}
-          isLoading={isLoading}
+        <div className="flex-1 flex flex-col main-content">
+          <ChatTabs
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onSessionSelect={selectSession}
+            onNewSession={createNewSession}
+            onCloseSession={closeSession}  // This now closes tabs
+            onRenameSession={renameSession}
+          />
+          
+          <MessageList
+            messages={currentMessages}
+            isLoading={isLoading}
+          />
+          
+          <MessageInput
+            onSendMessage={sendMessage}
+            isLoading={isLoading}
+            disabled={!isConfigured}
+            placeholder={!isConfigured ? "Please configure your API keys in settings first..." : "Type your message..."}
+          />
+        </div>
+
+        <SettingsDialog
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          availableModels={availableModels}
         />
-        
-        <MessageInput
-          onSendMessage={sendMessage}
-          isLoading={isLoading}
-          disabled={!isConfigured}
-        />
+
+        <Toaster />
       </div>
-
-      <SettingsDialog
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        settings={settings}
-        onUpdateSettings={updateSettings}
-        availableModels={availableModels}
-      />
-
-      <Toaster />
-    </div>
+    </ErrorBoundary>
   );
 }
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Edit3, Trash2 } from 'lucide-react';
+import { Edit3, Trash2, X } from 'lucide-react';
 
-const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose }) => {
+const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose, deleteLabel = "Delete" }) => {
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -30,6 +30,8 @@ const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose }) => {
 
   if (!isVisible) return null;
 
+  const isCloseAction = deleteLabel === "Close Tab";
+
   return (
     <div
       ref={menuRef}
@@ -47,11 +49,15 @@ const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose }) => {
         Rename
       </button>
       <button
-        className="w-full px-3 py-2 text-sm text-left hover:bg-destructive/10 hover:text-destructive flex items-center gap-2"
+        className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
+          isCloseAction 
+            ? 'hover:bg-accent hover:text-accent-foreground' 
+            : 'hover:bg-destructive/10 hover:text-destructive'
+        }`}
         onClick={onDelete}
       >
-        <Trash2 className="h-4 w-4" />
-        Delete
+        {isCloseAction ? <X className="h-4 w-4" /> : <Trash2 className="h-4 w-4" />}
+        {deleteLabel}
       </button>
     </div>
   );

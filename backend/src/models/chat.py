@@ -7,10 +7,12 @@ class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
 
     id = db.Column(db.String(36), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Added user relationship
     title = db.Column(db.String(200), nullable=False, default='New Chat')
     model = db.Column(db.String(100), nullable=False, default='gemini-2.5-flash')
     client_type = db.Column(db.String(50), nullable=False, default='gemini')
     temperature = db.Column(db.Float, default=1.0)
+    is_closed = db.Column(db.Boolean, default=False)  # Added to track closed tabs
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -20,10 +22,12 @@ class ChatSession(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'title': self.title,
             'model': self.model,
             'client_type': self.client_type,
             'temperature': self.temperature,
+            'is_closed': self.is_closed,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'message_count': len(self.messages)
@@ -55,6 +59,7 @@ class PromptTemplate(db.Model):
     __tablename__ = 'prompt_templates'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Added user relationship
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(100), default='General')
@@ -66,6 +71,7 @@ class PromptTemplate(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'title': self.title,
             'content': self.content,
             'category': self.category,
@@ -80,6 +86,7 @@ class FileUpload(db.Model):
     __tablename__ = 'file_uploads'
 
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Added user relationship
     filename = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)
@@ -90,6 +97,7 @@ class FileUpload(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'filename': self.filename,
             'original_filename': self.original_filename,
             'file_size': self.file_size,

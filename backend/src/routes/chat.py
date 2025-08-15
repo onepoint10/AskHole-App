@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from src.database import db
-from src.models.chat import db, ChatSession, ChatMessage, PromptTemplate, FileUpload
+from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
+from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
 import uuid
@@ -21,6 +22,11 @@ openrouter_client = None
 def set_config():
     """Set API keys and initialize clients"""
     global gemini_client, openrouter_client
+
+    # Check authentication
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
 
     data = request.get_json()
     gemini_key = data.get('gemini_api_key')
@@ -45,6 +51,11 @@ def set_config():
 @chat_bp.route('/models', methods=['GET'])
 def get_models():
     """Get available models from both clients"""
+    # Check authentication
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
     models = {
         'gemini': [],
         'openrouter': []
@@ -61,23 +72,52 @@ def get_models():
 
 @chat_bp.route('/sessions', methods=['GET'])
 def get_sessions():
-    """Get all chat sessions"""
-    sessions = ChatSession.query.order_by(ChatSession.updated_at.desc()).all()
+    """Get all chat sessions for current user"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Only return open (not closed) sessions for tabs
+    sessions = ChatSession.query.filter_by(
+        user_id=current_user.id,
+        is_closed=False
+    ).order_by(ChatSession.updated_at.desc()).all()
+
+    return jsonify([session.to_dict() for session in sessions])
+
+
+@chat_bp.route('/sessions/history', methods=['GET'])
+def get_session_history():
+    """Get all chat sessions (including closed) for history view"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    sessions = ChatSession.query.filter_by(
+        user_id=current_user.id
+    ).order_by(ChatSession.updated_at.desc()).all()
+
     return jsonify([session.to_dict() for session in sessions])
 
 
 @chat_bp.route('/sessions', methods=['POST'])
 def create_session():
     """Create a new chat session"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
     data = request.get_json()
 
     session_id = str(uuid.uuid4())
     session = ChatSession(
         id=session_id,
+        user_id=current_user.id,  # Associate with current user
         title=data.get('title', 'New Chat'),
         model=data.get('model', 'gemini-2.5-flash'),
         client_type=data.get('client_type', 'gemini'),
-        temperature=data.get('temperature', 1.0)
+        temperature=data.get('temperature', 1.0),
+        is_closed=False
     )
 
     db.session.add(session)
@@ -89,7 +129,18 @@ def create_session():
 @chat_bp.route('/sessions/<session_id>', methods=['GET'])
 def get_session(session_id):
     """Get a specific session with messages"""
-    session = ChatSession.query.get_or_404(session_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
     messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
 
     return jsonify({
@@ -101,7 +152,18 @@ def get_session(session_id):
 @chat_bp.route('/sessions/<session_id>', methods=['PUT'])
 def update_session(session_id):
     """Update session details"""
-    session = ChatSession.query.get_or_404(session_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
     data = request.get_json()
 
     if 'title' in data:
@@ -119,10 +181,67 @@ def update_session(session_id):
     return jsonify(session.to_dict())
 
 
+@chat_bp.route('/sessions/<session_id>/close', methods=['POST'])
+def close_session_tab(session_id):
+    """Close session tab (mark as closed, don't delete)"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
+    # Mark session as closed (hide from tabs, keep in history)
+    session.is_closed = True
+    session.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': 'Session tab closed'})
+
+
+@chat_bp.route('/sessions/<session_id>/reopen', methods=['POST'])
+def reopen_session(session_id):
+    """Reopen a closed session"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
+    # Reopen session
+    session.is_closed = False
+    session.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify(session.to_dict())
+
+
 @chat_bp.route('/sessions/<session_id>', methods=['DELETE'])
 def delete_session(session_id):
-    """Delete a chat session"""
-    session = ChatSession.query.get_or_404(session_id)
+    """Delete a chat session permanently"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
     db.session.delete(session)
     db.session.commit()
 
@@ -132,13 +251,28 @@ def delete_session(session_id):
 @chat_bp.route('/sessions/<session_id>/messages', methods=['POST'])
 def send_message(session_id):
     """Send a message in a chat session"""
-    session = ChatSession.query.get_or_404(session_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
     data = request.get_json()
 
     message_content = data.get('message', '')
-    file_ids = data.get('files', [])  # These are now file IDs from upload response
+    file_ids = data.get('files', [])
 
-    # Convert file IDs to actual file paths
+    # Validate message content
+    if not message_content or not message_content.strip():
+        return jsonify({'error': 'Message content cannot be empty'}), 400
+
+    # Convert file IDs to actual file paths (only user's files)
     file_paths = []
     if file_ids:
         for file_id in file_ids:
@@ -146,79 +280,105 @@ def send_message(session_id):
             if isinstance(file_id, str) and ('/' in file_id or '\\' in file_id):
                 file_paths.append(file_id)
             else:
-                # Look up file by ID
-                file_upload = FileUpload.query.get(file_id)
+                # Look up file by ID (only user's files)
+                file_upload = FileUpload.query.filter_by(
+                    id=file_id,
+                    user_id=current_user.id
+                ).first()
                 if file_upload:
                     file_paths.append(file_upload.file_path)
 
-    # Save user message
+    # Save user message first
     user_message = ChatMessage(
         session_id=session_id,
         role='user',
-        content=message_content,
+        content=message_content.strip(),
         files=json.dumps(file_ids) if file_ids else None
     )
-    db.session.add(user_message)
 
-    try:
-        # Get appropriate client
-        if session.client_type == 'gemini':
-            if not gemini_client:
-                raise Exception("Gemini client not configured")
-            response = gemini_client.chat_message(
+    # Use no_autoflush to prevent premature flushing
+    with db.session.no_autoflush:
+        db.session.add(user_message)
+
+        try:
+            # Get appropriate client and generate response
+            response_content = None
+
+            if session.client_type == 'gemini':
+                if not gemini_client:
+                    raise Exception("Gemini client not configured. Please check your API key in settings.")
+                response_content = gemini_client.chat_message(
+                    session_id=session_id,
+                    message=message_content,
+                    model=session.model,
+                    files=file_paths,
+                    temperature=session.temperature
+                )
+            elif session.client_type == 'openrouter':
+                if not openrouter_client:
+                    raise Exception("OpenRouter client not configured. Please check your API key in settings.")
+                response_content = openrouter_client.chat_message(
+                    session_id=session_id,
+                    message=message_content,
+                    model=session.model,
+                    files=file_paths,
+                    temperature=session.temperature
+                )
+            else:
+                raise Exception(f"Unknown client type: {session.client_type}")
+
+            # Validate response content
+            if not response_content or not response_content.strip():
+                response_content = "I apologize, but I couldn't generate a response. Please try again."
+
+            # Save assistant response
+            assistant_message = ChatMessage(
                 session_id=session_id,
-                message=message_content,
-                model=session.model,
-                files=file_paths,  # Pass actual file paths
-                temperature=session.temperature
+                role='assistant',
+                content=response_content.strip()
             )
-        elif session.client_type == 'openrouter':
-            if not openrouter_client:
-                raise Exception("OpenRouter client not configured")
-            response = openrouter_client.chat_message(
-                session_id=session_id,
-                message=message_content,
-                model=session.model,
-                files=file_paths,  # Pass actual file paths
-                temperature=session.temperature
-            )
-        else:
-            raise Exception(f"Unknown client type: {session.client_type}")
+            db.session.add(assistant_message)
 
-        # Save assistant response
-        assistant_message = ChatMessage(
-            session_id=session_id,
-            role='assistant',
-            content=response
-        )
-        db.session.add(assistant_message)
+            # Update session timestamp and title
+            session.updated_at = datetime.utcnow()
 
-        # Update session timestamp
-        session.updated_at = datetime.utcnow()
+            # Auto-generate title if this is the first message
+            if session.title == 'New Chat':
+                # Count existing messages (excluding the ones we're adding)
+                existing_message_count = ChatMessage.query.filter_by(session_id=session_id).count()
+                if existing_message_count == 0:  # This is the first exchange
+                    title_words = message_content.split()[:5]
+                    session.title = ' '.join(title_words) + ('...' if len(title_words) == 5 else '')
 
-        # Auto-generate title if this is the first message
-        if len(session.messages) == 0 and session.title == 'New Chat':
-            # Generate a title from the first message
-            title_words = message_content.split()[:5]
-            session.title = ' '.join(title_words) + ('...' if len(title_words) == 5 else '')
+            # Commit all changes
+            db.session.commit()
 
-        db.session.commit()
+            return jsonify({
+                'user_message': user_message.to_dict(),
+                'assistant_message': assistant_message.to_dict(),
+                'session': session.to_dict()
+            })
 
-        return jsonify({
-            'user_message': user_message.to_dict(),
-            'assistant_message': assistant_message.to_dict(),
-            'session': session.to_dict()
-        })
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error in send_message: {str(e)}")
+            return jsonify({'error': str(e)}), 500
 
 
 @chat_bp.route('/sessions/<session_id>/clear', methods=['POST'])
 def clear_session(session_id):
     """Clear all messages in a session"""
-    session = ChatSession.query.get_or_404(session_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
 
     # Delete all messages
     ChatMessage.query.filter_by(session_id=session_id).delete()
@@ -237,17 +397,29 @@ def clear_session(session_id):
 
 @chat_bp.route('/prompts', methods=['GET'])
 def get_prompts():
-    """Get all prompt templates"""
-    prompts = PromptTemplate.query.order_by(PromptTemplate.updated_at.desc()).all()
+    """Get all prompt templates for current user"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompts = PromptTemplate.query.filter_by(
+        user_id=current_user.id
+    ).order_by(PromptTemplate.updated_at.desc()).all()
+
     return jsonify([prompt.to_dict() for prompt in prompts])
 
 
 @chat_bp.route('/prompts', methods=['POST'])
 def create_prompt():
     """Create a new prompt template"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
     data = request.get_json()
 
     prompt = PromptTemplate(
+        user_id=current_user.id,
         title=data.get('title', 'Untitled Prompt'),
         content=data.get('content', ''),
         category=data.get('category', 'General'),
@@ -263,7 +435,18 @@ def create_prompt():
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['PUT'])
 def update_prompt(prompt_id):
     """Update a prompt template"""
-    prompt = PromptTemplate.query.get_or_404(prompt_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.filter_by(
+        id=prompt_id,
+        user_id=current_user.id
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
     data = request.get_json()
 
     if 'title' in data:
@@ -284,7 +467,18 @@ def update_prompt(prompt_id):
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['DELETE'])
 def delete_prompt(prompt_id):
     """Delete a prompt template"""
-    prompt = PromptTemplate.query.get_or_404(prompt_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.filter_by(
+        id=prompt_id,
+        user_id=current_user.id
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
     db.session.delete(prompt)
     db.session.commit()
 
@@ -294,7 +488,18 @@ def delete_prompt(prompt_id):
 @chat_bp.route('/prompts/<int:prompt_id>/use', methods=['POST'])
 def use_prompt(prompt_id):
     """Increment usage count for a prompt"""
-    prompt = PromptTemplate.query.get_or_404(prompt_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.filter_by(
+        id=prompt_id,
+        user_id=current_user.id
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
     prompt.usage_count += 1
     db.session.commit()
 
@@ -304,6 +509,10 @@ def use_prompt(prompt_id):
 @chat_bp.route('/files/upload', methods=['POST'])
 def upload_file():
     """Upload a file with better Cyrillic filename support"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file provided'}), 400
 
@@ -403,6 +612,7 @@ def upload_file():
 
         # Save to database with original filename preserved
         file_upload = FileUpload(
+            user_id=current_user.id,
             filename=unique_filename,
             original_filename=original_filename,  # Preserve original Cyrillic name
             file_path=file_path,
@@ -429,15 +639,32 @@ def upload_file():
 
 @chat_bp.route('/files', methods=['GET'])
 def get_files():
-    """Get all uploaded files"""
-    files = FileUpload.query.order_by(FileUpload.uploaded_at.desc()).all()
+    """Get all uploaded files for current user"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    files = FileUpload.query.filter_by(
+        user_id=current_user.id
+    ).order_by(FileUpload.uploaded_at.desc()).all()
+
     return jsonify([file.to_dict() for file in files])
 
 
 @chat_bp.route('/files/<int:file_id>', methods=['DELETE'])
 def delete_file(file_id):
     """Delete an uploaded file"""
-    file_upload = FileUpload.query.get_or_404(file_id)
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    file_upload = FileUpload.query.filter_by(
+        id=file_id,
+        user_id=current_user.id
+    ).first()
+
+    if not file_upload:
+        return jsonify({'error': 'File not found or access denied'}), 404
 
     # Delete physical file
     if os.path.exists(file_upload.file_path):
