@@ -9,8 +9,23 @@ import { useState } from 'react';
 
 const MessageList = ({ messages, isLoading }) => {
   const scrollRef = useRef(null);
+  const messagesEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
   const [isDark, setIsDark] = useState(false);
+
+  // Function to scroll to bottom
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // Force immediate scroll to bottom
+  const scrollToBottomImmediate = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
+    }
+  };
 
   useEffect(() => {
     // Check if dark mode is active
@@ -29,9 +44,14 @@ const MessageList = ({ messages, isLoading }) => {
     return () => observer.disconnect();
   }, []);
 
+  // Scroll to bottom when messages change or loading starts
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    // Use immediate scroll for user messages (when they just sent something)
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.isTemporary || isLoading) {
+      scrollToBottomImmediate();
+    } else {
+      scrollToBottom();
     }
   }, [messages, isLoading]);
 
@@ -187,10 +207,11 @@ const MessageList = ({ messages, isLoading }) => {
             </div>
           </div>
         )}
+        {/* Invisible element for scrolling to bottom */}
+        <div ref={messagesEndRef} />
       </div>
     </ScrollArea>
   );
 };
 
 export default MessageList;
-

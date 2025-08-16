@@ -292,6 +292,19 @@ function App() {
       }
     }
 
+    // Create temporary user message ID
+    const tempUserMessageId = `temp_${Date.now()}`;
+    const userMessage = {
+      id: tempUserMessageId,
+      role: 'user',
+      content: message.trim(),
+      files: files,
+      timestamp: new Date().toISOString(),
+      isTemporary: true
+    };
+
+    // Immediately add user message to chat
+    setCurrentMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     
     try {
@@ -300,7 +313,7 @@ function App() {
       for (const file of files) {
         try {
           const uploadResponse = await filesAPI.uploadFile(file);
-          uploadedFileIds.push(uploadResponse.data.id); // Use file ID instead of path
+          uploadedFileIds.push(uploadResponse.data.id);
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
           toast.error(`Failed to upload ${file.name}`);
@@ -310,33 +323,50 @@ function App() {
       // Send message
       const response = await sessionsAPI.sendMessage(activeSessionId, {
         message: message.trim(),
-        files: uploadedFileIds, // Send file IDs instead of paths
+        files: uploadedFileIds,
       });
 
-      // Update messages and session
-      setCurrentMessages(prev => [
-        ...prev,
-        response.data.user_message,
-        response.data.assistant_message,
-      ]);
+      // Replace temporary message with real messages from server
+      setCurrentMessages(prev => {
+        // Remove the temporary message
+        const withoutTemp = prev.filter(msg => msg.id !== tempUserMessageId);
+        // Add the real messages from server
+        return [
+          ...withoutTemp,
+          response.data.user_message,
+          response.data.assistant_message,
+        ];
+      });
 
       // Update session in list
       setSessions(prev => prev.map(s => 
         s.id === activeSessionId ? response.data.session : s
       ));
 
+      // Return success indicator
+      return { success: true };
+
     } catch (error) {
       console.error('Failed to send message:', error);
       
+      // Remove the temporary user message on error
+      setCurrentMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
+      
       // More specific error messages
+      let errorMessage = "Failed to send message";
       if (error.message.includes('Authentication required')) {
-        toast.error("Session expired. Please log in again.");
+        errorMessage = "Session expired. Please log in again.";
         setIsAuthenticated(false);
       } else if (error.message.includes('not configured')) {
-        toast.error("Please configure your API keys in settings before sending messages.");
+        errorMessage = "Please configure your API keys in settings before sending messages.";
       } else {
-        toast.error(`Failed to send message: ${error.message}`);
+        errorMessage = `Failed to send message: ${error.message}`;
       }
+      
+      toast.error(errorMessage);
+      
+      // Return error with the original message to restore in input
+      return { success: false, originalMessage: message, originalFiles: files };
     } finally {
       setIsLoading(false);
     }

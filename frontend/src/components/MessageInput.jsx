@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,12 +8,20 @@ const MessageInput = ({ onSendMessage, isLoading, disabled }) => {
   const [attachedFiles, setAttachedFiles] = useState([]);
   const fileInputRef = useRef(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (message.trim() || attachedFiles.length > 0) {
-      onSendMessage(message.trim(), attachedFiles);
-      setMessage('');
-      setAttachedFiles([]);
+      const result = await onSendMessage(message.trim(), attachedFiles);
+      
+      // Only clear input if message was sent successfully
+      if (result && result.success) {
+        setMessage('');
+        setAttachedFiles([]);
+      } else if (result && !result.success) {
+        // On error, restore the original message and files
+        setMessage(result.originalMessage || message);
+        // Note: files are kept as they were, since they're already attached
+      }
     }
   };
 
@@ -134,4 +142,3 @@ const MessageInput = ({ onSendMessage, isLoading, disabled }) => {
 };
 
 export default MessageInput;
-
