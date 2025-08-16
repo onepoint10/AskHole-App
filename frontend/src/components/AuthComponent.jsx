@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,15 @@ const AuthComponent = ({ onAuthSuccess }) => {
     password: '',
     confirmPassword: ''
   });
+
+  // Clear errors when switching tabs or changing form data
+  useEffect(() => {
+    setErrors({});
+  }, [activeTab]);
+
+  useEffect(() => {
+    setErrors({});
+  }, [loginForm, registerForm]);
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -55,7 +64,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
     setIsLoading(true);
     
     try {
-      // Import authAPI dynamically or make sure it's imported at top
+      // Dynamic import to ensure we have the latest API
       const { authAPI } = await import('../services/api');
       
       const response = await authAPI.login({
@@ -63,18 +72,32 @@ const AuthComponent = ({ onAuthSuccess }) => {
         password: loginForm.password
       });
 
-      // Store session_id if provided in response
-      if (response.data.session_id) {
-        localStorage.setItem('session_id', response.data.session_id);
-        // Also set as cookie
-        document.cookie = `session=${response.data.session_id}; path=/; max-age=${30*24*60*60}; SameSite=None`;
-      }
+      console.log('Login response:', response.data);
 
-      toast.success('Login successful!');
-      onAuthSuccess(response.data.user);
+      // The API client should already handle session storage
+      // Just verify we have user data
+      if (response.data.user) {
+        toast.success('Login successful!');
+        onAuthSuccess(response.data.user);
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
       console.error('Login error:', error);
-      setErrors({ general: error.message || 'Login failed' });
+      
+      // More specific error handling
+      let errorMessage = 'Login failed';
+      if (error.message.includes('Invalid username')) {
+        errorMessage = 'Invalid username or password';
+      } else if (error.message.includes('Authentication')) {
+        errorMessage = 'Authentication failed. Please try again.';
+      } else if (error.message.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +114,8 @@ const AuthComponent = ({ onAuthSuccess }) => {
       newErrors.username = 'Username is required';
     } else if (registerForm.username.trim().length < 3) {
       newErrors.username = 'Username must be at least 3 characters';
+    } else if (registerForm.username.trim().length > 80) {
+      newErrors.username = 'Username must be less than 80 characters';
     }
     
     if (!registerForm.email.trim()) {
@@ -116,7 +141,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
     setIsLoading(true);
     
     try {
-      // Import authAPI dynamically or make sure it's imported at top
+      // Dynamic import to ensure we have the latest API
       const { authAPI } = await import('../services/api');
       
       const response = await authAPI.register({
@@ -125,13 +150,53 @@ const AuthComponent = ({ onAuthSuccess }) => {
         password: registerForm.password
       });
 
-      toast.success('Registration successful! Welcome!');
-      onAuthSuccess(response.data.user);
+      console.log('Registration response:', response.data);
+
+      if (response.data.user) {
+        toast.success('Registration successful! Welcome!');
+        onAuthSuccess(response.data.user);
+      } else {
+        throw new Error('Invalid response from server');
+      }
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors({ general: error.message || 'Registration failed' });
+      
+      // More specific error handling
+      let errorMessage = 'Registration failed';
+      if (error.message.includes('Username already exists')) {
+        setErrors({ username: 'Username already exists' });
+        return;
+      } else if (error.message.includes('Email already registered')) {
+        setErrors({ email: 'Email already registered' });
+        return;
+      } else if (error.message.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else {
+        errorMessage = error.message || errorMessage;
+      }
+      
+      setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    setErrors({});
+    // Clear forms when switching tabs for security
+    if (newTab === 'login') {
+      setRegisterForm({
+        username: '',
+        email: '',
+        password: '',
+        confirmPassword: ''
+      });
+    } else {
+      setLoginForm({
+        username: '',
+        password: ''
+      });
     }
   };
 
@@ -139,14 +204,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to ChatApp</CardTitle>
+          <CardTitle className="text-2xl font-bold">Welcome to AskHole</CardTitle>
           <CardDescription>
             Sign in to your account or create a new one
           </CardDescription>
         </CardHeader>
         
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
@@ -164,6 +229,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                       className="pl-10"
                       disabled={isLoading}
+                      autoComplete="username"
                     />
                   </div>
                 </div>
@@ -178,12 +244,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       className="pl-10 pr-10"
                       disabled={isLoading}
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
                       disabled={isLoading}
+                      tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -221,6 +289,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
                       className="pl-10"
                       disabled={isLoading}
+                      autoComplete="username"
                     />
                   </div>
                   {errors.username && (
@@ -238,6 +307,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       className="pl-10"
                       disabled={isLoading}
+                      autoComplete="email"
                     />
                   </div>
                   {errors.email && (
@@ -255,12 +325,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                       className="pl-10 pr-10"
                       disabled={isLoading}
+                      autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-3 h-4 w-4 text-muted-foreground hover:text-foreground transition-colors"
                       disabled={isLoading}
+                      tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -280,6 +352,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                       className="pl-10"
                       disabled={isLoading}
+                      autoComplete="new-password"
                     />
                   </div>
                   {errors.confirmPassword && (
@@ -312,11 +385,8 @@ const AuthComponent = ({ onAuthSuccess }) => {
               {activeTab === 'login' ? "Don't have an account? " : "Already have an account? "}
               <button
                 type="button"
-                onClick={() => {
-                  setActiveTab(activeTab === 'login' ? 'register' : 'login');
-                  setErrors({});
-                }}
-                className="text-primary hover:underline font-medium"
+                onClick={() => handleTabChange(activeTab === 'login' ? 'register' : 'login')}
+                className="text-primary hover:underline font-medium transition-colors"
                 disabled={isLoading}
               >
                 {activeTab === 'login' ? 'Sign up' : 'Sign in'}
