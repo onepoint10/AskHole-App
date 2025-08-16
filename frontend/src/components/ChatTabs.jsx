@@ -10,7 +10,7 @@ const ChatTabs = ({
   activeSessionId, 
   onSessionSelect, 
   onNewSession, 
-  onCloseSession,  // This now closes the tab, not deletes
+  onCloseTab,  // Renamed from onCloseSession to be more specific
   onRenameSession 
 }) => {
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
@@ -35,8 +35,8 @@ const ChatTabs = ({
   };
 
   const handleCloseTab = () => {
-    // Close tab (mark as closed) instead of deleting
-    onCloseSession(contextMenu.sessionId);
+    // Close tab only (don't delete/close session)
+    onCloseTab(contextMenu.sessionId);
     handleCloseContextMenu();
   };
 
@@ -97,7 +97,7 @@ const ChatTabs = ({
                     className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 mr-1"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onCloseSession(session.id);  // Close tab, don't delete
+                      onCloseTab(session.id);  // Close tab only, don't delete session
                     }}
                     title="Close tab"
                   >
@@ -123,9 +123,9 @@ const ChatTabs = ({
         isVisible={contextMenu.isVisible}
         position={contextMenu.position}
         onRename={handleRename}
-        onDelete={handleCloseTab}  // Change label and function
+        onDelete={handleCloseTab}  
         onClose={handleCloseContextMenu}
-        deleteLabel="Close Tab"  // New prop to customize delete button
+        deleteLabel="Close Tab"  
       />
     </>
   );

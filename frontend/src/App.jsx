@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import AuthComponent from './components/AuthComponent';
@@ -12,17 +12,15 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 
-// Remove the session clearing code - let the backend handle session validation
-// This was causing the session to be reset on every page load
-
 function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // State management
+  // Core state management
   const [sessions, setSessions] = useState([]);
+  const [openTabIds, setOpenTabIds] = useState([]); // Track which sessions have open tabs
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [currentMessages, setCurrentMessages] = useState([]);
   const [prompts, setPrompts] = useState([]);
@@ -30,7 +28,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  // Settings stored in localStorage
+  // Settings stored in localStorage with improved defaults
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
     geminiApiKey: '',
     openrouterApiKey: '',
@@ -45,6 +43,18 @@ function App() {
     maxTokens: 4096,
   });
 
+  // Computed values
+  const isConfigured = useMemo(() => 
+    Boolean(settings.geminiApiKey || settings.openrouterApiKey), 
+    [settings.geminiApiKey, settings.openrouterApiKey]
+  );
+
+  // Filter sessions for tabs (only show open tabs)
+  const openTabSessions = useMemo(() => 
+    sessions.filter(session => openTabIds.includes(session.id)), 
+    [sessions, openTabIds]
+  );
+
   // Check authentication on app load
   useEffect(() => {
     checkAuthStatus();
@@ -57,24 +67,38 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  // Apply theme
+  // Apply theme with improved system theme detection
   useEffect(() => {
-    const root = document.documentElement;
-    if (settings.theme === 'dark') {
-      root.classList.add('dark');
-    } else if (settings.theme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      // System theme
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      if (mediaQuery.matches) {
+    const applyTheme = () => {
+      const root = document.documentElement;
+      
+      if (settings.theme === 'dark') {
         root.classList.add('dark');
-      } else {
+      } else if (settings.theme === 'light') {
         root.classList.remove('dark');
+      } else {
+        // System theme with proper media query listener
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const updateTheme = () => {
+          if (mediaQuery.matches) {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+        };
+        
+        updateTheme();
+        mediaQuery.addEventListener('change', updateTheme);
+        
+        return () => mediaQuery.removeEventListener('change', updateTheme);
       }
-    }
+    };
+
+    const cleanup = applyTheme();
+    return cleanup;
   }, [settings.theme]);
 
+  // Authentication functions
   const checkAuthStatus = async () => {
     try {
       const response = await authAPI.checkAuth();
@@ -97,13 +121,13 @@ function App() {
     }
   };
 
-  const handleAuthSuccess = (user) => {
+  const handleAuthSuccess = useCallback((user) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
     console.log('Authentication successful for:', user.username);
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await authAPI.logout();
       
@@ -111,9 +135,11 @@ function App() {
       localStorage.removeItem('session_id');
       document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
       
+      // Reset all state
       setIsAuthenticated(false);
       setCurrentUser(null);
       setSessions([]);
+      setOpenTabIds([]);
       setActiveSessionId(null);
       setCurrentMessages([]);
       setPrompts([]);
@@ -128,11 +154,12 @@ function App() {
       setCurrentUser(null);
       toast.error('Logout failed, but you have been logged out locally');
     }
-  };
+  }, []);
 
+  // App initialization
   const initializeApp = async () => {
     try {
-      // Only configure API if we have keys
+      // Configure API if we have keys
       if (settings.geminiApiKey || settings.openrouterApiKey) {
         try {
           await configAPI.setConfig({
@@ -145,7 +172,7 @@ function App() {
         }
       }
 
-      // Try to load available models
+      // Load available models
       try {
         const modelsResponse = await configAPI.getModels();
         if (modelsResponse && modelsResponse.data) {
@@ -160,24 +187,23 @@ function App() {
         });
       }
 
-      // Load sessions and prompts with better error handling
-      await Promise.all([
+      // Load sessions and prompts with improved error handling
+      await Promise.allSettled([
         loadSessions().catch(error => {
           console.error('Failed to load sessions:', error);
-          // Continue without sessions - will create new one
         }),
         loadPrompts().catch(error => {
           console.error('Failed to load prompts:', error);
-          // Continue without prompts
         }),
       ]);
 
     } catch (error) {
       console.error('App initialization error:', error);
-      // Don't show error toast for initialization - let user proceed
+      // Continue gracefully without showing error toast
     }
   };
 
+  // Session management functions
   const loadSessions = async () => {
     try {
       const response = await sessionsAPI.getSessions();
@@ -188,6 +214,7 @@ function App() {
       if (sessionsList.length > 0) {
         const mostRecent = sessionsList[0];
         setActiveSessionId(mostRecent.id);
+        setOpenTabIds([mostRecent.id]); // Set initial open tab
         await loadSessionMessages(mostRecent.id);
       } else {
         await createNewSession();
@@ -238,6 +265,7 @@ function App() {
       const newSession = response.data;
       setSessions(prev => [newSession, ...prev]);
       setActiveSessionId(newSession.id);
+      setOpenTabIds(prev => [newSession.id, ...prev]); // Add to open tabs
       setCurrentMessages([]);
       
       return newSession;
@@ -247,20 +275,55 @@ function App() {
     }
   };
 
-  const selectSession = async (sessionId) => {
+  const selectSession = useCallback(async (sessionId) => {
     setActiveSessionId(sessionId);
+    
+    // Add to open tabs if not already open
+    setOpenTabIds(prev => {
+      if (!prev.includes(sessionId)) {
+        return [sessionId, ...prev];
+      }
+      return prev;
+    });
+    
     await loadSessionMessages(sessionId);
-  };
+  }, []);
 
-  const closeSession = async (sessionId) => {
+  // Tab management functions
+  const closeTabOnly = useCallback((sessionId) => {
+    console.log('Closing tab only for session:', sessionId);
+    
+    // Remove from open tabs only (keep in sessions list)
+    setOpenTabIds(prev => prev.filter(id => id !== sessionId));
+    
+    // If closing active session, switch to another open tab or create new
+    if (sessionId === activeSessionId) {
+      setOpenTabIds(current => {
+        const remainingOpenTabs = current.filter(id => id !== sessionId);
+        if (remainingOpenTabs.length > 0) {
+          selectSession(remainingOpenTabs[0]);
+        } else {
+          createNewSession();
+        }
+        return remainingOpenTabs;
+      });
+    }
+    
+    // No backend call, no toast - just visual tab removal
+  }, [activeSessionId, selectSession]);
+
+  const deleteSession = useCallback(async (sessionId) => {
+    console.log('Actually deleting session:', sessionId);
+    
     try {
-      // Close the tab (mark as closed) instead of deleting
+      // Close the session on backend (mark as closed/deleted)
       await sessionsAPI.closeSession(sessionId);
       
-      // Remove from sessions list (it's now closed)
+      // Remove from both sessions list and open tabs
       setSessions(prev => prev.filter(s => s.id !== sessionId));
+      setOpenTabIds(prev => prev.filter(id => id !== sessionId));
       
-      // If closing active session, switch to another or create new
+      // If deleting active session, switch to another or create new
       if (sessionId === activeSessionId) {
         const remainingSessions = sessions.filter(s => s.id !== sessionId);
         if (remainingSessions.length > 0) {
@@ -270,17 +333,18 @@ function App() {
         }
       }
       
-      toast.success("Chat tab closed. You can find it in your history.");
+      toast.success("Chat deleted from history.");
     } catch (error) {
-      console.error('Failed to close session:', error);
-      toast.error("Failed to close chat tab.");
+      console.error('Failed to delete session:', error);
+      toast.error("Failed to delete chat.");
     }
-  };
+  }, [activeSessionId, sessions, selectSession]);
 
-  const sendMessage = async (message, files = []) => {
+  // Message handling with improved error handling and UX
+  const sendMessage = useCallback(async (message, files = []) => {
     if (!message || !message.trim()) {
       toast.error("Please enter a message");
-      return;
+      return { success: false };
     }
 
     if (!activeSessionId) {
@@ -288,7 +352,7 @@ function App() {
       const newSession = await createNewSession();
       if (!newSession) {
         toast.error("Cannot send message: No active session and failed to create new one.");
-        return;
+        return { success: false };
       }
     }
 
@@ -338,7 +402,7 @@ function App() {
         ];
       });
 
-      // Update session in list
+      // Update session in list (update title, message count, etc.)
       setSessions(prev => prev.map(s => 
         s.id === activeSessionId ? response.data.session : s
       ));
@@ -370,9 +434,10 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeSessionId]);
 
-  const createPrompt = async (promptData) => {
+  // Prompt management functions
+  const createPrompt = useCallback(async (promptData) => {
     try {
       const response = await promptsAPI.createPrompt(promptData);
       setPrompts(prev => [response.data, ...prev]);
@@ -381,9 +446,9 @@ function App() {
       console.error('Failed to create prompt:', error);
       toast.error("Failed to create prompt template.");
     }
-  };
+  }, []);
 
-  const usePrompt = async (prompt) => {
+  const usePrompt = useCallback(async (prompt) => {
     try {
       // Increment usage count
       await promptsAPI.usePrompt(prompt.id);
@@ -401,9 +466,9 @@ function App() {
       console.error('Failed to use prompt:', error);
       toast.error("Failed to use prompt template.");
     }
-  };
+  }, [sendMessage]);
 
-  const deletePrompt = async (promptId) => {
+  const deletePrompt = useCallback(async (promptId) => {
     try {
       await promptsAPI.deletePrompt(promptId);
       setPrompts(prev => prev.filter(p => p.id !== promptId));
@@ -412,11 +477,11 @@ function App() {
       console.error('Failed to delete prompt:', error);
       toast.error("Failed to delete prompt template.");
     }
-  };
+  }, []);
 
-  const renameSession = async (sessionId, newTitle) => {
+  const renameSession = useCallback(async (sessionId, newTitle) => {
     try {
-      const response = await sessionsAPI.updateSession(sessionId, {
+      await sessionsAPI.updateSession(sessionId, {
         title: newTitle.trim()
       });
       
@@ -430,9 +495,10 @@ function App() {
       console.error('Failed to rename session:', error);
       toast.error("Failed to rename chat session.");
     }
-  };
+  }, []);
 
-  const updateSettings = async (newSettings) => {
+  // Settings management with improved error handling
+  const updateSettings = useCallback(async (newSettings) => {
     setSettings(newSettings);
     
     try {
@@ -460,7 +526,7 @@ function App() {
       console.error('Failed to update API configuration:', error);
       toast.error("Failed to update API configuration. Please check your backend connection.");
     }
-  };
+  }, [setSettings]);
 
   // Show loading spinner while checking authentication
   if (isCheckingAuth) {
@@ -479,18 +545,16 @@ function App() {
     return <AuthComponent onAuthSuccess={handleAuthSuccess} />;
   }
 
-  const isConfigured = Boolean(settings.geminiApiKey || settings.openrouterApiKey);
-
   return (
     <ErrorBoundary>
       <div className="h-screen flex bg-background text-foreground">
         <Sidebar
-          sessions={sessions}
+          sessions={sessions}  // Show all sessions in sidebar
           prompts={prompts}
           currentUser={currentUser}
           onSessionSelect={selectSession}
           onNewSession={createNewSession}
-          onDeleteSession={closeSession}  // This now closes tabs
+          onDeleteSession={deleteSession}  // Use deleteSession for actual deletion
           onRenameSession={renameSession} 
           onNewPrompt={createPrompt}
           onUsePrompt={usePrompt}
@@ -501,11 +565,11 @@ function App() {
         
         <div className="flex-1 flex flex-col main-content">
           <ChatTabs
-            sessions={sessions}
+            sessions={openTabSessions}  // Only show open tab sessions
             activeSessionId={activeSessionId}
             onSessionSelect={selectSession}
             onNewSession={createNewSession}
-            onCloseSession={closeSession}  // This now closes tabs
+            onCloseTab={closeTabOnly}  // Use closeTabOnly for tab closure
             onRenameSession={renameSession}
           />
           
@@ -530,7 +594,7 @@ function App() {
           availableModels={availableModels}
         />
 
-        <Toaster />
+        <Toaster position="top-right" />
       </div>
     </ErrorBoundary>
   );
