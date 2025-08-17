@@ -32,7 +32,6 @@ function App() {
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
     geminiApiKey: '',
     openrouterApiKey: '',
-    defaultClient: 'gemini',
     defaultModel: 'gemini-2.5-flash',
     temperature: 1.0,
     theme: 'system',
@@ -42,6 +41,23 @@ function App() {
     streamResponses: false,
     maxTokens: 4096,
   });
+
+  const determineClientFromModel = (model) => {
+    // Handle undefined or non-string models
+    if (!model || typeof model !== 'string') {
+      return 'gemini'; // default fallback
+    }
+    
+    const geminiModels = [
+      'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-06-17'
+    ];
+    
+    // Check if model starts with 'gemini' or matches exactly
+    if (model.startsWith('gemini') || geminiModels.includes(model)) {
+      return 'gemini';
+    }
+    return 'openrouter';
+  };
 
   // Computed values
   const isConfigured = useMemo(() => 
@@ -210,24 +226,35 @@ function App() {
       const sessionsList = response.data || [];
       setSessions(sessionsList);
       
-      // Set active session to the most recent one or create a new one
+      // FIXED: Better session initialization logic
       if (sessionsList.length > 0) {
+        // Find a session that's already open in tabs or use the most recent one
         const mostRecent = sessionsList[0];
-        setActiveSessionId(mostRecent.id);
-        setOpenTabIds([mostRecent.id]); // Set initial open tab
-        await loadSessionMessages(mostRecent.id);
+        const sessionToActivate = openTabIds.length > 0 ? 
+          sessionsList.find(s => openTabIds.includes(s.id)) || mostRecent : 
+          mostRecent;
+        
+        setActiveSessionId(sessionToActivate.id);
+        setOpenTabIds(prev => {
+          if (prev.includes(sessionToActivate.id)) {
+            return prev; // Keep existing tabs
+          } else {
+            return [sessionToActivate.id, ...prev]; // Add to tabs
+          }
+        });
+        await loadSessionMessages(sessionToActivate.id);
       } else {
-        await createNewSession();
+        // FIXED: Don't auto-create session on load, let user create when needed
+        setActiveSessionId(null);
+        setOpenTabIds([]);
+        setCurrentMessages([]);
       }
     } catch (error) {
       console.error('Failed to load sessions:', error);
       setSessions([]);
-      // Try to create a new session if none exist
-      try {
-        await createNewSession();
-      } catch (createError) {
-        console.error('Failed to create new session:', createError);
-      }
+      setActiveSessionId(null);
+      setOpenTabIds([]);
+      setCurrentMessages([]);
     }
   };
 
@@ -253,25 +280,47 @@ function App() {
     }
   };
 
-  const createNewSession = async () => {
+  const createNewSession = async (selectedModel = null) => {
     try {
-      const response = await sessionsAPI.createSession({
+      // Ensure we extract just the string value from selectedModel
+      let model;
+      if (typeof selectedModel === 'string' && selectedModel) {
+        model = selectedModel;
+      } else if (selectedModel && selectedModel.value) {
+        // If selectedModel is an object with a value property
+        model = selectedModel.value;
+      } else {
+        model = settings.defaultModel || 'gemini-2.5-flash';
+      }
+      
+      console.log('Creating new session with model:', model, 'type:', typeof model);
+      
+      // Create a clean session object without any potential circular references
+      const sessionData = {
         title: 'New Chat',
-        model: settings.defaultModel,
-        client_type: settings.defaultClient,
-        temperature: settings.temperature,
-      });
+        model: String(model), // Ensure it's a string
+        temperature: Number(settings.temperature) || 1.0, // Ensure it's a number
+      };
+      
+      const response = await sessionsAPI.createSession(sessionData);
       
       const newSession = response.data;
       setSessions(prev => [newSession, ...prev]);
-      setActiveSessionId(newSession.id);
-      setOpenTabIds(prev => [newSession.id, ...prev]); // Add to open tabs
-      setCurrentMessages([]);
       
+      // FIXED: Immediately set as active session and open tab
+      setActiveSessionId(newSession.id);
+      setOpenTabIds(prev => [newSession.id, ...prev]);
+      setCurrentMessages([]); // Clear messages for new session
+
+      // Update sessions list immediately to ensure the new session is available
+      setSessions(prev => [newSession, ...prev.filter(s => s.id !== newSession.id)]);
+
+      console.log('New session created and activated:', newSession.id);
       return newSession;
     } catch (error) {
       console.error('Failed to create new session:', error);
       toast.error("Failed to create new chat session. Please check your backend connection.");
+      return null; // Return null on failure
     }
   };
 
@@ -347,13 +396,16 @@ function App() {
       return { success: false };
     }
 
+    // Don't auto-create session here, let MessageInput handle it
     if (!activeSessionId) {
-      // Try to create a new session if none exists
-      const newSession = await createNewSession();
-      if (!newSession) {
-        toast.error("Cannot send message: No active session and failed to create new one.");
-        return { success: false };
-      }
+      toast.error("No active session. Please create a new chat first.");
+      return { success: false };
+    }
+
+    const sessionExists = sessions.find(s => s.id === activeSessionId);
+    if (!sessionExists) {
+      toast.error("Active session not found. Please create a new chat.");
+      return { success: false };
     }
 
     // Create temporary user message ID
@@ -384,7 +436,7 @@ function App() {
         }
       }
 
-      // Send message
+      // Send message to the ACTIVE session (not the current session)
       const response = await sessionsAPI.sendMessage(activeSessionId, {
         message: message.trim(),
         files: uploadedFileIds,
@@ -434,7 +486,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, setIsAuthenticated]);
 
   // Prompt management functions
   const createPrompt = useCallback(async (promptData) => {
@@ -496,6 +548,28 @@ function App() {
       toast.error("Failed to rename chat session.");
     }
   }, []);
+
+  const changeSessionModel = useCallback(async (sessionId, newModel) => {
+    try {
+      await sessionsAPI.updateSession(sessionId, { model: newModel });
+      
+      // Update sessions list
+      setSessions(prev => prev.map(s => 
+        s.id === sessionId ? { ...s, model: newModel } : s
+      ));
+      
+      toast.success(`Model changed to ${newModel}`);
+    } catch (error) {
+      console.error('Failed to change session model:', error);
+      toast.error("Failed to change model.");
+    }
+  }, []);
+
+  // Find current session object
+  const currentSession = useMemo(() => 
+    sessions.find(s => s.id === activeSessionId), 
+    [sessions, activeSessionId]
+  );
 
   // Settings management with improved error handling
   const updateSettings = useCallback(async (newSettings) => {
@@ -582,7 +656,11 @@ function App() {
             onSendMessage={sendMessage}
             isLoading={isLoading}
             disabled={!isConfigured}
-            placeholder={!isConfigured ? "Please configure your API keys in settings first..." : "Type your message..."}
+            availableModels={availableModels}
+            currentSession={currentSession}
+            onModelChange={changeSessionModel}
+            onCreateNewSession={createNewSession}
+            settings={settings}
           />
         </div>
 

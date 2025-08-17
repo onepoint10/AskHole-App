@@ -11,6 +11,18 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import mimetypes
 
+def determine_client_from_model(model: str):
+    """Determine client type based on model name"""
+    gemini_models = [
+        'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-06-17',
+        'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro', 'gemini-pro-vision'
+    ]
+
+    if any(model.startswith(gm.split('-')[0] + '-') or model == gm for gm in gemini_models):
+        return 'gemini'
+    else:
+        return 'openrouter'
+
 chat_bp = Blueprint('chat', __name__)
 
 # Global clients - will be initialized when API keys are provided
@@ -108,14 +120,18 @@ def create_session():
         return jsonify({'error': 'Authentication required'}), 401
 
     data = request.get_json()
+    model = data.get('model', 'gemini-2.5-flash')
+
+    # Auto-determine client type based on model
+    client_type = determine_client_from_model(model)
 
     session_id = str(uuid.uuid4())
     session = ChatSession(
         id=session_id,
-        user_id=current_user.id,  # Associate with current user
+        user_id=current_user.id,
         title=data.get('title', 'New Chat'),
-        model=data.get('model', 'gemini-2.5-flash'),
-        client_type=data.get('client_type', 'gemini'),
+        model=model,
+        client_type=client_type,  # Auto-determined
         temperature=data.get('temperature', 1.0),
         is_closed=False
     )
@@ -170,8 +186,8 @@ def update_session(session_id):
         session.title = data['title']
     if 'model' in data:
         session.model = data['model']
-    if 'client_type' in data:
-        session.client_type = data['client_type']
+        # Auto-update client type when model changes
+        session.client_type = determine_client_from_model(data['model'])
     if 'temperature' in data:
         session.temperature = data['temperature']
 

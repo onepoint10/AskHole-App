@@ -118,22 +118,6 @@ const SettingsDialog = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="default-client">Default Client</Label>
-                <Select
-                  value={localSettings.defaultClient || 'gemini'}
-                  onValueChange={(value) => updateSetting('defaultClient', value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select default client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="gemini">Gemini</SelectItem>
-                    <SelectItem value="openrouter">OpenRouter</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="default-model">Default Model</Label>
                 <Select
                   value={localSettings.defaultModel || ''}

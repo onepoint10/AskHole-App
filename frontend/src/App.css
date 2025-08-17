@@ -122,6 +122,19 @@
   }
 }
 
+.model-selector {
+  z-index: 50;
+}
+
+.model-selector .select-trigger {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+.model-selector [data-radix-popper-content-wrapper] {
+  z-index: 100;
+}
+
 /* Claude-style message bubbles */
 .message-user {
   @apply bg-primary text-primary-foreground rounded-2xl px-4 py-3 max-w-[80%] ml-auto;

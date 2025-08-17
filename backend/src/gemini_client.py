@@ -25,56 +25,74 @@ import threading
 
 class GeminiClient:
     """Main client for interacting with Gemini AI models"""
-    
+
     def __init__(self, api_key: str):
         """Initialize the Gemini client with API key"""
         self.client = genai.Client(api_key=api_key)
         self.chat_sessions = {}  # Store chat sessions by session_id
-        
+
     def get_available_models(self):
         """Get list of available Gemini models"""
         return [
             "gemini-2.5-flash",
-            "gemini-2.5-pro", 
+            "gemini-2.5-pro",
             "gemini-2.5-flash-lite-preview-06-17"
         ]
-    
+
     def create_chat_session(self, session_id: str, model: str):
-        """Create a new chat session"""
+        """Create a new chat session with specified model"""
         chat = self.client.chats.create(model=model)
         self.chat_sessions[session_id] = {
             'chat': chat,
             'model': model,
             'message_count': 0
         }
+        print(f"Created new chat session {session_id} with model {model}")
         return chat
-    
-    def get_chat_session(self, session_id: str, model: str):
-        """Get existing chat session or create new one"""
-        if (session_id not in self.chat_sessions or 
-            self.chat_sessions[session_id]['model'] != model):
+
+    def get_chat_session(self, session_id: str, model: str = None):
+        """Get existing chat session - model parameter ignored, session keeps original model"""
+        if session_id not in self.chat_sessions:
+            # If no model specified for new session, this shouldn't happen
+            if not model:
+                raise Exception(f"Session {session_id} not found and no model specified for creation")
             return self.create_chat_session(session_id, model)
-        return self.chat_sessions[session_id]['chat']
-    
+
+        session_data = self.chat_sessions[session_id]
+
+        # Log if someone tries to change model (but don't allow it)
+        if model and session_data['model'] != model:
+            print(
+                f"WARNING: Attempt to change model from {session_data['model']} to {model} for session {session_id}. Ignoring - session will continue with {session_data['model']}")
+
+        return session_data['chat']
+
+    def get_session_model(self, session_id: str):
+        """Get the model used by a specific session"""
+        if session_id not in self.chat_sessions:
+            return None
+        return self.chat_sessions[session_id]['model']
+
     def clear_chat_session(self, session_id: str):
         """Clear chat session"""
         if session_id in self.chat_sessions:
+            print(f"Clearing chat session {session_id}")
             del self.chat_sessions[session_id]
-    
+
     def get_chat_history(self, session_id: str):
         """Get chat history for session"""
         if session_id not in self.chat_sessions:
             return []
-        
+
         try:
             chat = self.chat_sessions[session_id]['chat']
             return chat.get_history()
         except Exception as e:
-            print(f"Error getting chat history: {e}")
+            print(f"Error getting chat history for session {session_id}: {e}")
             return []
 
     def generate_text(self, prompt: str, model: str, files=None, temperature: float = 1.0):
-        """Generate text response"""
+        """Generate text response (one-off, not part of chat session)"""
         content_parts = [prompt]
 
         if files:
@@ -96,9 +114,13 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Text generation error: {str(e)}")
 
-    def chat_message(self, session_id: str, message: str, model: str, files=None, temperature: float = 1.0):
-        """Send message in chat mode"""
+    def chat_message(self, session_id: str, message: str, model: str = None, files=None, temperature: float = 1.0):
+        """Send message in chat mode - session keeps its original model"""
+        # Get or create chat session (model only used for creation)
         chat = self.get_chat_session(session_id, model)
+
+        # Get the actual model this session is using
+        session_model = self.chat_sessions[session_id]['model']
 
         content_parts = [message]
 
@@ -109,6 +131,7 @@ class GeminiClient:
                     content_parts.append(uploaded_file)
 
         try:
+            # Send message with session's original model and configuration
             response = chat.send_message(
                 content_parts,
                 config=GenerateContentConfig(
@@ -118,13 +141,15 @@ class GeminiClient:
             )
 
             # Update message count
-            if session_id in self.chat_sessions:
-                self.chat_sessions[session_id]['message_count'] += 1
+            self.chat_sessions[session_id]['message_count'] += 1
 
+            print(f"Sent message to session {session_id} using model {session_model}")
             return response.text
+
         except Exception as e:
+            print(f"Error in chat_message for session {session_id}: {str(e)}")
             raise Exception(f"Chat message error: {str(e)}")
-    
+
     def generate_image(self, prompt: str):
         """Generate image from text prompt"""
         try:
@@ -135,10 +160,10 @@ class GeminiClient:
                     response_modalities=['TEXT', 'IMAGE']
                 )
             )
-            
+
             images = []
             description = ""
-            
+
             for part in response.candidates[0].content.parts:
                 if part.text is not None:
                     description = part.text
@@ -146,18 +171,18 @@ class GeminiClient:
                     # Convert to PIL Image
                     image = Image.open(io.BytesIO(part.inline_data.data))
                     images.append(image)
-            
+
             return images, description
         except Exception as e:
             raise Exception(f"Image generation error: {str(e)}")
-    
+
     def edit_image(self, image_path: str, instruction: str):
         """Edit image based on instruction"""
         try:
             uploaded_file = self._upload_file(image_path)
             if not uploaded_file:
                 raise Exception("Failed to upload image")
-            
+
             response = self.client.models.generate_content(
                 model="gemini-2.0-flash-preview-image-generation",
                 contents=[instruction, uploaded_file],
@@ -165,21 +190,21 @@ class GeminiClient:
                     response_modalities=['TEXT', 'IMAGE']
                 )
             )
-            
+
             images = []
             description = ""
-            
+
             for part in response.candidates[0].content.parts:
                 if part.text is not None:
                     description = part.text
                 elif part.inline_data is not None:
                     image = Image.open(io.BytesIO(part.inline_data.data))
                     images.append(image)
-            
+
             return images, description
         except Exception as e:
             raise Exception(f"Image editing error: {str(e)}")
-    
+
     async def generate_audio(self, prompt: str):
         """Generate audio from text prompt"""
         try:
@@ -187,69 +212,69 @@ class GeminiClient:
                 "response_modalities": ["AUDIO"],
                 "system_instruction": "You are a helpful assistant and answer in a friendly tone.",
             }
-            
+
             audio_data = io.BytesIO()
-            
+
             async with self.client.aio.live.connect(
-                model="gemini-2.5-flash-preview-native-audio-dialog",
-                config=config
+                    model="gemini-2.5-flash-preview-native-audio-dialog",
+                    config=config
             ) as session:
                 await session.send_realtime_input(text=prompt)
-                
+
                 wf = wave.open(audio_data, "wb")
                 wf.setnchannels(1)
                 wf.setsampwidth(2)
                 wf.setframerate(24000)
-                
+
                 async for response in session.receive():
                     if response.data is not None:
                         wf.writeframes(response.data)
-                
+
                 wf.close()
                 audio_data.seek(0)
-            
+
             return audio_data
         except Exception as e:
             raise Exception(f"Audio generation error: {str(e)}")
-    
+
     async def process_audio_input(self, audio_path: str):
         """Process audio input and return audio response"""
         try:
             # Convert audio to required format
             y, sr = librosa.load(audio_path, sr=16000)
-            
+
             buffer = io.BytesIO()
             sf.write(buffer, y, sr, format='RAW', subtype='PCM_16')
             buffer.seek(0)
             audio_bytes = buffer.read()
-            
+
             config = {
                 "response_modalities": ["AUDIO"],
                 "system_instruction": "Listen to the audio input and respond appropriately in a friendly tone.",
             }
-            
+
             output_buffer = io.BytesIO()
-            
+
             async with self.client.aio.live.connect(
-                model="gemini-2.5-flash-preview-native-audio-dialog",
-                config=config
+                    model="gemini-2.5-flash-preview-native-audio-dialog",
+                    config=config
             ) as session:
                 await session.send_realtime_input(
                     audio=types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
                 )
-                
+
                 wf = wave.open(output_buffer, "wb")
                 wf.setnchannels(1)
                 wf.setsampwidth(2)
                 wf.setframerate(24000)
-                
+
                 async for response in session.receive():
                     if response.data is not None:
                         wf.writeframes(response.data)
-                
+
                 wf.close()
                 output_buffer.seek(0)
-            
+
             return output_buffer
         except Exception as e:
             raise Exception(f"Audio processing error: {str(e)}")
@@ -257,6 +282,7 @@ class GeminiClient:
     def _upload_file(self, file_path: str):
         """Upload file to Gemini API with better file handling"""
         if not os.path.exists(file_path):
+            print(f"File not found: {file_path}")
             return None
 
         try:
@@ -506,6 +532,7 @@ class GeminiClientAsync:
 
     def generate_audio_sync(self, prompt: str, callback=None):
         """Generate audio synchronously with callback"""
+
         def run_async():
             try:
                 loop = asyncio.new_event_loop()
@@ -523,6 +550,7 @@ class GeminiClientAsync:
 
     def process_audio_sync(self, audio_path: str, callback=None):
         """Process audio synchronously with callback"""
+
         def run_async():
             try:
                 loop = asyncio.new_event_loop()

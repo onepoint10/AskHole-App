@@ -58,54 +58,62 @@ const ChatTabs = ({
       <div className="flex items-center bg-muted/30 border-b">
         <ScrollArea className="flex-1">
           <div className="flex items-center">
-            {Array.isArray(sessions) && sessions.map((session) => (
-              <div
-                key={session.id}
-                className={`group flex items-center min-w-0 max-w-48 border-r border-border/50 ${
-                  activeSessionId === session.id
-                    ? 'bg-background border-b-2 border-b-primary'
-                    : 'bg-muted/20 hover:bg-muted/40'
-                }`}
-                onContextMenu={(e) => handleContextMenu(e, session.id)}
-              >
-                {editingSessionId === session.id ? (
-                  <div className="flex items-center gap-2 px-3 py-2 min-w-0 flex-1">
-                    <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <InlineEdit
-                      value={session.title || 'New Chat'}
-                      onSave={(newTitle) => handleSaveRename(session.id, newTitle)}
-                      onCancel={handleCancelRename}
-                      className="flex-1 min-w-0"
-                    />
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => onSessionSelect(session.id)}
-                    onDoubleClick={() => handleDoubleClick(session.id)}
-                    className="flex items-center gap-2 px-3 py-2 min-w-0 flex-1 text-left"
-                  >
-                    <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <span className="truncate text-sm font-medium">
-                      {session.title || 'New Chat'}
-                    </span>
-                  </button>
-                )}
-                {sessions.length > 1 && editingSessionId !== session.id && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 mr-1"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onCloseTab(session.id);  // Close tab only, don't delete session
-                    }}
-                    title="Close tab"
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
+            {Array.isArray(sessions) && sessions.length > 0 ? (
+              sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`group flex items-center min-w-0 max-w-48 border-r border-border/50 ${
+                    activeSessionId === session.id
+                      ? 'bg-background border-b-2 border-b-primary'
+                      : 'bg-muted/20 hover:bg-muted/40'
+                  }`}
+                  onContextMenu={(e) => handleContextMenu(e, session.id)}
+                >
+                  {editingSessionId === session.id ? (
+                    <div className="flex items-center gap-2 px-3 py-2 min-w-0 flex-1">
+                      <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <InlineEdit
+                        value={session.title || 'New Chat'}
+                        onSave={(newTitle) => handleSaveRename(session.id, newTitle)}
+                        onCancel={handleCancelRename}
+                        className="flex-1 min-w-0"
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => onSessionSelect(session.id)}
+                      onDoubleClick={() => handleDoubleClick(session.id)}
+                      className="flex items-center gap-2 px-3 py-2 min-w-0 flex-1 text-left"
+                    >
+                      <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <span className="truncate text-sm font-medium">
+                        {session.title || 'New Chat'}
+                      </span>
+                    </button>
+                  )}
+                  {sessions.length > 1 && editingSessionId !== session.id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 mr-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onCloseTab(session.id);  // Close tab only, don't delete session
+                      }}
+                      title="Close tab"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              ))
+            ) : (
+              // FIXED: Show placeholder when no tabs are open
+              <div className="flex items-center gap-2 px-3 py-2 text-muted-foreground text-sm">
+                <MessageSquare className="h-4 w-4" />
+                <span>No active chats</span>
               </div>
-            ))}
+            )}
           </div>
         </ScrollArea>
         <Button
