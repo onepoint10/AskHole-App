@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { 
   Settings, 
   Database, 
@@ -11,7 +11,9 @@ import {
   Tag,
   MessageSquare,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  HelpCircle,
+  LogOut
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +34,7 @@ import InlineEdit from './InlineEdit';
 const Sidebar = ({ 
   sessions = [],
   prompts = [],
+  currentUser,
   onSessionSelect, 
   onNewSession, 
   onDeleteSession,
@@ -39,7 +42,8 @@ const Sidebar = ({
   onNewPrompt,
   onUsePrompt,
   onDeletePrompt,
-  onOpenSettings 
+  onOpenSettings,
+  onLogout
 }) => {
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
   const [editingSessionId, setEditingSessionId] = useState(null);
@@ -150,6 +154,11 @@ const Sidebar = ({
     setIsCollapsed(!isCollapsed);
   };
 
+  // Handler for documentation link
+  const handleDocumentationClick = () => {
+    window.open('http://192.168.1.138:3000/', '_blank');
+  };
+
   return (
     <div 
       className="sidebar flex flex-col h-full border-r border-sidebar-border transition-all duration-300 ease-in-out relative"
@@ -225,43 +234,69 @@ const Sidebar = ({
 
       {isCollapsed ? (
         /* Collapsed State - Icon-only buttons */
-        <div className="flex flex-col items-center p-2 space-y-2">
-          <Button
-            variant={activeTab === 'history' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('history')}
-            className="w-10 h-10 p-0"
-            title="History"
-          >
-            <History className="h-4 w-4" />
-          </Button>
-          <Button
-            variant={activeTab === 'prompts' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setActiveTab('prompts')}
-            className="w-10 h-10 p-0"
-            title="Prompts"
-          >
-            <Database className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onNewSession}
-            className="w-10 h-10 p-0 hover:bg-sidebar-accent"
-            title="New Chat"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onOpenSettings}
-            className="w-10 h-10 p-0 hover:bg-sidebar-accent"
-            title="Settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col flex-1">
+          <div className="flex flex-col items-center p-2 space-y-2 flex-1">
+            <Button
+              variant={activeTab === 'history' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('history')}
+              className="w-10 h-10 p-0"
+              title="History"
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTab === 'prompts' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('prompts')}
+              className="w-10 h-10 p-0"
+              title="Prompts"
+            >
+              <Database className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onNewSession}
+              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              title="New Chat"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onOpenSettings}
+              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* *** ADD THIS: Fixed Bottom Panel for Collapsed State *** */}
+          <div className="border-t border-sidebar-border p-2 bg-background">
+            <div className="flex flex-col items-center space-y-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDocumentationClick}
+                className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+                title="Documentation"
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLogout}
+                className="w-10 h-10 p-0 hover:bg-destructive/10 hover:text-destructive"
+                title="Log out"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -500,6 +535,38 @@ const Sidebar = ({
               </div>
             )}
           </ScrollArea>
+
+          {/* *** ADD THIS: Fixed Bottom Panel for Expanded State *** */}
+          <div className="border-t border-sidebar-border p-3 bg-background">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDocumentationClick}
+                  className="hover:bg-sidebar-accent flex-shrink-0"
+                  title="Documentation"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </Button>
+                {currentUser && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {currentUser.username}
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLogout}
+                className="hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
+                title="Log out"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="ml-1 text-xs">Log out</span>
+              </Button>
+            </div>
+          </div>
         </>
       )}
       
