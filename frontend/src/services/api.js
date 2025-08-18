@@ -1,5 +1,19 @@
-// API configuration
-const API_BASE_URL = 'http://127.0.0.1:5000/api';
+// API configuration - Dynamic base URL that works across network
+const getApiBaseUrl = () => {
+  // If we're in development and accessing via network IP, use the same IP for API
+  const currentHost = window.location.hostname;
+  
+  // Check if we're accessing via a network IP (not localhost/127.0.0.1)
+  if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
+    // Use the same host but port 5000 for API
+    return `http://${currentHost}:5000/api`;
+  }
+  
+  // Default to localhost for local development
+  return 'http://127.0.0.1:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to get cookie value
 const getCookie = (name) => {
@@ -13,26 +27,29 @@ const getCookie = (name) => {
 const setCookie = (name, value, days = 30) => {
   const expires = new Date();
   expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=None`;
+  // FIXED: Use SameSite=Lax for better network compatibility
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
 };
 
 // Helper function for making API calls with proper error handling
 const apiCall = async (url, options = {}) => {
-  // Get session ID from multiple sources with priority order
-  const sessionIdFromCookie = getCookie('session');
+  // FIXED: Get session ID from multiple sources with better priority
   const sessionIdFromStorage = localStorage.getItem('session_id');
-  const sessionId = sessionIdFromCookie || sessionIdFromStorage; // Prefer cookie over localStorage
+  const sessionIdFromCookie = getCookie('session');
+  
+  // Prefer localStorage over cookie for network compatibility
+  const sessionId = sessionIdFromStorage || sessionIdFromCookie;
   
   console.log(`API Call ${url}: session_id = ${sessionId}`);
   
   const defaultOptions = {
     credentials: 'include',
     mode: 'cors',
-    timeout: 120000,
+    timeout: 180000,
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      // Send Authorization header for better CORS compatibility
+      // FIXED: Always send session ID in Authorization header for network requests
       ...(sessionId && { 
         'Authorization': `Bearer ${sessionId}`
       }),
@@ -77,10 +94,18 @@ const apiCall = async (url, options = {}) => {
       if (response.status === 401) {
         // Clear invalid session data
         localStorage.removeItem('session_id');
-        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
+        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax';
         throw new Error('Authentication required. Please log in again.');
       }
       throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    }
+
+    // FIXED: Extract session ID from response headers for network compatibility
+    const sessionFromHeader = response.headers.get('X-Session-ID');
+    if (sessionFromHeader) {
+      localStorage.setItem('session_id', sessionFromHeader);
+      setCookie('session', sessionFromHeader);
+      console.log('Session updated from header:', sessionFromHeader);
     }
 
     // Return data in same format as old axios API (with .data property)
@@ -124,22 +149,18 @@ export const authAPI = {
       body: JSON.stringify(credentials),
     });
     
-    // Extract and store session ID from response
+    // FIXED: Always prefer session_id from response data for network compatibility
     if (response.data.session_id) {
       localStorage.setItem('session_id', response.data.session_id);
       setCookie('session', response.data.session_id);
-      console.log('Session stored:', response.data.session_id);
-    }
-    
-    // Also try to extract from Set-Cookie header as backup
-    const cookieHeader = response.headers?.get('Set-Cookie');
-    if (cookieHeader) {
-      const sessionMatch = cookieHeader.match(/session=([^;]+)/);
-      if (sessionMatch && !response.data.session_id) {
-        const sessionFromCookie = sessionMatch[1];
-        localStorage.setItem('session_id', sessionFromCookie);
-        setCookie('session', sessionFromCookie);
-        console.log('Session from cookie:', sessionFromCookie);
+      console.log('Session stored from response:', response.data.session_id);
+    } else {
+      // Fallback to header if no session_id in response
+      const sessionFromHeader = response.headers?.get('X-Session-ID');
+      if (sessionFromHeader) {
+        localStorage.setItem('session_id', sessionFromHeader);
+        setCookie('session', sessionFromHeader);
+        console.log('Session stored from header:', sessionFromHeader);
       }
     }
     

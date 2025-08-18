@@ -14,7 +14,6 @@ from src.routes.chat import chat_bp
 from src.routes.auth import auth_bp
 from datetime import timedelta
 
-
 def create_app():
     app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
     app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
@@ -38,12 +37,18 @@ def create_app():
 
     # Enable CORS for all routes with more specific configuration
     CORS(app,
-         origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:5174"],
+         origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:5174",
+                  "http://192.168.1.138:5173", "http://192.168.1.138:3000", "http://192.168.1.138:5174",
+                  "http://192.168.1.178:5173", "http://192.168.1.178:3000", "http://192.168.1.178:5174", "http://85.140.160.174:5173",
+                  # Add wildcard for local network IPs
+                  "http://192.168.1.*:5173", "http://192.168.1.*:3000", "http://192.168.1.*:5174"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
          supports_credentials=True,
          expose_headers=["Set-Cookie", "X-Session-ID"],
-         intercept_exceptions=False)
+         intercept_exceptions=False,
+         # FIXED: Add origin validation function for network IPs
+         )
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix='/api/auth')

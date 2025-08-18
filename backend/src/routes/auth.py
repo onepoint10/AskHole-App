@@ -33,7 +33,7 @@ def validate_password(password):
 
 
 def get_current_user():
-    """Get current user from session - try multiple methods"""
+    """Get current user from session - improved network compatibility"""
 
     session_id = None
 
@@ -60,6 +60,32 @@ def get_current_user():
         return None
 
     print(f"Looking up session: {session_id}")
+
+    # FIXED: Don't try to decode Flask session tokens from Authorization header
+    # If this looks like a Flask session token AND it came from cookie/Flask session, try to decode it
+    if (session_id.startswith('eyJ') and '.' in session_id and
+        (auth_header is None or not auth_header.startswith('Bearer '))):
+        print("Detected Flask session token from cookie, extracting session_id")
+        try:
+            from flask import current_app
+            from itsdangerous import URLSafeTimedSerializer
+
+            serializer = URLSafeTimedSerializer(current_app.secret_key)
+            session_data = serializer.loads(session_id)
+            actual_session_id = session_data.get('session_id')
+            print(f"Extracted actual session_id: {actual_session_id}")
+
+            if actual_session_id:
+                session_id = actual_session_id
+            else:
+                print("No session_id found in Flask session data")
+                return None
+        except Exception as e:
+            print(f"Failed to decode Flask session: {e}")
+            # Don't return None immediately - the session_id might be our custom session ID
+            print("Treating as direct session ID")
+
+    # Look up session in database
     user_session = UserSession.query.filter_by(
         id=session_id,
         is_active=True
@@ -82,41 +108,41 @@ def get_current_user():
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """Register a new user"""
+    """Register a new user with improved network compatibility"""
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
-        
+
         # Validation
         if not username or not email or not password:
             return jsonify({'error': 'All fields are required'}), 400
-        
+
         if len(username) < 3 or len(username) > 80:
             return jsonify({'error': 'Username must be 3-80 characters long'}), 400
-        
+
         if not validate_email(email):
             return jsonify({'error': 'Invalid email format'}), 400
-        
+
         valid_password, password_message = validate_password(password)
         if not valid_password:
             return jsonify({'error': password_message}), 400
-        
+
         # Check if user exists
         if User.query.filter_by(username=username).first():
             return jsonify({'error': 'Username already exists'}), 400
-        
+
         if User.query.filter_by(email=email).first():
             return jsonify({'error': 'Email already registered'}), 400
-        
+
         # Create new user
         user = User(username=username, email=email)
         user.set_password(password)
-        
+
         db.session.add(user)
         db.session.commit()
-        
+
         # Create session
         session_id = UserSession.generate_session_id()
         user_session = UserSession(
@@ -124,35 +150,41 @@ def register():
             user_id=user.id,
             expires_at=datetime.utcnow() + timedelta(days=30)
         )
-        
+
         db.session.add(user_session)
         db.session.commit()
 
-        # Set session cookie
-        session.clear()  # Clear any existing session data
+        # FIXED: Set Flask session for local compatibility
+        session.clear()
         session['session_id'] = session_id
         session['user_id'] = user.id
         session.permanent = True
 
-        # Create response and set cookie explicitly
+        # Create response and set cookie
         response = jsonify({
             'success': True,
             'message': 'Registration successful',
-            'user': user.to_dict()
+            'user': user.to_dict(),
+            'session_id': session_id  # Always send session_id in response
         })
 
-        # Set cookie with proper cross-origin settings
+        # FIXED: Set cookie with network-compatible settings
         response.set_cookie(
             'session',
-            session_id,
-            max_age=30 * 24 * 60 * 60,  # 30 days
-            httponly=False,  # Allow JavaScript access
-            secure=False,  # Set to True in production with HTTPS
-            samesite='None'  # Required for cross-origin
+            session_id,  # Send actual session_id, not Flask session
+            max_age=30 * 24 * 60 * 60,
+            httponly=False,
+            secure=False,
+            samesite='Lax',  # Changed for better compatibility
+            domain=None,
+            path='/'
         )
 
+        # Always set session ID in response header
+        response.headers['X-Session-ID'] = session_id
+
         return response, 201
-        
+
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Registration failed: {str(e)}'}), 500
@@ -160,7 +192,7 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Login user"""
+    """Login user with improved network compatibility"""
     try:
         data = request.get_json()
         username_or_email = data.get('username', '').strip()
@@ -202,7 +234,7 @@ def login():
 
         print(f"Created session {session_id} for user {user.id}")
 
-        # Set Flask session
+        # FIXED: Set Flask session for local compatibility only
         session.clear()
         session['session_id'] = session_id
         session['user_id'] = user.id
@@ -215,24 +247,24 @@ def login():
             'success': True,
             'message': 'Login successful',
             'user': user.to_dict(),
-            'session_id': session_id  # Send session_id in response
+            'session_id': session_id  # Always send session_id in response for network clients
         }
 
         response = jsonify(response_data)
 
-        # Try multiple ways to set the session cookie
+        # FIXED: Set cookie with network-compatible settings
         response.set_cookie(
             'session',
-            session_id,
+            session_id,  # Send actual session_id, not Flask session
             max_age=30 * 24 * 60 * 60,
             httponly=False,
-            secure=False,
-            samesite=None,
+            secure=False,  # Must be False for local network
+            samesite='Lax',  # Changed from None to Lax for better compatibility
             domain=None,
             path='/'
         )
 
-        # Also set as a custom header
+        # FIXED: Always set session ID in response header for network clients
         response.headers['X-Session-ID'] = session_id
 
         return response
