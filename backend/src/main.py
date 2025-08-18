@@ -37,11 +37,6 @@ def create_app():
 
     # Enable CORS for all routes with more specific configuration
     CORS(app,
-         origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000", "http://localhost:5174",
-                  "http://192.168.1.138:5173", "http://192.168.1.138:3000", "http://192.168.1.138:5174",
-                  "http://192.168.1.178:5173", "http://192.168.1.178:3000", "http://192.168.1.178:5174", "http://85.140.160.174:5173",
-                  # Add wildcard for local network IPs
-                  "http://192.168.1.*:5173", "http://192.168.1.*:3000", "http://192.168.1.*:5174"],
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
          supports_credentials=True,
