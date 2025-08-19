@@ -46,9 +46,12 @@ def set_config():
 
     try:
         if gemini_key:
-            gemini_client = GeminiClient(gemini_key)
+            # Only (re)initialize if missing or API key has changed to preserve in-memory chat sessions
+            if (gemini_client is None) or (getattr(gemini_client, 'api_key', None) != gemini_key):
+                gemini_client = GeminiClient(gemini_key)
         if openrouter_key:
-            openrouter_client = OpenRouterClient(openrouter_key)
+            if (openrouter_client is None) or (getattr(openrouter_client, 'api_key', None) != openrouter_key):
+                openrouter_client = OpenRouterClient(openrouter_key)
 
         return jsonify({
             'success': True,
@@ -323,16 +326,50 @@ def send_message(session_id):
             if session.client_type == 'gemini':
                 if not gemini_client:
                     raise Exception("Gemini client not configured. Please check your API key in settings.")
+                # Rehydrate Gemini chat session with DB history on first use if needed
+                history_messages = None
+                try:
+                    # Only build history when GeminiClient does not have this session
+                    if session_id not in getattr(gemini_client, 'chat_sessions', {}):
+                        # Load prior messages from DB and convert to Gemini format
+                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                        history_messages = []
+                        for m in prior_messages:
+                            role = 'user' if m.role == 'user' else 'model'
+                            text = m.content or ''
+                            # Minimal history element for Gemini SDK
+                            history_messages.append({
+                                'role': role,
+                                'parts': [text]
+                            })
+                except Exception as hist_err:
+                    print(f"History build error for session {session_id}: {hist_err}")
                 response_content = gemini_client.chat_message(
                     session_id=session_id,
                     message=message_content,
                     model=session.model,
                     files=file_paths,
-                    temperature=session.temperature
+                    temperature=session.temperature,
+                    history_messages=history_messages
                 )
             elif session.client_type == 'openrouter':
                 if not openrouter_client:
                     raise Exception("OpenRouter client not configured. Please check your API key in settings.")
+                # Rehydrate OpenRouter conversation history if missing
+                try:
+                    if session_id not in getattr(openrouter_client, 'chat_sessions', {}):
+                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                        history_messages = []
+                        for m in prior_messages:
+                            role = 'user' if m.role == 'user' else 'assistant'
+                            text = m.content or ''
+                            history_messages.append({
+                                'role': role,
+                                'content': [{ 'type': 'text', 'text': text }]
+                            })
+                        openrouter_client.chat_sessions[session_id] = history_messages
+                except Exception as or_hist_err:
+                    print(f"OpenRouter history build error for session {session_id}: {or_hist_err}")
                 response_content = openrouter_client.chat_message(
                     session_id=session_id,
                     message=message_content,
