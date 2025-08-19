@@ -56,7 +56,11 @@ class GeminiClient:
             # If no model specified for new session, this shouldn't happen
             if not model:
                 raise Exception(f"Session {session_id} not found and no model specified for creation")
-            return self.create_chat_session(session_id, model)
+            
+            # Create new session and restore context from database if it exists
+            chat = self.create_chat_session(session_id, model)
+            self._restore_chat_context_from_db(session_id)
+            return chat
 
         session_data = self.chat_sessions[session_id]
 
@@ -90,6 +94,70 @@ class GeminiClient:
         except Exception as e:
             print(f"Error getting chat history for session {session_id}: {e}")
             return []
+
+    def _restore_chat_context_from_db(self, session_id: str):
+        """Restore chat context from database messages when session is recreated"""
+        try:
+            # Import here to avoid circular imports
+            from src.models.chat import ChatMessage
+            
+            # Get all messages for this session from database, ordered by timestamp
+            messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            
+            if not messages:
+                print(f"No existing messages found for session {session_id}")
+                return
+                
+            print(f"Restoring {len(messages)} messages to Gemini chat session {session_id}")
+            
+            if session_id not in self.chat_sessions:
+                print(f"Error: Session {session_id} not found in chat_sessions during context restoration")
+                return
+                
+            chat = self.chat_sessions[session_id]['chat']
+            
+            # Build conversation history from database messages
+            # We'll create the conversation history manually using Gemini's content format
+            conversation_history = []
+            
+            for message in messages:
+                if message.role == 'user':
+                    conversation_history.append({
+                        'role': 'user',
+                        'parts': [{'text': message.content}]
+                    })
+                elif message.role == 'assistant':
+                    conversation_history.append({
+                        'role': 'model',  # Gemini uses 'model' instead of 'assistant'
+                        'parts': [{'text': message.content}]
+                    })
+            
+            if conversation_history:
+                try:
+                    # Create a new chat session with the restored history
+                    # This is the most reliable way to restore context in Gemini
+                    model = self.chat_sessions[session_id]['model']
+                    
+                    # Create new chat with history
+                    chat_with_history = self.client.chats.create(
+                        model=model,
+                        history=conversation_history
+                    )
+                    
+                    # Replace the chat session with the one that has history
+                    self.chat_sessions[session_id]['chat'] = chat_with_history
+                    self.chat_sessions[session_id]['message_count'] = len([m for m in messages if m.role == 'user'])
+                    
+                    print(f"Successfully restored chat context for session {session_id} with {len(conversation_history)} messages")
+                    
+                except Exception as e:
+                    print(f"Error creating chat with history for session {session_id}: {e}")
+                    # Fall back to the original empty chat session
+                    print("Continuing with empty chat session")
+            
+        except Exception as e:
+            print(f"Error restoring chat context for session {session_id}: {e}")
+            # Don't raise the exception as this is a best-effort restoration
 
     def generate_text(self, prompt: str, model: str, files=None, temperature: float = 1.0):
         """Generate text response (one-off, not part of chat session)"""

@@ -160,6 +160,8 @@ class OpenRouterClient:
             # Get or create session history
             if session_id not in self.chat_sessions:
                 self.chat_sessions[session_id] = []
+                # Try to restore context from database if session exists
+                self._restore_chat_context_from_db(session_id)
 
             messages = self.chat_sessions[session_id].copy()
 
@@ -336,6 +338,47 @@ class OpenRouterClient:
         if session_id in self.chat_sessions:
             del self.chat_sessions[session_id]
             logging.info(f"Cleared OpenRouter chat session: {session_id}")
+
+    def _restore_chat_context_from_db(self, session_id: str):
+        """Restore chat context from database messages when session is recreated"""
+        try:
+            # Import here to avoid circular imports
+            from src.models.chat import ChatMessage
+            
+            # Get all messages for this session from database, ordered by timestamp
+            messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+            
+            if not messages:
+                logging.info(f"No existing messages found for OpenRouter session {session_id}")
+                return
+                
+            logging.info(f"Restoring {len(messages)} messages to OpenRouter chat session {session_id}")
+            
+            # Build conversation history from database messages
+            conversation_history = []
+            
+            for message in messages:
+                if message.role == 'user':
+                    # For OpenRouter, we store user messages in simplified format
+                    # since we can't easily reconstruct complex content with files
+                    conversation_history.append({
+                        'role': 'user',
+                        'content': message.content
+                    })
+                elif message.role == 'assistant':
+                    conversation_history.append({
+                        'role': 'assistant',
+                        'content': message.content
+                    })
+            
+            if conversation_history:
+                # Set the restored conversation history
+                self.chat_sessions[session_id] = conversation_history
+                logging.info(f"Successfully restored OpenRouter chat context for session {session_id} with {len(conversation_history)} messages")
+            
+        except Exception as e:
+            logging.error(f"Error restoring OpenRouter chat context for session {session_id}: {e}")
+            # Don't raise the exception as this is a best-effort restoration
 
     def get_available_models(self) -> List[str]:
         """Get list of available OpenRouter models"""
