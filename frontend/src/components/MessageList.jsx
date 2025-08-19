@@ -377,7 +377,7 @@ const MessageList = ({ messages = [], isLoading = false }) => {
             }
           })
           .filter(Boolean) // Remove null messages
-        }
+        )}
         {Boolean(isLoading) && (
           <div className="fade-in flex justify-start">
             <div className="flex gap-3 max-w-[85%]">
