@@ -83,7 +83,7 @@ function App() {
     }
   }, [isAuthenticated]);
 
-  // Apply theme with improved system theme detection
+  // Apply theme with improved system theme detection and iOS-compatible listener
   useEffect(() => {
     const applyTheme = () => {
       const root = document.documentElement;
@@ -104,9 +104,13 @@ function App() {
         };
         
         updateTheme();
-        mediaQuery.addEventListener('change', updateTheme);
-        
-        return () => mediaQuery.removeEventListener('change', updateTheme);
+        if (typeof mediaQuery.addEventListener === 'function') {
+          mediaQuery.addEventListener('change', updateTheme);
+          return () => mediaQuery.removeEventListener('change', updateTheme);
+        } else if (typeof mediaQuery.addListener === 'function') {
+          mediaQuery.addListener(updateTheme);
+          return () => mediaQuery.removeListener(updateTheme);
+        }
       }
     };
 
@@ -605,7 +609,7 @@ function App() {
   // Show loading spinner while checking authentication
   if (isCheckingAuth) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
+      <div className="app-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
@@ -621,7 +625,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen flex bg-background text-foreground">
+      <div className="app-screen flex bg-background text-foreground">
         <Sidebar
           sessions={sessions}  // Show all sessions in sidebar
           prompts={prompts}
