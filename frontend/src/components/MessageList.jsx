@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -170,12 +170,12 @@ const MessageList = ({ messages, isLoading }) => {
                         tbody: ({ children }) => <tbody>{children}</tbody>,
                         tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
                         th: ({ children }) => (
-                          <th className="border border-border px-2 py-1 text-left font-semibold align-middle">
+                          <th className="bg-gray-800 border border-gray-200 px-2 py-1 text-left font-semibold align-middle">
                             {children}
                           </th>
                         ),
                         td: ({ children }) => (
-                          <td className="border border-border px-2 py-1 align-top">{children}</td>
+                          <td className="bg-gray-600 border border-gray-200 px-2 py-1 align-top">{children}</td>
                         ),
                       }}
                     >
