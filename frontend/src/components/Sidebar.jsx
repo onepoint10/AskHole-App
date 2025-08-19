@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   Settings, 
   Database, 
@@ -53,6 +53,7 @@ const Sidebar = ({
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
+  const [isHoveringLogo, setIsHoveringLogo] = useState(false);
 
   // Calculate adaptive width based on content
   const calculateAdaptiveWidth = () => {
@@ -164,31 +165,24 @@ const Sidebar = ({
       className="sidebar flex flex-col h-full border-r border-sidebar-border transition-all duration-300 ease-in-out relative"
       style={{ width: `${sidebarWidth}px` }}
     >
-      {/* Collapse Toggle Button */}
-      <div 
-        className="absolute top-6 z-10"
-        style={{ right: isCollapsed ? '-12px' : '-12px' }}
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={toggleCollapse}
-          className="h-6 w-6 p-0 rounded-full border-sidebar-border bg-background hover:bg-sidebar-accent shadow-md"
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {isCollapsed ? 
-            <ChevronRight className="h-3 w-3" /> : 
-            <ChevronLeft className="h-3 w-3" />
-          }
-        </Button>
-      </div>
-
       {/* Header */}
       <div className="p-3 border-b border-sidebar-border">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <MessageSquare className="h-4 w-4 text-primary-foreground" />
+            <div 
+              className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-primary/90 transition-colors"
+              onClick={toggleCollapse}
+              onMouseEnter={() => setIsHoveringLogo(true)}
+              onMouseLeave={() => setIsHoveringLogo(false)}
+              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isHoveringLogo ? (
+                isCollapsed ? 
+                  <ChevronRight className="h-4 w-4 text-primary-foreground" /> : 
+                  <ChevronLeft className="h-4 w-4 text-primary-foreground" />
+              ) : (
+                <MessageSquare className="h-4 w-4 text-primary-foreground" />
+              )}
             </div>
             {!isCollapsed && (
               <h2 className="text-lg font-semibold text-sidebar-foreground whitespace-nowrap">AskHole</h2>
