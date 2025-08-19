@@ -29,6 +29,8 @@ class GeminiClient:
     def __init__(self, api_key: str):
         """Initialize the Gemini client with API key"""
         self.client = genai.Client(api_key=api_key)
+        # Store API key so callers can detect changes and avoid unnecessary reinitialization
+        self.api_key = api_key
         self.chat_sessions = {}  # Store chat sessions by session_id
 
     def get_available_models(self):
@@ -50,13 +52,35 @@ class GeminiClient:
         print(f"Created new chat session {session_id} with model {model}")
         return chat
 
-    def get_chat_session(self, session_id: str, model: str = None):
-        """Get existing chat session - model parameter ignored, session keeps original model"""
+    def create_chat_session_with_history(self, session_id: str, model: str, history_messages=None):
+        """Create a new chat session and optionally preload history.
+
+        history_messages format: list of dicts like {"role": "user"|"model", "parts": ["text"]}
+        """
+        if history_messages and isinstance(history_messages, list) and len(history_messages) > 0:
+            try:
+                chat = self.client.chats.create(model=model, history=history_messages)
+            except Exception as e:
+                print(f"Failed to create chat with history, falling back without history: {e}")
+                chat = self.client.chats.create(model=model)
+        else:
+            chat = self.client.chats.create(model=model)
+
+        self.chat_sessions[session_id] = {
+            'chat': chat,
+            'model': model,
+            'message_count': 0
+        }
+        print(f"Created new chat session {session_id} with model {model} (with_history={bool(history_messages)})")
+        return chat
+
+    def get_chat_session(self, session_id: str, model: str = None, history_messages=None):
+        """Get existing chat session; if absent, create it (optionally with history)."""
         if session_id not in self.chat_sessions:
             # If no model specified for new session, this shouldn't happen
             if not model:
                 raise Exception(f"Session {session_id} not found and no model specified for creation")
-            return self.create_chat_session(session_id, model)
+            return self.create_chat_session_with_history(session_id, model, history_messages)
 
         session_data = self.chat_sessions[session_id]
 
@@ -114,10 +138,13 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Text generation error: {str(e)}")
 
-    def chat_message(self, session_id: str, message: str, model: str = None, files=None, temperature: float = 1.0):
-        """Send message in chat mode - session keeps its original model"""
+    def chat_message(self, session_id: str, message: str, model: str = None, files=None, temperature: float = 1.0, history_messages=None):
+        """Send message in chat mode - session keeps its original model.
+
+        history_messages: optional list used only when creating a new chat session.
+        """
         # Get or create chat session (model only used for creation)
-        chat = self.get_chat_session(session_id, model)
+        chat = self.get_chat_session(session_id, model, history_messages)
 
         # Get the actual model this session is using
         session_model = self.chat_sessions[session_id]['model']
