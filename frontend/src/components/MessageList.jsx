@@ -1,5 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check } from 'lucide-react';
@@ -139,6 +140,7 @@ const MessageList = ({ messages, isLoading }) => {
                 ) : (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
                       components={{
                         code: CodeBlock,
                         pre: ({ children }) => <div>{children}</div>,
@@ -158,6 +160,22 @@ const MessageList = ({ messages, isLoading }) => {
                           <a href={href} className="text-primary hover:text-primary/80 underline" target="_blank" rel="noopener noreferrer">
                             {children}
                           </a>
+                        ),
+                        table: ({ children }) => (
+                          <div className="my-3 w-full overflow-x-auto">
+                            <table className="w-full border-collapse text-sm">{children}</table>
+                          </div>
+                        ),
+                        thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+                        tbody: ({ children }) => <tbody>{children}</tbody>,
+                        tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+                        th: ({ children }) => (
+                          <th className="bg-gray-800 border border-gray-200 px-2 py-1 text-left font-semibold align-middle">
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td className="bg-gray-600 border border-gray-200 px-2 py-1 align-top">{children}</td>
                         ),
                       }}
                     >
