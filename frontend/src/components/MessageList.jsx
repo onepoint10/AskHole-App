@@ -1,32 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-
-// Import with fallbacks to prevent crashes
-let ReactMarkdown;
-let remarkGfm;
-let SyntaxHighlighter;
-let oneDark, oneLight;
-
-try {
-  ReactMarkdown = require('react-markdown').default;
-} catch (error) {
-  console.error('Failed to import ReactMarkdown:', error);
-}
-
-try {
-  remarkGfm = require('remark-gfm').default;
-} catch (error) {
-  console.error('Failed to import remarkGfm:', error);
-}
-
-try {
-  const Prism = require('react-syntax-highlighter').Prism;
-  const styles = require('react-syntax-highlighter/dist/esm/styles/prism');
-  SyntaxHighlighter = Prism;
-  oneDark = styles.oneDark;
-  oneLight = styles.oneLight;
-} catch (error) {
-  console.error('Failed to import syntax highlighter:', error);
-}
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark.js';
+import oneLight from 'react-syntax-highlighter/dist/esm/styles/prism/one-light.js';
 
 import { User, Bot, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -92,10 +69,9 @@ const MessageList = ({ messages = [], isLoading = false }) => {
   };
 
   const CodeBlock = ({ node, inline, className, children, ...props }) => {
-    try {
-      const match = /language-(\w+)/.exec(className || '');
-      
-      if (!inline && match && SyntaxHighlighter && oneDark && oneLight) {
+    const match = /language-(\w+)/.exec(className || '');
+    
+    if (!inline && match) {
         return (
           <div className="relative my-4">
             <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border">
@@ -121,25 +97,16 @@ const MessageList = ({ messages = [], isLoading = false }) => {
               {String(children).replace(/\n$/, '')}
             </SyntaxHighlighter>
           </div>
-        );
+                );
       } else {
-        // Fallback for inline code or when syntax highlighter is not available
+        // Fallback for inline code
         return (
           <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
             {children}
           </code>
         );
       }
-    } catch (error) {
-      console.error('Error rendering code block:', error);
-      // Fallback to simple code display
-      return (
-        <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-          {children}
-        </code>
-      );
-    }
-  };
+    };
 
   // If there's an error, show a simple fallback
   if (hasError) {
@@ -207,37 +174,13 @@ const MessageList = ({ messages = [], isLoading = false }) => {
                           : 'message-assistant border border-border/50'
                       }`}
                     >
-                      {(() => {
-                        try {
-                          if (message.role === 'user') {
-                            return <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>;
-                          } else {
-                            return (
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                {(() => {
-                                  try {
-                                    // Check if ReactMarkdown is available and is a function
-                                    if (!ReactMarkdown || typeof ReactMarkdown !== 'function') {
-                                      throw new Error('ReactMarkdown component not available');
-                                    }
-                                    
-                                    return (
-                                      <ReactMarkdown
-                                        remarkPlugins={(() => {
-                                          try {
-                                            // Check if remarkGfm is available and is a function
-                                            if (typeof remarkGfm === 'function') {
-                                              return [remarkGfm];
-                                            } else {
-                                              console.warn('remarkGfm plugin not available, falling back to basic markdown');
-                                              return [];
-                                            }
-                                          } catch (error) {
-                                            console.error('Error loading remarkGfm plugin:', error);
-                                            return [];
-                                          }
-                                        })()}
-                                        components={{
+                      {message.role === 'user' ? (
+                        <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
+                      ) : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
                                           code: CodeBlock,
                                           pre: ({ children }) => <div>{children}</div>,
                                           p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
@@ -248,7 +191,7 @@ const MessageList = ({ messages = [], isLoading = false }) => {
                                           ol: ({ children }) => <ol className="mb-3 pl-4 space-y-1">{children}</ol>,
                                           li: ({ children }) => <li className="text-foreground">{children}</li>,
                                           blockquote: ({ children }) => (
-                                            <blockquote className="border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
+                                            <blockquote className="bg-muted/20 border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
                                               {children}
                                             </blockquote>
                                           ),
@@ -257,87 +200,28 @@ const MessageList = ({ messages = [], isLoading = false }) => {
                                               {children}
                                             </a>
                                           ),
-                                          table: ({ children }) => {
-                                            try {
-                                              return (
-                                                <div className="my-3 w-full overflow-x-auto">
-                                                  <table className="w-full border-collapse text-sm">{children}</table>
-                                                </div>
-                                              );
-                                            } catch (error) {
-                                              console.error('Error rendering table:', error);
-                                              return <div className="my-3 p-2 bg-muted/20 rounded border">Table content</div>;
-                                            }
-                                          },
-                                          thead: ({ children }) => {
-                                            try {
-                                              return <thead className="bg-muted/50">{children}</thead>;
-                                            } catch (error) {
-                                              return <thead>{children}</thead>;
-                                            }
-                                          },
-                                          tbody: ({ children }) => {
-                                            try {
-                                              return <tbody>{children}</tbody>;
-                                            } catch (error) {
-                                              return <tbody>{children}</tbody>;
-                                            }
-                                          },
-                                          tr: ({ children }) => {
-                                            try {
-                                              return <tr className="even:bg-muted/20">{children}</tr>;
-                                            } catch (error) {
-                                              return <tr>{children}</tr>;
-                                            }
-                                          },
-                                          th: ({ children }) => {
-                                            try {
-                                              return (
-                                                <th className="bg-muted/80 border border-border px-2 py-1 text-left font-semibold align-middle">
-                                                  {children}
-                                                </th>
-                                              );
-                                            } catch (error) {
-                                              return <th className="px-2 py-1 text-left font-semibold">{children}</th>;
-                                            }
-                                          },
-                                          td: ({ children }) => {
-                                            try {
-                                              return (
-                                                <td className="bg-muted/40 border border-border px-2 py-1 align-top">{children}</td>
-                                              );
-                                            } catch (error) {
-                                              return <td className="px-2 py-1 align-top">{children}</td>;
-                                            }
-                                          },
+                                          table: ({ children }) => (
+                                            <div className="my-3 w-full overflow-x-auto">
+                                              <table className="w-full border-collapse text-sm">{children}</table>
+                                            </div>
+                                          ),
+                                          thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+                                          tbody: ({ children }) => <tbody>{children}</tbody>,
+                                          tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+                                          th: ({ children }) => (
+                                            <th className="bg-muted/80 border border-border px-2 py-1 text-left font-semibold align-middle">
+                                              {children}
+                                            </th>
+                                          ),
+                                          td: ({ children }) => (
+                                            <td className="bg-muted/40 border border-border px-2 py-1 align-top">{children}</td>
+                                          ),
                                         }}
                                       >
                                         {message.content}
                                       </ReactMarkdown>
-                                    );
-                                  } catch (error) {
-                                    console.error('Error rendering markdown:', error);
-                                    // Fallback to plain text rendering
-                                    return (
-                                      <div className="whitespace-pre-wrap leading-relaxed">
-                                        {message.content}
-                                      </div>
-                                    );
-                                  }
-                                })()}
-                              </div>
-                            );
-                          }
-                        } catch (error) {
-                          console.error('Error rendering message:', error);
-                          return (
-                            <div className="p-3 bg-muted/20 rounded border">
-                              <p className="text-sm text-muted-foreground">Error rendering message</p>
-                              <pre className="mt-2 text-xs overflow-auto">{JSON.stringify(message, null, 2)}</pre>
-                            </div>
-                          );
-                        }
-                      })()}
+                        </div>
+                      )}
                     </div>
                     {message.role === 'assistant' && (
                       <Button
