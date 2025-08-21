@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
+import PromptDialog from './components/PromptDialog';
 
 function App() {
   // Authentication state
@@ -27,6 +28,8 @@ function App() {
   const [availableModels, setAvailableModels] = useState({ gemini: [], openrouter: [] });
   const [isLoading, setIsLoading] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
+  const [promptInitialContent, setPromptInitialContent] = useState('');
   
   // Settings stored in localStorage with improved defaults
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
@@ -602,6 +605,11 @@ function App() {
     }
   }, [setSettings]);
 
+  const openPromptDialogWithContent = useCallback((content) => {
+    setPromptInitialContent(content || '');
+    setIsPromptDialogOpen(true);
+  }, []);
+
   // Show loading spinner while checking authentication
   if (isCheckingAuth) {
     return (
@@ -650,6 +658,7 @@ function App() {
           <MessageList
             messages={currentMessages}
             isLoading={isLoading}
+            onAddToPrompt={openPromptDialogWithContent}
           />
           
           <MessageInput
@@ -670,6 +679,16 @@ function App() {
           settings={settings}
           onUpdateSettings={updateSettings}
           availableModels={availableModels}
+        />
+
+        <PromptDialog
+          isOpen={isPromptDialogOpen}
+          onClose={() => setIsPromptDialogOpen(false)}
+          initialContent={promptInitialContent}
+          onCreate={async (data) => {
+            await createPrompt(data);
+            setIsPromptDialogOpen(false);
+          }}
         />
 
         <Toaster position="top-right" />
