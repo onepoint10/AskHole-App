@@ -65,7 +65,7 @@ const Sidebar = ({
     sessions.forEach(session => {
       if (session.model) {
         // Estimate width needed: base width + text length * character width + padding for buttons
-        const estimatedWidth = 200 + session.model.length * 8 + 100; // 100px for buttons
+        const estimatedWidth = 200 + session.model.length * 8 + 20; // 20px for buttons
         maxWidth = Math.max(maxWidth, Math.min(estimatedWidth, 500)); // Cap at 500px
       }
     });
@@ -268,7 +268,7 @@ const Sidebar = ({
             </Button>
           </div>
           
-          {/* *** ADD THIS: Fixed Bottom Panel for Collapsed State *** */}
+          {/* Fixed Bottom Panel for Collapsed State */}
           <div className="border-t border-sidebar-border p-2 bg-background">
             <div className="flex flex-col items-center space-y-2">
               <Button
@@ -295,7 +295,7 @@ const Sidebar = ({
       ) : (
         <>
           {/* Search */}
-          <div className="px-3 pb-3 border-b border-sidebar-border">
+          <div className="px-2 py-3 border-b border-sidebar-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -308,7 +308,7 @@ const Sidebar = ({
           </div>
 
           {/* Content */}
-          <ScrollArea className="flex-1 custom-scrollbar">
+          <ScrollArea className="flex-1 custom-scrollbar message-scroll-area">
             {activeTab === 'history' && (
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
