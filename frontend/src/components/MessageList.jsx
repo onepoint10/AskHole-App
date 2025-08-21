@@ -1,6 +1,5 @@
 ﻿import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check } from 'lucide-react';
@@ -13,6 +12,35 @@ const MessageList = ({ messages, isLoading }) => {
   const messagesEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
   const [isDark, setIsDark] = useState(false);
+  const [remarkPlugins, setRemarkPlugins] = useState([]);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  useEffect(() => {
+    // Load different plugins based on device type
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
+    setIsMobileDevice(isMobile);
+    
+    if (!isMobile) {
+      // Desktop: Load remark-gfm for full GFM support
+      import('remark-gfm')
+        .then((mod) => {
+          setRemarkPlugins([mod.default]);
+        })
+        .catch(() => {
+          // Ignore failures silently; markdown will render without GFM
+        });
+    } else {
+      // Mobile: Load remark-breaks for line break handling
+      import('remark-breaks')
+        .then((mod) => {
+          setRemarkPlugins([mod.default]);
+        })
+        .catch(() => {
+          // Ignore failures silently; markdown will render without breaks plugin
+        });
+    }
+  }, []);
 
   // Function to scroll to bottom
   const scrollToBottom = () => {
@@ -64,6 +92,82 @@ const MessageList = ({ messages, isLoading }) => {
     } catch (err) {
       console.error('Failed to copy text: ', err);
     }
+  };
+
+  // Preprocess markdown for mobile to handle tables manually
+  const preprocessMarkdownForMobile = (markdown) => {
+    if (!isMobileDevice) return markdown;
+    
+    // Simple table detection and conversion for mobile
+    const tableRegex = /^\|(.+)\|$/gm;
+    const lines = markdown.split('\n');
+    let processedLines = [];
+    let inTable = false;
+    let tableData = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (tableRegex.test(line)) {
+        if (!inTable) {
+          inTable = true;
+          tableData = [];
+        }
+        // Extract table row data
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+        tableData.push(cells);
+      } else if (inTable && line.trim() === '') {
+        // End of table, convert to mobile-friendly format
+        if (tableData.length > 0) {
+          const mobileTable = convertTableForMobile(tableData);
+          processedLines.push(mobileTable);
+          tableData = [];
+        }
+        inTable = false;
+        processedLines.push(line);
+      } else if (inTable && /^[-|\s:]+$/.test(line)) {
+        // Skip table separator line
+        continue;
+      } else {
+        if (inTable && tableData.length > 0) {
+          // End of table without empty line
+          const mobileTable = convertTableForMobile(tableData);
+          processedLines.push(mobileTable);
+          tableData = [];
+          inTable = false;
+        }
+        processedLines.push(line);
+      }
+    }
+    
+    // Handle table at end of content
+    if (inTable && tableData.length > 0) {
+      const mobileTable = convertTableForMobile(tableData);
+      processedLines.push(mobileTable);
+    }
+    
+    return processedLines.join('\n');
+  };
+
+  const convertTableForMobile = (tableData) => {
+    if (tableData.length === 0) return '';
+    
+    const headers = tableData[0];
+    const rows = tableData.slice(1);
+    
+    let mobileFormat = '';
+    
+    rows.forEach((row, rowIndex) => {
+      if (rowIndex > 0) mobileFormat += '\n---\n\n';
+      
+      headers.forEach((header, cellIndex) => {
+        if (cellIndex < row.length) {
+          mobileFormat += `**${header}:** ${row[cellIndex]}\n\n`;
+        }
+      });
+    });
+    
+    return mobileFormat;
   };
 
   const CodeBlock = ({ node, inline, className, children, ...props }) => {
@@ -140,7 +244,7 @@ const MessageList = ({ messages, isLoading }) => {
                 ) : (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
+                      remarkPlugins={remarkPlugins}
                       components={{
                         code: CodeBlock,
                         pre: ({ children }) => <div>{children}</div>,
@@ -179,7 +283,7 @@ const MessageList = ({ messages, isLoading }) => {
                         ),
                       }}
                     >
-                      {message.content}
+                      {preprocessMarkdownForMobile(message.content)}
                     </ReactMarkdown>
                   </div>
                 )}
