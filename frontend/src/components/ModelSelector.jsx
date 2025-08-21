@@ -28,7 +28,6 @@ const ModelSelector = ({
       >
         <SelectTrigger className="w-64 h-8 text-xs bg-background/50 border-border/50 hover:bg-background/80 transition-colors">
           <SelectValue placeholder="Choose model..." />
-          <ChevronUp className="h-3 w-3 opacity-50" />
         </SelectTrigger>
         <SelectContent align="start" side="top" className="w-64 max-h-48">
           {allModels.map((model) => (

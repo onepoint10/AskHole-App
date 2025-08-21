@@ -183,7 +183,7 @@ const MessageInput = ({
           
           {/* Model selector - bottom left corner, only shown for new/empty chats */}
           {shouldShowModelSelector && !disabled && (
-            <div className="absolute -bottom-12 left-0">
+            <div className="py-3 absolute left-0">
               <ModelSelector
                 availableModels={availableModels}
                 selectedModel={selectedModel}
