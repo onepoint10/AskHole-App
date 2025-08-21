@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -6,8 +6,9 @@ import { User, Bot, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
+import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 
-const MessageList = ({ messages, isLoading }) => {
+const MessageList = ({ messages, isLoading, onAddToPrompt }) => {
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -232,16 +233,25 @@ const MessageList = ({ messages, isLoading }) => {
                   <Bot className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
-              <div
-                className={`group relative ${
-                  message.role === 'user'
-                    ? 'message-user'
-                    : 'message-assistant border border-border/50'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
-                ) : (
+              {message.role === 'user' ? (
+                <CM>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      className={`group relative message-user`}
+                    >
+                      <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => onAddToPrompt && onAddToPrompt(message.content)}>
+                      Add to prompt database
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </CM>
+              ) : (
+                <div
+                  className={`group relative message-assistant border border-border/50`}
+                >
                   <div className="prose prose-sm dark:prose-invert max-w-none">
                     <ReactMarkdown
                       remarkPlugins={remarkPlugins}
@@ -286,30 +296,30 @@ const MessageList = ({ messages, isLoading }) => {
                       {preprocessMarkdownForMobile(message.content)}
                     </ReactMarkdown>
                   </div>
-                )}
-                {message.role === 'assistant' && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={() => copyToClipboard(message.content, message.id)}
-                  >
-                    {copiedId === message.id ? (
-                      <Check className="h-3 w-3 text-green-500" />
-                    ) : (
-                      <Copy className="h-3 w-3" />
-                    )}
-                  </Button>
-                )}
-                {message.files && message.files.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-border/30">
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <span>📎</span>
-                      <span>{message.files.length} file(s) attached</span>
+                  {message.role === 'assistant' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => copyToClipboard(message.content, message.id)}
+                    >
+                      {copiedId === message.id ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  )}
+                  {message.files && message.files.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-border/30">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span>📎</span>
+                        <span>{message.files.length} file(s) attached</span>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
