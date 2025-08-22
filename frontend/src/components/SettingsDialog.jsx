@@ -6,7 +6,8 @@ import {
   Sliders,
   Moon,
   Sun,
-  Monitor
+  Monitor,
+  User
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import DeviceManager from './DeviceManager';
 
 const SettingsDialog = ({ 
   isOpen, 
@@ -57,7 +59,7 @@ const SettingsDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
@@ -66,11 +68,12 @@ const SettingsDialog = ({
         </DialogHeader>
 
         <Tabs defaultValue="api" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="api">API Keys</TabsTrigger>
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="account">Account</TabsTrigger>
           </TabsList>
 
           <TabsContent value="api" className="space-y-4">
@@ -104,7 +107,7 @@ const SettingsDialog = ({
                   placeholder="Enter your OpenRouter API key"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Get your API key from OpenRouter.ai
+                  Get your API key from OpenRouter
                 </p>
               </div>
             </div>
@@ -120,42 +123,50 @@ const SettingsDialog = ({
               <div className="space-y-2">
                 <Label htmlFor="default-model">Default Model</Label>
                 <Select
-                  value={localSettings.defaultModel || ''}
+                  value={localSettings.defaultModel || 'gemini-2.5-flash'}
                   onValueChange={(value) => updateSetting('defaultModel', value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select default model" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableModels.gemini?.map((model) => (
-                      <SelectItem key={model} value={model}>
-                        {model} (Gemini)
-                      </SelectItem>
-                    ))}
-                    {availableModels.openrouter?.map((model) => (
-                      <SelectItem key={model} value={model}>
-                        {model} (OpenRouter)
-                      </SelectItem>
-                    ))}
+                    {availableModels.gemini && availableModels.gemini.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">Gemini Models</div>
+                        {availableModels.gemini.map((model) => (
+                          <SelectItem key={model} value={model}>
+                            {model}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    )}
+                    {availableModels.openrouter && availableModels.openrouter.length > 0 && (
+                      <div>
+                        <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">OpenRouter Models</div>
+                        {availableModels.openrouter.map((model) => (
+                          <SelectItem key={model} value={model}>
+                            {model}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="temperature">
-                  Temperature: {localSettings.temperature || 1.0}
-                </Label>
+                <Label htmlFor="temperature">Temperature: {localSettings.temperature || 1.0}</Label>
                 <Slider
                   id="temperature"
                   min={0}
                   max={2}
                   step={0.1}
                   value={[localSettings.temperature || 1.0]}
-                  onValueChange={(value) => updateSetting('temperature', value[0])}
+                  onValueChange={([value]) => updateSetting('temperature', value)}
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Controls randomness in responses. Lower values are more focused, higher values are more creative.
+                  Controls randomness in responses (0 = focused, 2 = creative)
                 </p>
               </div>
             </div>
@@ -278,6 +289,17 @@ const SettingsDialog = ({
                   Maximum number of tokens in AI responses
                 </p>
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="account" className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 mb-4">
+                <User className="h-4 w-4" />
+                <h3 className="text-lg font-medium">Account Settings</h3>
+              </div>
+              
+              <DeviceManager />
             </div>
           </TabsContent>
         </Tabs>

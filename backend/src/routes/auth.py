@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from src.database import db
 from src.models.user import User, UserSession
+from src.utils.device_utils import get_device_info_from_request
 from datetime import datetime, timedelta
 import re
 
@@ -33,7 +34,7 @@ def validate_password(password):
 
 
 def get_current_user():
-    """Get current user from session - improved network compatibility"""
+    """Get current user from session - improved network compatibility with device tracking"""
 
     session_id = None
 
@@ -102,18 +103,31 @@ def get_current_user():
         session.clear()
         return None
 
+    # Update last activity
+    user_session.update_activity()
+    
+    # Check if session should be renewed
+    if user_session.should_renew():
+        print("Renewing session")
+        if user_session.is_remember_me:
+            user_session.renew_session(days=90)  # 90 days for remember me
+        else:
+            user_session.renew_session(days=30)  # 30 days for regular sessions
+        db.session.commit()
+
     print(f"Found user: {user_session.user.username}")
     return user_session.user
 
 
 @auth_bp.route('/register', methods=['POST'])
 def register():
-    """Register a new user with improved network compatibility"""
+    """Register a new user with improved network compatibility and device tracking"""
     try:
         data = request.get_json()
         username = data.get('username', '').strip()
         email = data.get('email', '').strip().lower()
         password = data.get('password', '')
+        remember_me = data.get('remember_me', False)
 
         # Validation
         if not username or not email or not password:
@@ -143,12 +157,23 @@ def register():
         db.session.add(user)
         db.session.commit()
 
-        # Create session
+        # Get device information
+        device_info = get_device_info_from_request()
+        
+        # Create session with device tracking
         session_id = UserSession.generate_session_id()
+        session_duration = 90 if remember_me else 30
+        
         user_session = UserSession(
             id=session_id,
             user_id=user.id,
-            expires_at=datetime.utcnow() + timedelta(days=30)
+            expires_at=datetime.utcnow() + timedelta(days=session_duration),
+            device_id=device_info['device_id'],
+            device_name=device_info['device_name'],
+            device_type=device_info['device_type'],
+            user_agent=device_info['user_agent'],
+            ip_address=device_info['ip_address'],
+            is_remember_me=remember_me
         )
 
         db.session.add(user_session)
@@ -165,14 +190,20 @@ def register():
             'success': True,
             'message': 'Registration successful',
             'user': user.to_dict(),
-            'session_id': session_id  # Always send session_id in response
+            'session_id': session_id,  # Always send session_id in response
+            'device_info': {
+                'device_id': device_info['device_id'],
+                'device_name': device_info['device_name'],
+                'device_type': device_info['device_type']
+            }
         })
 
         # FIXED: Set cookie with network-compatible settings
+        cookie_max_age = 90 * 24 * 60 * 60 if remember_me else 30 * 24 * 60 * 60
         response.set_cookie(
             'session',
             session_id,  # Send actual session_id, not Flask session
-            max_age=30 * 24 * 60 * 60,
+            max_age=cookie_max_age,
             httponly=False,
             secure=False,
             samesite='Lax',  # Changed for better compatibility
@@ -192,11 +223,12 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Login user with improved network compatibility"""
+    """Login user with improved network compatibility and device tracking"""
     try:
         data = request.get_json()
         username_or_email = data.get('username', '').strip()
         password = data.get('password', '')
+        remember_me = data.get('remember_me', False)
 
         print(f"Login attempt for: {username_or_email}")
 
@@ -215,24 +247,56 @@ def login():
         if not user.is_active:
             return jsonify({'error': 'Account is disabled'}), 403
 
-        # Deactivate old sessions
-        UserSession.query.filter_by(
+        # Get device information
+        device_info = get_device_info_from_request()
+        
+        # Check if there's an existing session for this device
+        existing_session = UserSession.query.filter_by(
             user_id=user.id,
+            device_id=device_info['device_id'],
             is_active=True
-        ).update({'is_active': False})
+        ).first()
+        
+        if existing_session:
+            # Update existing session instead of creating new one
+            print(f"Found existing session for device: {existing_session.id}")
+            existing_session.update_activity()
+            
+            # Renew if it's a remember me session or if it's close to expiry
+            if existing_session.is_remember_me or existing_session.should_renew():
+                session_duration = 90 if existing_session.is_remember_me else 30
+                existing_session.renew_session(days=session_duration)
+            
+            db.session.commit()
+            session_id = existing_session.id
+        else:
+            # Deactivate old sessions for this user (but keep remember me sessions)
+            UserSession.query.filter_by(
+                user_id=user.id,
+                is_active=True,
+                is_remember_me=False
+            ).update({'is_active': False})
 
-        # Create new session
-        session_id = UserSession.generate_session_id()
-        user_session = UserSession(
-            id=session_id,
-            user_id=user.id,
-            expires_at=datetime.utcnow() + timedelta(days=30)
-        )
+            # Create new session
+            session_id = UserSession.generate_session_id()
+            session_duration = 90 if remember_me else 30
+            
+            user_session = UserSession(
+                id=session_id,
+                user_id=user.id,
+                expires_at=datetime.utcnow() + timedelta(days=session_duration),
+                device_id=device_info['device_id'],
+                device_name=device_info['device_name'],
+                device_type=device_info['device_type'],
+                user_agent=device_info['user_agent'],
+                ip_address=device_info['ip_address'],
+                is_remember_me=remember_me
+            )
 
-        db.session.add(user_session)
-        db.session.commit()
+            db.session.add(user_session)
+            db.session.commit()
 
-        print(f"Created session {session_id} for user {user.id}")
+        print(f"Using session {session_id} for user {user.id}")
 
         # FIXED: Set Flask session for local compatibility only
         session.clear()
@@ -247,16 +311,22 @@ def login():
             'success': True,
             'message': 'Login successful',
             'user': user.to_dict(),
-            'session_id': session_id  # Always send session_id in response for network clients
+            'session_id': session_id,  # Always send session_id in response for network clients
+            'device_info': {
+                'device_id': device_info['device_id'],
+                'device_name': device_info['device_name'],
+                'device_type': device_info['device_type']
+            }
         }
 
         response = jsonify(response_data)
 
         # FIXED: Set cookie with network-compatible settings
+        cookie_max_age = 90 * 24 * 60 * 60 if remember_me else 30 * 24 * 60 * 60
         response.set_cookie(
             'session',
             session_id,  # Send actual session_id, not Flask session
-            max_age=30 * 24 * 60 * 60,
+            max_age=cookie_max_age,
             httponly=False,
             secure=False,  # Must be False for local network
             samesite='Lax',  # Changed from None to Lax for better compatibility
@@ -315,6 +385,66 @@ def check_auth():
         'authenticated': user is not None,
         'user': user.to_dict() if user else None
     })
+
+@auth_bp.route('/devices', methods=['GET'])
+def get_user_devices():
+    """Get all active sessions/devices for the current user"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Get all active sessions for the user
+    sessions = UserSession.query.filter_by(
+        user_id=user.id,
+        is_active=True
+    ).order_by(UserSession.last_used.desc()).all()
+    
+    return jsonify({
+        'devices': [session.to_dict() for session in sessions]
+    })
+
+@auth_bp.route('/devices/<session_id>', methods=['DELETE'])
+def revoke_device(session_id):
+    """Revoke a specific device session"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    # Find the session and ensure it belongs to the current user
+    user_session = UserSession.query.filter_by(
+        id=session_id,
+        user_id=user.id,
+        is_active=True
+    ).first()
+    
+    if not user_session:
+        return jsonify({'error': 'Session not found'}), 404
+    
+    # Deactivate the session
+    user_session.is_active = False
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'Device session revoked'})
+
+@auth_bp.route('/devices/revoke-all', methods=['POST'])
+def revoke_all_devices():
+    """Revoke all device sessions except the current one"""
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    current_session_id = session.get('session_id')
+    
+    # Deactivate all other sessions for this user
+    UserSession.query.filter(
+        UserSession.user_id == user.id,
+        UserSession.is_active == True,
+        UserSession.id != current_session_id
+    ).update({'is_active': False})
+    
+    db.session.commit()
+    
+    return jsonify({'success': True, 'message': 'All other device sessions revoked'})
 
 @auth_bp.route('/debug-session', methods=['GET'])
 def debug_session_info():

@@ -1,5 +1,5 @@
 from src.database import db
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 import secrets
 
@@ -46,14 +46,46 @@ class UserSession(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     
+    # Device tracking fields
+    device_id = db.Column(db.String(128), nullable=True)  # Unique device identifier
+    device_name = db.Column(db.String(255), nullable=True)  # Human-readable device name
+    device_type = db.Column(db.String(50), nullable=True)  # mobile, desktop, tablet
+    user_agent = db.Column(db.Text, nullable=True)  # Browser user agent
+    ip_address = db.Column(db.String(45), nullable=True)  # IP address
+    is_remember_me = db.Column(db.Boolean, default=False)  # Remember me token
+    last_used = db.Column(db.DateTime, default=datetime.utcnow)  # Last activity timestamp
+    
     @staticmethod
     def generate_session_id():
         """Generate secure session ID"""
         return secrets.token_urlsafe(48)
     
+    @staticmethod
+    def generate_device_id():
+        """Generate a unique device identifier"""
+        return secrets.token_urlsafe(32)
+    
     def is_expired(self):
         """Check if session is expired"""
         return datetime.utcnow() > self.expires_at
+    
+    def should_renew(self):
+        """Check if session should be renewed (within 7 days of expiry)"""
+        if self.is_remember_me:
+            # Remember me tokens get renewed if within 7 days of expiry
+            return (self.expires_at - datetime.utcnow()).days <= 7
+        else:
+            # Regular sessions get renewed if within 1 day of expiry
+            return (self.expires_at - datetime.utcnow()).days <= 1
+    
+    def renew_session(self, days=30):
+        """Renew session expiration"""
+        self.expires_at = datetime.utcnow() + timedelta(days=days)
+        self.last_used = datetime.utcnow()
+    
+    def update_activity(self):
+        """Update last activity timestamp"""
+        self.last_used = datetime.utcnow()
     
     def to_dict(self):
         return {
@@ -61,5 +93,10 @@ class UserSession(db.Model):
             'user_id': self.user_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
-            'is_active': self.is_active
+            'is_active': self.is_active,
+            'device_id': self.device_id,
+            'device_name': self.device_name,
+            'device_type': self.device_type,
+            'is_remember_me': self.is_remember_me,
+            'last_used': self.last_used.isoformat() if self.last_used else None
         }
