@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -16,6 +16,32 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+
+  // Helper function to get file URL
+  const getFileUrl = useCallback((file) => {
+    if (typeof file === 'string') {
+      return file;
+    }
+    if (file.id) {
+      return `/api/files/${file.id}/download`;
+    }
+    if (file.url || file.src) {
+      return file.url || file.src;
+    }
+    // Fallback for File objects (during upload)
+    if (file instanceof File) {
+      return URL.createObjectURL(file);
+    }
+    return null;
+  }, []);
+
+  // Helper function to get file display name
+  const getFileDisplayName = useCallback((file) => {
+    if (typeof file === 'string') {
+      return file;
+    }
+    return file.original_filename || file.filename || file.name || 'Unknown file';
+  }, []);
 
   // Initialize plugins and device detection
   useEffect(() => {
@@ -393,15 +419,15 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                           {/* Separate images and other files */}
                           {(() => {
                             const images = message.files.filter(file => {
-                              const fileName = typeof file === 'string' ? file : file.name || '';
+                              const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
                               return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
-                                     (file.type && file.type.startsWith('image/'));
+                                     (file.mime_type && file.mime_type.startsWith('image/'));
                             });
                             
                             const otherFiles = message.files.filter(file => {
-                              const fileName = typeof file === 'string' ? file : file.name || '';
+                              const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
                               return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
-                                     !(file.type && file.type.startsWith('image/'));
+                                     !(file.mime_type && file.mime_type.startsWith('image/'));
                             });
 
                             return (
@@ -417,8 +443,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                       {images.map((image, index) => (
                                         <div key={`image-${index}`} className="relative group">
                                           <img
-                                            src={typeof image === 'string' ? image : (image.url || image.src || URL.createObjectURL(image))}
-                                            alt={typeof image === 'string' ? image : (image.name || `Image ${index + 1}`)}
+                                            src={getFileUrl(image)}
+                                            alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
                                             className="max-w-full h-auto max-h-48 rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                             onClick={(e) => {
                                               // Open image in new tab on click
@@ -431,7 +457,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                             }}
                                           />
                                           <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
-                                            {typeof image === 'string' ? image.split('/').pop() : image.name || `Image ${index + 1}`}
+                                            {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
                                           </div>
                                         </div>
                                       ))}
@@ -451,11 +477,11 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                         <span 
                                           key={`file-${index}`}
                                           className="inline-flex items-center gap-1 px-2 py-1 bg-primary-foreground/10 rounded text-xs text-primary-foreground/90 border border-primary-foreground/20"
-                                          title={file.name || file}
+                                          title={getFileDisplayName(file)}
                                         >
                                           <span>📄</span>
                                           <span className="max-w-[200px] truncate">
-                                            {typeof file === 'string' ? file : file.name || 'Unknown file'}
+                                            {getFileDisplayName(file)}
                                           </span>
                                         </span>
                                       ))}
@@ -510,15 +536,15 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                           <div className="mt-3 pt-3 border-t border-border/30">
                             {(() => {
                               const images = message.files.filter(file => {
-                                const fileName = typeof file === 'string' ? file : file.name || '';
+                                const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
                                 return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
-                                       (file.type && file.type.startsWith('image/'));
+                                       (file.mime_type && file.mime_type.startsWith('image/'));
                               });
                               
                               const otherFiles = message.files.filter(file => {
-                                const fileName = typeof file === 'string' ? file : file.name || '';
+                                const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
                                 return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
-                                       !(file.type && file.type.startsWith('image/'));
+                                       !(file.mime_type && file.mime_type.startsWith('image/'));
                               });
 
                               return (
@@ -534,8 +560,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                         {images.map((image, index) => (
                                           <div key={`image-${index}`} className="relative group">
                                             <img
-                                              src={typeof image === 'string' ? image : (image.url || image.src || URL.createObjectURL(image))}
-                                              alt={typeof image === 'string' ? image : (image.name || `Image ${index + 1}`)}
+                                              src={getFileUrl(image)}
+                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
                                               className="max-w-full h-auto max-h-48 rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity"
                                               onClick={(e) => {
                                                 const imgSrc = e.target.src;
@@ -546,7 +572,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                               }}
                                             />
                                             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
-                                              {typeof image === 'string' ? image.split('/').pop() : image.name || `Image ${index + 1}`}
+                                              {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
                                             </div>
                                           </div>
                                         ))}
@@ -556,21 +582,21 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
                                   {/* Display other files */}
                                   {otherFiles.length > 0 && (
-                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-border/20' : ''}`}>
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
+                                      {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
                                         <span>📎</span>
-                                        <span>Referenced files:</span>
-                                      </div>
+                                        <span>Attached files:</span>
+                                      </div>*/}
                                       <div className="flex flex-wrap gap-1">
                                         {otherFiles.map((file, index) => (
                                           <span 
                                             key={`file-${index}`}
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-muted/30 rounded text-xs text-muted-foreground border border-border/30"
-                                            title={file.name || file}
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-primary-foreground/10 rounded text-xs text-primary-foreground/90 border border-primary-foreground/20"
+                                            title={getFileDisplayName(file)}
                                           >
                                             <span>📄</span>
                                             <span className="max-w-[200px] truncate">
-                                              {typeof file === 'string' ? file : file.name || 'Unknown file'}
+                                              {getFileDisplayName(file)}
                                             </span>
                                           </span>
                                         ))}
@@ -582,25 +608,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                             })()}
                           </div>
                         )}
-
-                        {/* Copy button for assistant messages - positioned inside the message */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            copyToClipboard(message.content, message.id);
-                          }}
-                          title="Copy message"
-                        >
-                          {copiedId === message.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5 transition-transform hover:scale-110" />
-                          )}
-                        </Button>
                       </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
@@ -608,6 +615,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                         <Copy className="h-4 w-4 mr-2" />
                         Copy
                       </ContextMenuItem>
+                      {onAddToPrompt && (
+                        <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
+                          <Database className="h-4 w-4 mr-2" />
+                          Add to database
+                        </ContextMenuItem>
+                      )}
                       {onDeleteMessage && (
                         <ContextMenuItem 
                           onSelect={() => onDeleteMessage(message.id)}
@@ -624,26 +637,16 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             </div>
           </div>
         ))}
-        
-        {/* Loading indicator */}
         {isLoading && (
-          <div className="fade-in flex justify-start">
-            <div className="flex gap-3 max-w-[85%]">
-              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted border border-border">
-                <Bot className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50">
-                <div className="typing-indicator flex space-x-1">
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                </div>
-              </div>
-            </div>
+          <div className="flex justify-center py-8">
+            <p className="text-muted-foreground">Loading messages...</p>
           </div>
         )}
-        
-        {/* Scroll anchor */}
+        {!isLoading && messages.length === 0 && (
+          <div className="flex justify-center py-8">
+            <p className="text-muted-foreground">No messages yet. Start a conversation!</p>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
     </ScrollArea>

@@ -45,12 +45,49 @@ class ChatMessage(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
+        # Get file information if files exist
+        file_info = []
+        if self.files:
+            try:
+                file_ids = json.loads(self.files)
+                if file_ids:
+                    # Import here to avoid circular imports
+                    from src.database import db
+                    from src.models.chat import FileUpload
+                    
+                    # Get file information for each file ID
+                    for file_id in file_ids:
+                        file_upload = FileUpload.query.get(file_id)
+                        if file_upload:
+                            file_info.append({
+                                'id': file_upload.id,
+                                'filename': file_upload.filename,
+                                'original_filename': file_upload.original_filename,
+                                'file_size': file_upload.file_size,
+                                'mime_type': file_upload.mime_type,
+                                'uploaded_at': file_upload.uploaded_at.isoformat() if file_upload.uploaded_at else None
+                            })
+                        else:
+                            # File not found, add placeholder
+                            file_info.append({
+                                'id': file_id,
+                                'filename': 'Unknown file',
+                                'original_filename': 'Unknown file',
+                                'file_size': 0,
+                                'mime_type': 'unknown',
+                                'uploaded_at': None,
+                                'error': 'File not found'
+                            })
+            except (json.JSONDecodeError, Exception) as e:
+                print(f"Error parsing files for message {self.id}: {e}")
+                file_info = []
+        
         return {
             'id': self.id,
             'session_id': self.session_id,
             'role': self.role,
             'content': self.content,
-            'files': json.loads(self.files) if self.files else [],
+            'files': file_info,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
 

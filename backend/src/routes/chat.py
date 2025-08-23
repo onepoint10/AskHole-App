@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app
+from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from src.database import db
 from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
 from src.routes.auth import get_current_user
@@ -791,6 +791,33 @@ def upload_file():
             except:
                 pass
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+
+
+@chat_bp.route('/files/<int:file_id>/download', methods=['GET'])
+def download_file(file_id):
+    """Download/serve an uploaded file"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    file_upload = FileUpload.query.filter_by(
+        id=file_id,
+        user_id=current_user.id
+    ).first()
+
+    if not file_upload:
+        return jsonify({'error': 'File not found or access denied'}), 404
+
+    if not os.path.exists(file_upload.file_path):
+        return jsonify({'error': 'File not found on disk'}), 404
+
+    # Serve the file
+    return send_from_directory(
+        os.path.dirname(file_upload.file_path),
+        os.path.basename(file_upload.file_path),
+        as_attachment=False,
+        mimetype=file_upload.mime_type or 'application/octet-stream'
+    )
 
 
 @chat_bp.route('/files', methods=['GET'])
