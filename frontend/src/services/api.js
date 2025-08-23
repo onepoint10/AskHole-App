@@ -291,6 +291,13 @@ export const sessionsAPI = {
     });
   },
 
+  deleteMessage: async (sessionId, messageId) => {
+    console.log('API Request: DELETE /sessions/' + sessionId + '/messages/' + messageId);
+    return apiCall(`/sessions/${sessionId}/messages/${messageId}`, {
+      method: 'DELETE',
+    });
+  },
+
   clearSession: async (sessionId) => {
     console.log('API Request: POST /sessions/' + sessionId + '/clear');
     return apiCall(`/sessions/${sessionId}/clear`, {

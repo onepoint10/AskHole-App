@@ -491,6 +491,30 @@ function App() {
     }
   }, [activeSessionId, setIsAuthenticated]);
 
+  // Delete message function
+  const deleteMessage = useCallback(async (messageId) => {
+    try {
+      // Remove message from local state immediately for better UX
+      setCurrentMessages(prev => prev.filter(msg => msg.id !== messageId));
+      
+      // Call API to delete message from server
+      await sessionsAPI.deleteMessage(activeSessionId, messageId);
+      
+      toast.success("Message deleted successfully.");
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+      toast.error("Failed to delete message.");
+      
+      // Reload messages from server to restore state
+      try {
+        const response = await sessionsAPI.getSession(activeSessionId);
+        setCurrentMessages(response.data?.messages || []);
+      } catch (reloadError) {
+        console.error('Failed to reload messages:', reloadError);
+      }
+    }
+  }, [activeSessionId]);
+
   // Prompt management functions
   const createPrompt = useCallback(async (promptData) => {
     try {
@@ -659,6 +683,7 @@ function App() {
             messages={currentMessages}
             isLoading={isLoading}
             onAddToPrompt={openPromptDialogWithContent}
+            onDeleteMessage={deleteMessage}
           />
           
           <MessageInput

@@ -418,6 +418,37 @@ def send_message(session_id):
             return jsonify({'error': str(e)}), 500
 
 
+@chat_bp.route('/sessions/<session_id>/messages/<message_id>', methods=['DELETE'])
+def delete_message(session_id, message_id):
+    """Delete a specific message from a chat session"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
+    message = ChatMessage.query.filter_by(
+        id=message_id,
+        session_id=session_id
+    ).first()
+
+    if not message:
+        return jsonify({'error': 'Message not found'}), 404
+
+    # Delete the message
+    db.session.delete(message)
+    session.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    return jsonify({'success': True})
+
+
 @chat_bp.route('/sessions/<session_id>/clear', methods=['POST'])
 def clear_session(session_id):
     """Clear all messages in a session"""
