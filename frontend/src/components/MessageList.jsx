@@ -1,72 +1,55 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Bot, Copy, Check, Trash2 } from 'lucide-react';
+import { User, Bot, Copy, Check, Trash2, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useState } from 'react';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { toast } from 'sonner';
 
-const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) => {
+const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [copiedCodeId, setCopiedCodeId] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
+  // Initialize plugins and device detection
   useEffect(() => {
-    // Load different plugins based on device type
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
     setIsMobileDevice(isMobile);
     
-    if (!isMobile) {
-      // Desktop: Load remark-gfm for full GFM support
-      import('remark-gfm')
-        .then((mod) => {
-          setRemarkPlugins([mod.default]);
-        })
-        .catch(() => {
-          // Ignore failures silently; markdown will render without GFM
-        });
-    } else {
-      // Mobile: Load remark-breaks for line break handling
-      import('remark-breaks')
-        .then((mod) => {
-          setRemarkPlugins([mod.default]);
-        })
-        .catch(() => {
-          // Ignore failures silently; markdown will render without breaks plugin
-        });
-    }
+    const loadPlugins = async () => {
+      try {
+        if (!isMobile) {
+          const remarkGfm = await import('remark-gfm');
+          setRemarkPlugins([remarkGfm.default]);
+        } else {
+          const remarkBreaks = await import('remark-breaks');
+          setRemarkPlugins([remarkBreaks.default]);
+        }
+      } catch (error) {
+        // Silently fail - markdown will render without plugins
+        console.warn('Failed to load markdown plugins:', error);
+      }
+    };
+
+    loadPlugins();
   }, []);
 
-  // Function to scroll to bottom
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  // Force immediate scroll to bottom
-  const scrollToBottomImmediate = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
-    }
-  };
-
+  // Dark mode detection
   useEffect(() => {
-    // Check if dark mode is active
-    setIsDark(document.documentElement.classList.contains('dark'));
-    
-    // Listen for theme changes
-    const observer = new MutationObserver(() => {
+    const updateDarkMode = () => {
       setIsDark(document.documentElement.classList.contains('dark'));
-    });
+    };
+
+    updateDarkMode();
     
+    const observer = new MutationObserver(updateDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class']
@@ -75,253 +58,239 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
     return () => observer.disconnect();
   }, []);
 
-  // Scroll to bottom when messages change or loading starts
-  useEffect(() => {
-    // Use immediate scroll for user messages (when they just sent something)
-    const lastMessage = messages[messages.length - 1];
-    if (lastMessage?.isTemporary || isLoading) {
-      scrollToBottomImmediate();
-    } else {
-      scrollToBottom();
+  // Scroll management
+  const scrollToBottom = useCallback((immediate = false) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: immediate ? 'instant' : 'smooth' 
+      });
     }
-  }, [messages, isLoading]);
+  }, []);
 
-  const copyToClipboard = async (text, messageId) => {
-    
+  useEffect(() => {
+    const lastMessage = messages[messages.length - 1];
+    const shouldScrollImmediate = lastMessage?.isTemporary || isLoading;
+    scrollToBottom(shouldScrollImmediate);
+  }, [messages, isLoading, scrollToBottom]);
+
+  // Improved clipboard functionality with better debugging
+  const copyToClipboard = useCallback(async (text, messageId, isCode = false) => {
+    if (!text) {
+      console.log('Copy failed: No text provided');
+      return;
+    }
+
+    console.log('Attempting to copy text:', text.substring(0, 50) + '...');
+    console.log('Is secure context:', window.isSecureContext);
+    console.log('Navigator clipboard available:', !!navigator.clipboard);
+
     try {
-      // Try the modern clipboard API first
+      let success = false;
+
+      // Method 1: Modern clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        // Check if we're in a secure context (HTTPS or localhost)
-        if (window.isSecureContext) {
+        try {
+          console.log('Trying modern clipboard API...');
           await navigator.clipboard.writeText(text);
-          setCopiedId(messageId);
-          setTimeout(() => setCopiedId(null), 2000);
-          toast.success('Copied to clipboard!');
-          return;
-        } else {
-          // Not in secure context, using fallback method
+          console.log('Modern clipboard API succeeded');
+          success = true;
+        } catch (clipboardError) {
+          console.log('Modern clipboard API failed:', clipboardError.name, clipboardError.message);
         }
       }
-      
-      // Fallback for older browsers or when clipboard API is not available
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.left = '-999999px';
-      textArea.style.top = '-999999px';
-      textArea.style.zIndex = '-1000';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      
-      if (successful) {
-        setCopiedId(messageId);
-        setTimeout(() => setCopiedId(null), 2000);
-        toast.success('Copied to clipboard!');
-      } else {
-        console.error('Failed to copy text using fallback method');
-        // Last resort: show text in a temporary textarea for manual copying
-        showManualCopyTextarea(text, messageId);
-      }
-    } catch (err) {
-      console.error('Failed to copy text: ', err);
-      
-      // Try fallback method if modern API fails
-      try {
+
+      // Method 2: execCommand fallback
+      if (!success) {
+        console.log('Trying execCommand fallback...');
         const textArea = document.createElement('textarea');
         textArea.value = text;
+        
+        // Make textarea invisible but still functional
         textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.width = '2em';
+        textArea.style.height = '2em';
+        textArea.style.padding = '0';
+        textArea.style.border = 'none';
+        textArea.style.outline = 'none';
+        textArea.style.boxShadow = 'none';
+        textArea.style.background = 'transparent';
+        textArea.style.opacity = '0';
         textArea.style.zIndex = '-1000';
+        
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
         
-        const successful = document.execCommand('copy');
-        document.body.removeChild(textArea);
+        // For mobile devices
+        textArea.setSelectionRange(0, 99999);
         
-        if (successful) {
+        try {
+          success = document.execCommand('copy');
+          console.log('execCommand result:', success);
+        } catch (execError) {
+          console.log('execCommand failed:', execError);
+        }
+        
+        document.body.removeChild(textArea);
+      }
+
+      // Method 3: Alternative approach for stubborn cases
+      if (!success) {
+        console.log('Trying alternative selection method...');
+        const range = document.createRange();
+        const selection = window.getSelection();
+        
+        const textNode = document.createTextNode(text);
+        const span = document.createElement('span');
+        span.appendChild(textNode);
+        span.style.position = 'fixed';
+        span.style.top = '0';
+        span.style.left = '0';
+        span.style.opacity = '0';
+        span.style.pointerEvents = 'none';
+        
+        document.body.appendChild(span);
+        range.selectNode(span);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        try {
+          success = document.execCommand('copy');
+          console.log('Alternative method result:', success);
+        } catch (altError) {
+          console.log('Alternative method failed:', altError);
+        }
+        
+        selection.removeAllRanges();
+        document.body.removeChild(span);
+      }
+
+      if (success) {
+        console.log('Copy succeeded!');
+        // Set appropriate copied state
+        if (isCode) {
+          setCopiedCodeId(messageId);
+          setTimeout(() => setCopiedCodeId(null), 2000);
+        } else {
           setCopiedId(messageId);
           setTimeout(() => setCopiedId(null), 2000);
-          toast.success('Copied to clipboard!');
-        } else {
-          toast.error('Failed to copy to clipboard');
-          // Last resort: show text in a temporary textarea for manual copying
-          showManualCopyTextarea(text, messageId);
         }
-      } catch (fallbackErr) {
-        console.error('Fallback copy method also failed: ', fallbackErr);
-        toast.error('Failed to copy to clipboard');
-        // Last resort: show text in a temporary textarea for manual copying
-        showManualCopyTextarea(text, messageId);
+        
+        toast.success('Copied to clipboard!');
+      } else {
+        console.log('All copy methods failed');
+        toast.error('Failed to copy to clipboard. Please try copying manually.');
       }
+    } catch (error) {
+      console.error('Copy failed with error:', error);
+      toast.error('Failed to copy to clipboard');
     }
-  };
+  }, []);
 
-  // Last resort function to show text in a temporary textarea for manual copying
-  const showManualCopyTextarea = (text, messageId) => {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.top = '50%';
-    textarea.style.left = '50%';
-    textarea.style.transform = 'translate(-50%, -50%)';
-    textarea.style.width = '80%';
-    textarea.style.height = '200px';
-    textarea.style.zIndex = '10000';
-    textarea.style.padding = '10px';
-    textarea.style.border = '2px solid #ccc';
-    textarea.style.borderRadius = '5px';
-    textarea.style.backgroundColor = 'white';
-    textarea.style.color = 'black';
-    textarea.placeholder = 'Text to copy (select all and copy manually)';
+  // Mobile table preprocessing
+  const preprocessMarkdownForMobile = useCallback((markdown) => {
+    if (!isMobileDevice || !markdown) return markdown;
     
-    const overlay = document.createElement('div');
-    overlay.style.position = 'fixed';
-    overlay.style.top = '0';
-    overlay.style.left = '0';
-    overlay.style.width = '100%';
-    overlay.style.height = '100%';
-    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-    overlay.style.zIndex = '9999';
-    
-    const closeButton = document.createElement('button');
-    closeButton.textContent = 'Close';
-    closeButton.style.position = 'absolute';
-    closeButton.style.top = '10px';
-    closeButton.style.right = '10px';
-    closeButton.style.padding = '5px 10px';
-    closeButton.style.backgroundColor = '#f44336';
-    closeButton.style.color = 'white';
-    closeButton.style.border = 'none';
-    closeButton.style.borderRadius = '3px';
-    closeButton.style.cursor = 'pointer';
-    
-    const closeModal = () => {
-      document.body.removeChild(overlay);
-      document.body.removeChild(textarea);
-    };
-    
-    closeButton.onclick = closeModal;
-    overlay.onclick = closeModal;
-    
-    textarea.onclick = (e) => e.stopPropagation();
-    
-    document.body.appendChild(overlay);
-    document.body.appendChild(textarea);
-    overlay.appendChild(closeButton);
-    
-    textarea.focus();
-    textarea.select();
-    
-    toast.info('Copy failed. Text shown in popup for manual copying.');
-  };
-
-  // Preprocess markdown for mobile to handle tables manually
-  const preprocessMarkdownForMobile = (markdown) => {
-    if (!isMobileDevice) return markdown;
-    
-    // Simple table detection and conversion for mobile
-    const tableRegex = /^\|(.+)\|$/gm;
     const lines = markdown.split('\n');
-    let processedLines = [];
-    let inTable = false;
+    const processedLines = [];
     let tableData = [];
+    let inTable = false;
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    const convertTableForMobile = (tableData) => {
+      if (tableData.length === 0) return '';
       
-      if (tableRegex.test(line)) {
+      const headers = tableData[0];
+      const rows = tableData.slice(1);
+      
+      return rows.map((row, rowIndex) => {
+        const rowContent = headers.map((header, cellIndex) => {
+          if (cellIndex < row.length) {
+            return `**${header}:** ${row[cellIndex]}`;
+          }
+          return '';
+        }).filter(Boolean).join('\n\n');
+        
+        return rowContent;
+      }).join('\n\n---\n\n');
+    };
+
+    for (const line of lines) {
+      const isTableRow = /^\|(.+)\|$/.test(line);
+      const isTableSeparator = /^[-|\s:]+$/.test(line);
+      
+      if (isTableRow) {
         if (!inTable) {
           inTable = true;
           tableData = [];
         }
-        // Extract table row data
         const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
         tableData.push(cells);
-      } else if (inTable && line.trim() === '') {
-        // End of table, convert to mobile-friendly format
+      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
         if (tableData.length > 0) {
-          const mobileTable = convertTableForMobile(tableData);
-          processedLines.push(mobileTable);
+          processedLines.push(convertTableForMobile(tableData));
           tableData = [];
         }
         inTable = false;
-        processedLines.push(line);
-      } else if (inTable && /^[-|\s:]+$/.test(line)) {
-        // Skip table separator line
-        continue;
-      } else {
-        if (inTable && tableData.length > 0) {
-          // End of table without empty line
-          const mobileTable = convertTableForMobile(tableData);
-          processedLines.push(mobileTable);
-          tableData = [];
-          inTable = false;
+        if (!isTableSeparator) {
+          processedLines.push(line);
         }
+      } else if (!isTableSeparator) {
         processedLines.push(line);
       }
     }
     
-    // Handle table at end of content
+    // Handle table at end
     if (inTable && tableData.length > 0) {
-      const mobileTable = convertTableForMobile(tableData);
-      processedLines.push(mobileTable);
+      processedLines.push(convertTableForMobile(tableData));
     }
     
     return processedLines.join('\n');
-  };
+  }, [isMobileDevice]);
 
-  const convertTableForMobile = (tableData) => {
-    if (tableData.length === 0) return '';
-    
-    const headers = tableData[0];
-    const rows = tableData.slice(1);
-    
-    let mobileFormat = '';
-    
-    rows.forEach((row, rowIndex) => {
-      if (rowIndex > 0) mobileFormat += '\n---\n\n';
-      
-      headers.forEach((header, cellIndex) => {
-        if (cellIndex < row.length) {
-          mobileFormat += `**${header}:** ${row[cellIndex]}\n\n`;
-        }
-      });
-    });
-    
-    return mobileFormat;
-  };
-
-  const CodeBlock = ({ node, inline, className, children, ...props }) => {
+  // Code block component with improved copy functionality
+  const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
-    return !inline && match ? (
-      <div className="relative my-4">
-        <div 
-          className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border"
+    const codeString = String(children).replace(/\n$/, '');
+    // Create a more unique ID that includes content hash for better state tracking
+    const codeId = `code-${Math.abs(codeString.split('').reduce((a, b) => {
+      a = ((a << 5) - a) + b.charCodeAt(0);
+      return a & a;
+    }, 0))}`;
+    
+    if (inline || !match) {
+      return (
+        <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+          {children}
+        </code>
+      );
+    }
 
-        >
+    return (
+      <div className="relative my-4">
+        <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {match[1]}
           </span>
-        </div>
-        <div className="relative">
           <Button
             variant="ghost"
             size="sm"
-            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-background/80 cursor-pointer z-10"
+            className="h-6 w-6 p-0 hover:bg-background/80 transition-all duration-200 hover:scale-105"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();
-              copyToClipboard(String(children), `code-${Math.random()}`);
+              copyToClipboard(codeString, codeId, true);
             }}
+            title="Copy code"
           >
-            <Copy className="h-3 w-3" />
+            {copiedCodeId === codeId ? (
+              <Check className="h-3 w-3 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
+            ) : (
+              <Copy className="h-3 w-3 transition-transform hover:scale-110" />
+            )}
           </Button>
+        </div>
         <SyntaxHighlighter
           style={isDark ? oneDark : oneLight}
           language={match[1]}
@@ -329,20 +298,60 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
           className="!mt-0 !rounded-t-none !border-t-0"
           {...props}
         >
-          {String(children).replace(/\n$/, '')}
+          {codeString}
         </SyntaxHighlighter>
       </div>
-    ) : (
-      <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
-        {children}
-      </code>
     );
+  }, [copyToClipboard, copiedCodeId, isDark]);
+
+  // Markdown components configuration
+  const markdownComponents = {
+    code: CodeBlock,
+    pre: ({ children }) => <div>{children}</div>,
+    p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+    h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
+    h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
+    h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-foreground">{children}</h3>,
+    ul: ({ children }) => <ul className="mb-3 pl-4 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="mb-3 pl-4 space-y-1">{children}</ol>,
+    li: ({ children }) => <li className="text-foreground">{children}</li>,
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
+        {children}
+      </blockquote>
+    ),
+    a: ({ href, children }) => (
+      <a 
+        href={href} 
+        className="text-primary hover:text-primary/80 underline transition-colors" 
+        target="_blank" 
+        rel="noopener noreferrer"
+      >
+        {children}
+      </a>
+    ),
+    table: ({ children }) => (
+      <div className="my-3 w-full overflow-x-auto">
+        <table className="w-full border-collapse text-sm">{children}</table>
+      </div>
+    ),
+    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+    tbody: ({ children }) => <tbody>{children}</tbody>,
+    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+    th: ({ children }) => (
+      <th className="border border-border px-3 py-2 text-left font-semibold bg-muted/30">
+        {children}
+      </th>
+    ),
+    td: ({ children }) => (
+      <td className="border border-border px-3 py-2">{children}</td>
+    ),
   };
 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {messages.map((message, index) => (
+        {messages.map((message) => (
           <div
             key={message.id}
             className={`fade-in ${
@@ -354,6 +363,7 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
                 message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
               }`}
             >
+              {/* Avatar */}
               <div
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
                   message.role === 'user'
@@ -367,152 +377,273 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
                   <Bot className="h-4 w-4 text-muted-foreground" />
                 )}
               </div>
+
+              {/* Message Content */}
               {message.role === 'user' ? (
                 <CM>
                   <ContextMenuTrigger asChild>
-                    <div
-                      className={`group relative message-user`}
-                    >
-                      <div className="whitespace-pre-wrap leading-relaxed">{message.content}</div>
+                    <div className="group relative px-4 py-3 rounded-2xl bg-primary text-primary-foreground max-w-full">
+                      <div className="whitespace-pre-wrap leading-relaxed break-words">
+                        {message.content}
+                      </div>
+                      
+                      {/* File attachments and images for user messages */}
+                      {message.files && message.files.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-primary-foreground/20">
+                          {/* Separate images and other files */}
+                          {(() => {
+                            const images = message.files.filter(file => {
+                              const fileName = typeof file === 'string' ? file : file.name || '';
+                              return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
+                                     (file.type && file.type.startsWith('image/'));
+                            });
+                            
+                            const otherFiles = message.files.filter(file => {
+                              const fileName = typeof file === 'string' ? file : file.name || '';
+                              return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
+                                     !(file.type && file.type.startsWith('image/'));
+                            });
+
+                            return (
+                              <>
+                                {/* Display images */}
+                                {images.length > 0 && (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
+                                      <span>🖼️</span>
+                                      <span>Images:</span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {images.map((image, index) => (
+                                        <div key={`image-${index}`} className="relative group">
+                                          <img
+                                            src={typeof image === 'string' ? image : (image.url || image.src || URL.createObjectURL(image))}
+                                            alt={typeof image === 'string' ? image : (image.name || `Image ${index + 1}`)}
+                                            className="max-w-full h-auto max-h-48 rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                            onClick={(e) => {
+                                              // Open image in new tab on click
+                                              const imgSrc = e.target.src;
+                                              window.open(imgSrc, '_blank');
+                                            }}
+                                            onError={(e) => {
+                                              // Hide broken images
+                                              e.target.style.display = 'none';
+                                            }}
+                                          />
+                                          <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
+                                            {typeof image === 'string' ? image.split('/').pop() : image.name || `Image ${index + 1}`}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Display other files */}
+                                {otherFiles.length > 0 && (
+                                  <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
+                                    <div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
+                                      <span>📎</span>
+                                      <span>Attached files:</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                      {otherFiles.map((file, index) => (
+                                        <span 
+                                          key={`file-${index}`}
+                                          className="inline-flex items-center gap-1 px-2 py-1 bg-primary-foreground/10 rounded text-xs text-primary-foreground/90 border border-primary-foreground/20"
+                                          title={file.name || file}
+                                        >
+                                          <span>📄</span>
+                                          <span className="max-w-[200px] truncate">
+                                            {typeof file === 'string' ? file : file.name || 'Unknown file'}
+                                          </span>
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => {
-                      copyToClipboard(message.content, message.id);
-                    }}>
+                    <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
                       <Copy className="h-4 w-4 mr-2" />
                       Copy
                     </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => onAddToPrompt && onAddToPrompt(message.content)}>
-                      Add to prompt database
-                    </ContextMenuItem>
-                    <ContextMenuItem 
-                      onSelect={() => onDeleteMessage && onDeleteMessage(message.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </CM>
-              ) : (
-                <div className="relative">
-                  <CM>
-                    <ContextMenuTrigger asChild>
-                      <div
-                        className={`group relative message-assistant border border-border/50`}
-
-                      >
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <ReactMarkdown
-                            remarkPlugins={remarkPlugins}
-                            components={{
-                              code: CodeBlock,
-                              pre: ({ children }) => <div>{children}</div>,
-                              p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
-                              h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
-                              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
-                              h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-foreground">{children}</h3>,
-                              ul: ({ children }) => <ul className="mb-3 pl-4 space-y-1">{children}</ul>,
-                              ol: ({ children }) => <ol className="mb-3 pl-4 space-y-1">{children}</ol>,
-                              li: ({ children }) => <li className="text-foreground">{children}</li>,
-                              blockquote: ({ children }) => (
-                                <blockquote className="border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
-                                  {children}
-                                </blockquote>
-                              ),
-                              a: ({ href, children }) => (
-                                <a href={href} className="text-primary hover:text-primary/80 underline" target="_blank" rel="noopener noreferrer">
-                                  {children}
-                                </a>
-                              ),
-                              table: ({ children }) => (
-                                <div className="my-3 w-full overflow-x-auto">
-                                  <table className="w-full border-collapse text-sm">{children}</table>
-                                </div>
-                              ),
-                              thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-                              tbody: ({ children }) => <tbody>{children}</tbody>,
-                              tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
-                              th: ({ children }) => (
-                                <th className="bg-gray-800 border border-gray-200 px-2 py-1 text-left font-semibold align-middle">
-                                  {children}
-                                </th>
-                              ),
-                              td: ({ children }) => (
-                                <td className="bg-gray-600 border border-gray-200 px-2 py-1 align-top">{children}</td>
-                              ),
-                            }}
-                          >
-                            {preprocessMarkdownForMobile(message.content)}
-                          </ReactMarkdown>
-                        </div>
-                        {message.files && message.files.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-border/30">
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <span>📎</span>
-                              <span>{message.files.length} file(s) attached</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => {
-                        copyToClipboard(message.content, message.id);
-                      }}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Copy
+                    {onAddToPrompt && (
+                      <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
+                        <Database className="h-4 w-4 mr-2" />
+                        Add to database
                       </ContextMenuItem>
+                    )}
+                    {onDeleteMessage && (
                       <ContextMenuItem 
-                        onSelect={() => onDeleteMessage && onDeleteMessage(message.id)}
+                        onSelect={() => onDeleteMessage(message.id)}
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                       </ContextMenuItem>
-                    </ContextMenuContent>
-                  </CM>
-                  {message.role === 'assistant' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
-                                                onClick={(e) => {
+                    )}
+                  </ContextMenuContent>
+                </CM>
+              ) : (
+                <div className="relative group w-full min-h-[60px]">
+                  <CM>
+                    <ContextMenuTrigger asChild>
+                      <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50 relative">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown
+                            remarkPlugins={remarkPlugins}
+                            components={markdownComponents}
+                          >
+                            {preprocessMarkdownForMobile(message.content)}
+                          </ReactMarkdown>
+                        </div>
+                        
+                        {/* File attachments and images for assistant messages */}
+                        {message.files && message.files.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-border/30">
+                            {(() => {
+                              const images = message.files.filter(file => {
+                                const fileName = typeof file === 'string' ? file : file.name || '';
+                                return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
+                                       (file.type && file.type.startsWith('image/'));
+                              });
+                              
+                              const otherFiles = message.files.filter(file => {
+                                const fileName = typeof file === 'string' ? file : file.name || '';
+                                return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
+                                       !(file.type && file.type.startsWith('image/'));
+                              });
+
+                              return (
+                                <>
+                                  {/* Display images */}
+                                  {images.length > 0 && (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                                        <span>🖼️</span>
+                                        <span>Referenced images:</span>
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {images.map((image, index) => (
+                                          <div key={`image-${index}`} className="relative group">
+                                            <img
+                                              src={typeof image === 'string' ? image : (image.url || image.src || URL.createObjectURL(image))}
+                                              alt={typeof image === 'string' ? image : (image.name || `Image ${index + 1}`)}
+                                              className="max-w-full h-auto max-h-48 rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                              onClick={(e) => {
+                                                const imgSrc = e.target.src;
+                                                window.open(imgSrc, '_blank');
+                                              }}
+                                              onError={(e) => {
+                                                e.target.style.display = 'none';
+                                              }}
+                                            />
+                                            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
+                                              {typeof image === 'string' ? image.split('/').pop() : image.name || `Image ${index + 1}`}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Display other files */}
+                                  {otherFiles.length > 0 && (
+                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-border/20' : ''}`}>
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
+                                        <span>📎</span>
+                                        <span>Referenced files:</span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1">
+                                        {otherFiles.map((file, index) => (
+                                          <span 
+                                            key={`file-${index}`}
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-muted/30 rounded text-xs text-muted-foreground border border-border/30"
+                                            title={file.name || file}
+                                          >
+                                            <span>📄</span>
+                                            <span className="max-w-[200px] truncate">
+                                              {typeof file === 'string' ? file : file.name || 'Unknown file'}
+                                            </span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        )}
+
+                        {/* Copy button for assistant messages - positioned inside the message */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
+                          onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
                             copyToClipboard(message.content, message.id);
                           }}
-                    >
-                      {copiedId === message.id ? (
-                        <Check className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Copy className="h-3 w-3" />
+                          title="Copy message"
+                        >
+                          {copiedId === message.id ? (
+                            <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 transition-transform hover:scale-110" />
+                          )}
+                        </Button>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy
+                      </ContextMenuItem>
+                      {onDeleteMessage && (
+                        <ContextMenuItem 
+                          onSelect={() => onDeleteMessage(message.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </ContextMenuItem>
                       )}
-                    </Button>
-                  )}
+                    </ContextMenuContent>
+                  </CM>
                 </div>
               )}
             </div>
           </div>
         ))}
+        
+        {/* Loading indicator */}
         {isLoading && (
           <div className="fade-in flex justify-start">
             <div className="flex gap-3 max-w-[85%]">
               <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted border border-border">
                 <Bot className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="message-assistant border border-border/50">
-                <div className="typing-indicator">
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
+              <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50">
+                <div className="typing-indicator flex space-x-1">
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                 </div>
               </div>
             </div>
           </div>
         )}
-        {/* Invisible element for scrolling to bottom */}
+        
+        {/* Scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
     </ScrollArea>
