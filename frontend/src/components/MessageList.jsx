@@ -442,10 +442,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                 {/* Display other files */}
                                 {otherFiles.length > 0 && (
                                   <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
-                                    <div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
+                                    {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
                                       <span>📎</span>
                                       <span>Attached files:</span>
-                                    </div>
+                                    </div>*/}
                                     <div className="flex flex-wrap gap-1">
                                       {otherFiles.map((file, index) => (
                                         <span 
