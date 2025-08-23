@@ -649,148 +649,148 @@ def upload_file():
 
         # Handle Cyrillic and special characters in filename
         original_filename = file.filename
+        
+        # Ensure filename is properly encoded
+        if isinstance(original_filename, bytes):
+            original_filename = original_filename.decode('utf-8')
+
+        # Create a safe ASCII filename while preserving the original
+        safe_filename = secure_filename(original_filename)
+        if not safe_filename:  # If secure_filename returns empty (all non-ASCII)
+            # Fallback: use file extension with timestamp
+            file_ext = os.path.splitext(original_filename)[1] if '.' in original_filename else ''
+            safe_filename = f"uploaded_file_{int(datetime.now().timestamp())}{file_ext}"
+
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4()}_{safe_filename}"
+        file_path = os.path.join(upload_dir, unique_filename)
+        print(f"File will be saved as: {file_path}")
+
+        # Save the file first with timeout handling
         try:
-            # Ensure filename is properly encoded
-            if isinstance(original_filename, bytes):
-                original_filename = original_filename.decode('utf-8')
+            file.save(file_path)
+            print(f"File saved successfully to: {file_path}")
+        except Exception as save_error:
+            print(f"File save error: {save_error}")
+            return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
 
-            # Create a safe ASCII filename while preserving the original
-            safe_filename = secure_filename(original_filename)
-            if not safe_filename:  # If secure_filename returns empty (all non-ASCII)
-                # Fallback: use file extension with timestamp
-                file_ext = os.path.splitext(original_filename)[1] if '.' in original_filename else ''
-                safe_filename = f"uploaded_file_{int(datetime.now().timestamp())}{file_ext}"
+        # Get file info after saving
+        file_size = os.path.getsize(file_path)
+        print(f"File size: {file_size} bytes")
 
-            # Generate unique filename
-            unique_filename = f"{uuid.uuid4()}_{safe_filename}"
-            file_path = os.path.join(upload_dir, unique_filename)
-            print(f"File will be saved as: {file_path}")
+        # Improved MIME type detection
+        mime_type = None
 
-            # Save the file first with timeout handling
+        # Try multiple methods to determine MIME type
+        # 1. Try mimetypes based on file extension
+        mime_type, _ = mimetypes.guess_type(safe_filename)
+
+        if not mime_type:
+            # 2. Try with original filename (might work better for some extensions)
+            mime_type, _ = mimetypes.guess_type(original_filename.lower())
+
+        if not mime_type:
+            # 3. Determine by file extension manually for common types
+            file_ext = os.path.splitext(original_filename.lower())[1]
+            ext_to_mime = {
+                '.pdf': 'application/pdf',
+                '.txt': 'text/plain',
+                '.doc': 'application/msword',
+                '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                '.xls': 'application/vnd.ms-excel',
+                '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                '.ppt': 'application/vnd.ms-powerpoint',
+                '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp',
+                '.bmp': 'image/bmp',
+                '.svg': 'image/svg+xml',
+                '.mp3': 'audio/mpeg',
+                '.wav': 'audio/wav',
+                '.ogg': 'audio/ogg',
+                '.mp4': 'video/mp4',
+                '.avi': 'video/x-msvideo',
+                '.mov': 'video/quicktime',
+                '.csv': 'text/csv',
+                '.json': 'application/json',
+                '.xml': 'application/xml',
+                '.html': 'text/html',
+                '.css': 'text/css',
+                '.js': 'text/javascript',
+                '.py': 'text/x-python',
+                '.java': 'text/x-java-source',
+                '.cpp': 'text/x-c++src',
+                '.c': 'text/x-csrc',
+                '.h': 'text/x-chdr',
+                '.md': 'text/markdown',
+                '.rtf': 'application/rtf',
+                '.zip': 'application/zip',
+                '.tar': 'application/x-tar',
+                '.gz': 'application/gzip'
+            }
+            mime_type = ext_to_mime.get(file_ext, 'application/octet-stream')
+
+        # Validate file size (20MB limit)
+        max_size = 20 * 1024 * 1024  # 20MB
+        if file_size > max_size:
+            # Remove the uploaded file if it's too large
             try:
-                file.save(file_path)
-                print(f"File saved successfully to: {file_path}")
-            except Exception as save_error:
-                print(f"File save error: {save_error}")
-                return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
+                os.remove(file_path)
+            except:
+                pass
+            return jsonify({
+                'error': f'File size ({file_size / (1024 * 1024):.1f}MB) exceeds 20MB limit',
+                'file_size': file_size,
+                'max_size': max_size
+            }), 400
 
-            # Get file info after saving
-            file_size = os.path.getsize(file_path)
-            print(f"File size: {file_size} bytes")
+        # Validate file content (basic check)
+        if file_size == 0:
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            return jsonify({'error': 'File appears to be empty or corrupted'}), 400
 
-            # Improved MIME type detection
-            mime_type = None
+        # Save to database with original filename preserved
+        print(f"About to save file to database. User ID: {current_user.id}")
+        file_upload = FileUpload(
+            user_id=current_user.id,
+            filename=unique_filename,
+            original_filename=original_filename,  # Preserve original Cyrillic name
+            file_path=file_path,
+            file_size=file_size,
+            mime_type=mime_type
+        )
 
-            # Try multiple methods to determine MIME type
-            # 1. Try mimetypes based on file extension
-            mime_type, _ = mimetypes.guess_type(safe_filename)
+        print(f"FileUpload object created: {file_upload}")
+        db.session.add(file_upload)
+        print("FileUpload added to session")
+        db.session.commit()
+        print(f"File uploaded successfully to database with ID: {file_upload.id}")
 
-            if not mime_type:
-                # 2. Try with original filename (might work better for some extensions)
-                mime_type, _ = mimetypes.guess_type(original_filename.lower())
+        return jsonify(file_upload.to_dict()), 201
 
-            if not mime_type:
-                # 3. Determine by file extension manually for common types
-                file_ext = os.path.splitext(original_filename.lower())[1]
-                ext_to_mime = {
-                    '.pdf': 'application/pdf',
-                    '.txt': 'text/plain',
-                    '.doc': 'application/msword',
-                    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    '.xls': 'application/vnd.ms-excel',
-                    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    '.ppt': 'application/vnd.ms-powerpoint',
-                    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    '.jpg': 'image/jpeg',
-                    '.jpeg': 'image/jpeg',
-                    '.png': 'image/png',
-                    '.gif': 'image/gif',
-                    '.webp': 'image/webp',
-                    '.bmp': 'image/bmp',
-                    '.svg': 'image/svg+xml',
-                    '.mp3': 'audio/mpeg',
-                    '.wav': 'audio/wav',
-                    '.ogg': 'audio/ogg',
-                    '.mp4': 'video/mp4',
-                    '.avi': 'video/x-msvideo',
-                    '.mov': 'video/quicktime',
-                    '.csv': 'text/csv',
-                    '.json': 'application/json',
-                    '.xml': 'application/xml',
-                    '.html': 'text/html',
-                    '.css': 'text/css',
-                    '.js': 'text/javascript',
-                    '.py': 'text/x-python',
-                    '.java': 'text/x-java-source',
-                    '.cpp': 'text/x-c++src',
-                    '.c': 'text/x-csrc',
-                    '.h': 'text/x-chdr',
-                    '.md': 'text/markdown',
-                    '.rtf': 'application/rtf',
-                    '.zip': 'application/zip',
-                    '.tar': 'application/x-tar',
-                    '.gz': 'application/gzip'
-                }
-                mime_type = ext_to_mime.get(file_ext, 'application/octet-stream')
-
-            # Validate file size (20MB limit)
-            max_size = 20 * 1024 * 1024  # 20MB
-            if file_size > max_size:
-                # Remove the uploaded file if it's too large
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
-                return jsonify({
-                    'error': f'File size ({file_size / (1024 * 1024):.1f}MB) exceeds 20MB limit',
-                    'file_size': file_size,
-                    'max_size': max_size
-                }), 400
-
-            # Validate file content (basic check)
-            if file_size == 0:
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
-                return jsonify({'error': 'File appears to be empty or corrupted'}), 400
-
-            # Save to database with original filename preserved
-            print(f"About to save file to database. User ID: {current_user.id}")
-            file_upload = FileUpload(
-                user_id=current_user.id,
-                filename=unique_filename,
-                original_filename=original_filename,  # Preserve original Cyrillic name
-                file_path=file_path,
-                file_size=file_size,
-                mime_type=mime_type
-            )
-
-            print(f"FileUpload object created: {file_upload}")
-            db.session.add(file_upload)
-            print("FileUpload added to session")
-            db.session.commit()
-            print(f"File uploaded successfully to database with ID: {file_upload.id}")
-
-            return jsonify(file_upload.to_dict()), 201
-
-        except UnicodeDecodeError as e:
-            print(f"Unicode decode error: {e}")
-            return jsonify({'error': f'Filename encoding error: {str(e)}'}), 400
-        except Exception as e:
-            print(f"Unexpected error in upload_file: {e}")
-            print(f"Error type: {type(e).__name__}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
-            
-            # Clean up file if database save fails
-            if 'file_path' in locals() and os.path.exists(file_path):
-                try:
-                    os.remove(file_path)
-                    print(f"Cleaned up file: {file_path}")
-                except:
-                    pass
-            return jsonify({'error': f'Upload failed: {str(e)}'}), 500
+    except UnicodeDecodeError as e:
+        print(f"Unicode decode error: {e}")
+        return jsonify({'error': f'Filename encoding error: {str(e)}'}), 400
+    except Exception as e:
+        print(f"Unexpected error in upload_file: {e}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        
+        # Clean up file if database save fails
+        if 'file_path' in locals() and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"Cleaned up file: {file_path}")
+            except:
+                pass
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
 @chat_bp.route('/files/upload', methods=['OPTIONS'])
