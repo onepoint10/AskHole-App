@@ -60,7 +60,7 @@ def create_app():
     
     # Enable CORS for all routes with more specific configuration
     CORS(app,
-         origins=["*"],  # Allow all origins for development
+         origins=None,  # Allow all origins but handle credentials properly
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
          supports_credentials=True,
@@ -195,12 +195,24 @@ def create_app():
     @app.before_request
     def handle_preflight():
         if request.method == "OPTIONS":
-            response = jsonify({'status': 'ok'})
-            response.headers.add('Access-Control-Allow-Origin', '*')
-            response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cookie, Set-Cookie, X-Session-ID')
-            response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+            # Get the origin from the request
+            origin = request.headers.get('Origin')
+            if origin:
+                response = jsonify({'status': 'ok'})
+                response.headers.add('Access-Control-Allow-Origin', origin)
+                response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cookie, Set-Cookie, X-Session-ID')
+                response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+                response.headers.add('Access-Control-Allow-Credentials', 'true')
+                return response
+
+    # Global CORS response handler
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get('Origin')
+        if origin:
+            response.headers.add('Access-Control-Allow-Origin', origin)
             response.headers.add('Access-Control-Allow-Credentials', 'true')
-            return response
+        return response
 
     print("Database initialization completed successfully")
 

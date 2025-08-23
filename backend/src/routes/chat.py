@@ -797,12 +797,15 @@ def upload_file():
 def upload_file_options():
     """Handle CORS preflight request for file upload"""
     print("OPTIONS request received for file upload")
-    response = jsonify({'status': 'ok'})
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cookie, Set-Cookie, X-Session-ID')
-    response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
+    origin = request.headers.get('Origin')
+    if origin:
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', origin)
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Cookie, Set-Cookie, X-Session-ID')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+    return jsonify({'status': 'ok'})
 
 
 @chat_bp.route('/files', methods=['GET'])
