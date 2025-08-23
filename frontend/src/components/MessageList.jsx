@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useState } from 'react';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { toast } from 'sonner';
 
 const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) => {
   const scrollRef = useRef(null);
@@ -86,13 +87,138 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
   }, [messages, isLoading]);
 
   const copyToClipboard = async (text, messageId) => {
+    
     try {
-      await navigator.clipboard.writeText(text);
-      setCopiedId(messageId);
-      setTimeout(() => setCopiedId(null), 2000);
+      // Try the modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        // Check if we're in a secure context (HTTPS or localhost)
+        if (window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          setCopiedId(messageId);
+          setTimeout(() => setCopiedId(null), 2000);
+          toast.success('Copied to clipboard!');
+          return;
+        } else {
+          // Not in secure context, using fallback method
+        }
+      }
+      
+      // Fallback for older browsers or when clipboard API is not available
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      textArea.style.zIndex = '-1000';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        setCopiedId(messageId);
+        setTimeout(() => setCopiedId(null), 2000);
+        toast.success('Copied to clipboard!');
+      } else {
+        console.error('Failed to copy text using fallback method');
+        // Last resort: show text in a temporary textarea for manual copying
+        showManualCopyTextarea(text, messageId);
+      }
     } catch (err) {
       console.error('Failed to copy text: ', err);
+      
+      // Try fallback method if modern API fails
+      try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        textArea.style.zIndex = '-1000';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          setCopiedId(messageId);
+          setTimeout(() => setCopiedId(null), 2000);
+          toast.success('Copied to clipboard!');
+        } else {
+          toast.error('Failed to copy to clipboard');
+          // Last resort: show text in a temporary textarea for manual copying
+          showManualCopyTextarea(text, messageId);
+        }
+      } catch (fallbackErr) {
+        console.error('Fallback copy method also failed: ', fallbackErr);
+        toast.error('Failed to copy to clipboard');
+        // Last resort: show text in a temporary textarea for manual copying
+        showManualCopyTextarea(text, messageId);
+      }
     }
+  };
+
+  // Last resort function to show text in a temporary textarea for manual copying
+  const showManualCopyTextarea = (text, messageId) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.top = '50%';
+    textarea.style.left = '50%';
+    textarea.style.transform = 'translate(-50%, -50%)';
+    textarea.style.width = '80%';
+    textarea.style.height = '200px';
+    textarea.style.zIndex = '10000';
+    textarea.style.padding = '10px';
+    textarea.style.border = '2px solid #ccc';
+    textarea.style.borderRadius = '5px';
+    textarea.style.backgroundColor = 'white';
+    textarea.style.color = 'black';
+    textarea.placeholder = 'Text to copy (select all and copy manually)';
+    
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    overlay.style.zIndex = '9999';
+    
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    closeButton.style.position = 'absolute';
+    closeButton.style.top = '10px';
+    closeButton.style.right = '10px';
+    closeButton.style.padding = '5px 10px';
+    closeButton.style.backgroundColor = '#f44336';
+    closeButton.style.color = 'white';
+    closeButton.style.border = 'none';
+    closeButton.style.borderRadius = '3px';
+    closeButton.style.cursor = 'pointer';
+    
+    const closeModal = () => {
+      document.body.removeChild(overlay);
+      document.body.removeChild(textarea);
+    };
+    
+    closeButton.onclick = closeModal;
+    overlay.onclick = closeModal;
+    
+    textarea.onclick = (e) => e.stopPropagation();
+    
+    document.body.appendChild(overlay);
+    document.body.appendChild(textarea);
+    overlay.appendChild(closeButton);
+    
+    textarea.focus();
+    textarea.select();
+    
+    toast.info('Copy failed. Text shown in popup for manual copying.');
   };
 
   // Preprocess markdown for mobile to handle tables manually
@@ -175,19 +301,27 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
     const match = /language-(\w+)/.exec(className || '');
     return !inline && match ? (
       <div className="relative my-4">
-        <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border">
+        <div 
+          className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border"
+
+        >
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {match[1]}
           </span>
+        </div>
+        <div className="relative">
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 hover:bg-background/80"
-            onClick={() => copyToClipboard(String(children), `code-${Math.random()}`)}
+            className="absolute top-2 right-2 h-6 w-6 p-0 hover:bg-background/80 cursor-pointer z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              copyToClipboard(String(children), `code-${Math.random()}`);
+            }}
           >
             <Copy className="h-3 w-3" />
           </Button>
-        </div>
         <SyntaxHighlighter
           style={isDark ? oneDark : oneLight}
           language={match[1]}
@@ -243,7 +377,9 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
+                    <ContextMenuItem onSelect={() => {
+                      copyToClipboard(message.content, message.id);
+                    }}>
                       <Copy className="h-4 w-4 mr-2" />
                       Copy
                     </ContextMenuItem>
@@ -260,93 +396,102 @@ const MessageList = ({ messages, isLoading, onAddToPrompt, onDeleteMessage }) =>
                   </ContextMenuContent>
                 </CM>
               ) : (
-                <CM>
-                  <ContextMenuTrigger asChild>
-                    <div
-                      className={`group relative message-assistant border border-border/50`}
-                    >
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown
-                          remarkPlugins={remarkPlugins}
-                          components={{
-                            code: CodeBlock,
-                            pre: ({ children }) => <div>{children}</div>,
-                            p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
-                            h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
-                            h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
-                            h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-foreground">{children}</h3>,
-                            ul: ({ children }) => <ul className="mb-3 pl-4 space-y-1">{children}</ul>,
-                            ol: ({ children }) => <ol className="mb-3 pl-4 space-y-1">{children}</ol>,
-                            li: ({ children }) => <li className="text-foreground">{children}</li>,
-                            blockquote: ({ children }) => (
-                              <blockquote className="border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
-                                {children}
-                              </blockquote>
-                            ),
-                            a: ({ href, children }) => (
-                              <a href={href} className="text-primary hover:text-primary/80 underline" target="_blank" rel="noopener noreferrer">
-                                {children}
-                              </a>
-                            ),
-                            table: ({ children }) => (
-                              <div className="my-3 w-full overflow-x-auto">
-                                <table className="w-full border-collapse text-sm">{children}</table>
-                              </div>
-                            ),
-                            thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-                            tbody: ({ children }) => <tbody>{children}</tbody>,
-                            tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
-                            th: ({ children }) => (
-                              <th className="bg-gray-800 border border-gray-200 px-2 py-1 text-left font-semibold align-middle">
-                                {children}
-                              </th>
-                            ),
-                            td: ({ children }) => (
-                              <td className="bg-gray-600 border border-gray-200 px-2 py-1 align-top">{children}</td>
-                            ),
-                          }}
-                        >
-                          {preprocessMarkdownForMobile(message.content)}
-                        </ReactMarkdown>
-                      </div>
-                      {message.role === 'assistant' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => copyToClipboard(message.content, message.id)}
-                        >
-                          {copiedId === message.id ? (
-                            <Check className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </Button>
-                      )}
-                      {message.files && message.files.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-border/30">
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <span>📎</span>
-                            <span>{message.files.length} file(s) attached</span>
-                          </div>
+                <div className="relative">
+                  <CM>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        className={`group relative message-assistant border border-border/50`}
+
+                      >
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown
+                            remarkPlugins={remarkPlugins}
+                            components={{
+                              code: CodeBlock,
+                              pre: ({ children }) => <div>{children}</div>,
+                              p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                              h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-base font-semibold mb-2 text-foreground">{children}</h3>,
+                              ul: ({ children }) => <ul className="mb-3 pl-4 space-y-1">{children}</ul>,
+                              ol: ({ children }) => <ol className="mb-3 pl-4 space-y-1">{children}</ol>,
+                              li: ({ children }) => <li className="text-foreground">{children}</li>,
+                              blockquote: ({ children }) => (
+                                <blockquote className="border-l-4 border-primary pl-4 my-3 italic text-muted-foreground">
+                                  {children}
+                                </blockquote>
+                              ),
+                              a: ({ href, children }) => (
+                                <a href={href} className="text-primary hover:text-primary/80 underline" target="_blank" rel="noopener noreferrer">
+                                  {children}
+                                </a>
+                              ),
+                              table: ({ children }) => (
+                                <div className="my-3 w-full overflow-x-auto">
+                                  <table className="w-full border-collapse text-sm">{children}</table>
+                                </div>
+                              ),
+                              thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+                              tbody: ({ children }) => <tbody>{children}</tbody>,
+                              tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+                              th: ({ children }) => (
+                                <th className="bg-gray-800 border border-gray-200 px-2 py-1 text-left font-semibold align-middle">
+                                  {children}
+                                </th>
+                              ),
+                              td: ({ children }) => (
+                                <td className="bg-gray-600 border border-gray-200 px-2 py-1 align-top">{children}</td>
+                              ),
+                            }}
+                          >
+                            {preprocessMarkdownForMobile(message.content)}
+                          </ReactMarkdown>
                         </div>
-                      )}
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
-                    </ContextMenuItem>
-                    <ContextMenuItem 
-                      onSelect={() => onDeleteMessage && onDeleteMessage(message.id)}
-                      className="text-destructive focus:text-destructive"
+                        {message.files && message.files.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-border/30">
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span>📎</span>
+                              <span>{message.files.length} file(s) attached</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => {
+                        copyToClipboard(message.content, message.id);
+                      }}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copy
+                      </ContextMenuItem>
+                      <ContextMenuItem 
+                        onSelect={() => onDeleteMessage && onDeleteMessage(message.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </CM>
+                  {message.role === 'assistant' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                                                onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            copyToClipboard(message.content, message.id);
+                          }}
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </CM>
+                      {copiedId === message.id ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
