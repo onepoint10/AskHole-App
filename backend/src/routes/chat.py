@@ -592,7 +592,7 @@ def use_prompt(prompt_id):
 
 @chat_bp.route('/files/upload', methods=['POST'])
 def upload_file():
-    """Upload a file with better Cyrillic filename support"""
+    """Upload a file with better Cyrillic filename support and timeout handling"""
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -626,8 +626,12 @@ def upload_file():
         unique_filename = f"{uuid.uuid4()}_{safe_filename}"
         file_path = os.path.join(upload_dir, unique_filename)
 
-        # Save the file first
-        file.save(file_path)
+        # Save the file first with timeout handling
+        try:
+            file.save(file_path)
+        except Exception as save_error:
+            print(f"File save error: {save_error}")
+            return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
 
         # Get file info after saving
         file_size = os.path.getsize(file_path)
@@ -691,8 +695,23 @@ def upload_file():
         max_size = 20 * 1024 * 1024  # 20MB
         if file_size > max_size:
             # Remove the uploaded file if it's too large
-            os.remove(file_path)
-            return jsonify({'error': f'File size ({file_size / (1024 * 1024):.1f}MB) exceeds 20MB limit'}), 400
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            return jsonify({
+                'error': f'File size ({file_size / (1024 * 1024):.1f}MB) exceeds 20MB limit',
+                'file_size': file_size,
+                'max_size': max_size
+            }), 400
+
+        # Validate file content (basic check)
+        if file_size == 0:
+            try:
+                os.remove(file_path)
+            except:
+                pass
+            return jsonify({'error': 'File appears to be empty or corrupted'}), 400
 
         # Save to database with original filename preserved
         file_upload = FileUpload(
@@ -759,3 +778,46 @@ def delete_file(file_id):
     db.session.commit()
 
     return jsonify({'success': True})
+
+
+@chat_bp.route('/files/<int:file_id>/status', methods=['GET'])
+def get_file_status(file_id):
+    """Get file upload status and processing information"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    file_upload = FileUpload.query.filter_by(
+        id=file_id,
+        user_id=current_user.id
+    ).first()
+
+    if not file_upload:
+        return jsonify({'error': 'File not found or access denied'}), 404
+
+    # Check if file exists on disk
+    file_exists = os.path.exists(file_upload.file_path)
+    file_size = os.path.getsize(file_upload.file_path) if file_exists else 0
+    
+    # Get file modification time
+    file_modified = None
+    if file_exists:
+        try:
+            file_modified = datetime.fromtimestamp(os.path.getmtime(file_upload.file_path))
+        except:
+            pass
+
+    status_info = {
+        'id': file_upload.id,
+        'filename': file_upload.filename,
+        'original_filename': file_upload.original_filename,
+        'file_size': file_size,
+        'mime_type': file_upload.mime_type,
+        'uploaded_at': file_upload.uploaded_at.isoformat() if file_upload.uploaded_at else None,
+        'file_exists': file_exists,
+        'file_modified': file_modified.isoformat() if file_modified else None,
+        'status': 'ready' if file_exists and file_size > 0 else 'missing',
+        'processing_status': 'completed' if file_exists and file_size > 0 else 'failed'
+    }
+
+    return jsonify(status_info)

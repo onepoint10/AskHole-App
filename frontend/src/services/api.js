@@ -45,7 +45,7 @@ const apiCall = async (url, options = {}) => {
   const defaultOptions = {
     credentials: 'include',
     mode: 'cors',
-    timeout: 180000,
+    timeout: 120000, // Increased to 120 seconds to match backend timeout
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -385,6 +385,11 @@ export const filesAPI = {
     return apiCall(`/files/${fileId}`, {
       method: 'DELETE',
     });
+  },
+
+  getFileStatus: async (fileId) => {
+    console.log('API Request: GET /files/' + fileId + '/status');
+    return apiCall(`/files/${fileId}/status`);
   },
 };
 

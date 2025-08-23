@@ -27,6 +27,8 @@ function App() {
   const [prompts, setPrompts] = useState([]);
   const [availableModels, setAvailableModels] = useState({ gemini: [], openrouter: [] });
   const [isLoading, setIsLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
@@ -431,11 +433,77 @@ function App() {
       const uploadedFileIds = [];
       for (const file of files) {
         try {
+          console.log(`Uploading file: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
           const uploadResponse = await filesAPI.uploadFile(file);
-          uploadedFileIds.push(uploadResponse.data.id);
+          const fileId = uploadResponse.data.id;
+          uploadedFileIds.push(fileId);
+          setUploadedFileIds(prev => [...prev, fileId]); // Add to tracking state
+          
+          // Check file status after upload to ensure it's ready
+          try {
+            let retries = 0;
+            const maxRetries = 30; // 30 * 4 seconds = 120 seconds max wait
+            let fileReady = false;
+            
+            while (retries < maxRetries && !fileReady) {
+              await new Promise(resolve => setTimeout(resolve, 4000)); // Wait 4 seconds between checks
+              
+              try {
+                const statusResponse = await filesAPI.getFileStatus(fileId);
+                if (statusResponse.data.status === 'ready' && statusResponse.data.processing_status === 'completed') {
+                  fileReady = true;
+                  console.log(`File ${file.name} is ready for processing`);
+                } else {
+                  console.log(`File ${file.name} status: ${statusResponse.data.status}, processing: ${statusResponse.data.processing_status}`);
+                  retries++;
+                }
+              } catch (statusError) {
+                console.warn(`Failed to check status for ${file.name}:`, statusError);
+                retries++;
+              }
+            }
+            
+            if (!fileReady) {
+              console.warn(`File ${file.name} may not be fully ready after ${maxRetries * 4} seconds`);
+              // Continue anyway - the backend will handle file processing
+            }
+          } catch (statusError) {
+            console.warn(`Status checking failed for ${file.name}:`, statusError);
+            // Continue anyway - the backend will handle file processing
+          }
+          
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
-          toast.error(`Failed to upload ${file.name}`);
+          let errorMsg = `Failed to upload ${file.name}`;
+          
+          if (error.message.includes('timeout')) {
+            errorMsg = `Upload timeout for ${file.name}. The file may still be processing.`;
+          } else if (error.message.includes('size')) {
+            errorMsg = `File ${file.name} is too large. Maximum size is 20MB.`;
+          } else if (error.message.includes('Authentication')) {
+            errorMsg = `Authentication failed for ${file.name}. Please log in again.`;
+          }
+          
+          toast.error(errorMsg);
+          
+          // Try to retry the upload once
+          try {
+            console.log(`Retrying upload for ${file.name}...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+            
+            const retryResponse = await filesAPI.uploadFile(file);
+            const retryFileId = retryResponse.data.id;
+            uploadedFileIds.push(retryFileId);
+            setUploadedFileIds(prev => [...prev, retryFileId]); // Add to tracking state
+            console.log(`Retry successful for ${file.name}`);
+            toast.success(`Retry successful for ${file.name}`);
+          } catch (retryError) {
+            console.error(`Retry failed for ${file.name}:`, retryError);
+            toast.error(`Retry failed for ${file.name}. Please try again later.`);
+          }
+          
+          // Don't add failed files to the list if retry also failed
+          continue;
         }
       }
 
@@ -462,6 +530,13 @@ function App() {
         s.id === activeSessionId ? response.data.session : s
       ));
 
+      // Show success message for file uploads
+      if (uploadedFileIds.length > 0) {
+        toast.success(`Message sent successfully with ${uploadedFileIds.length} file(s)`);
+        // Clear uploaded file IDs after successful sending
+        clearUploadedFileIds();
+      }
+
       // Return success indicator
       return { success: true };
 
@@ -478,6 +553,12 @@ function App() {
         setIsAuthenticated(false);
       } else if (error.message.includes('not configured')) {
         errorMessage = "Please configure your API keys in settings before sending messages.";
+      } else if (error.message.includes('timeout')) {
+        errorMessage = "Request timeout. The file may still be processing. Please check the file status or try again.";
+      } else if (error.message.includes('Load error')) {
+        errorMessage = "File loading error. The file may still be processing. Please refresh the page to check status.";
+      } else if (error.message.includes('File upload timeout')) {
+        errorMessage = "File upload timeout. The file may still be processing. Please check the file status.";
       } else {
         errorMessage = `Failed to send message: ${error.message}`;
       }
@@ -490,6 +571,44 @@ function App() {
       setIsLoading(false);
     }
   }, [activeSessionId, setIsAuthenticated]);
+
+  // Add periodic file status checking
+  const checkFileStatuses = useCallback(async (fileIds) => {
+    if (!fileIds || fileIds.length === 0) return;
+    
+    console.log(`Checking status for ${fileIds.length} files...`);
+    
+    for (const fileId of fileIds) {
+      try {
+        const statusResponse = await filesAPI.getFileStatus(fileId);
+        const status = statusResponse.data;
+        
+        if (status.status === 'ready' && status.processing_status === 'completed') {
+          console.log(`File ${status.original_filename} is ready`);
+        } else {
+          console.log(`File ${status.original_filename} status: ${status.status}, processing: ${status.processing_status}`);
+        }
+      } catch (error) {
+        console.warn(`Failed to check status for file ${fileId}:`, error);
+      }
+    }
+  }, []);
+
+  // Check file statuses periodically when there are uploaded files
+  useEffect(() => {
+    if (uploadedFileIds.length > 0) {
+      const interval = setInterval(() => {
+        checkFileStatuses(uploadedFileIds);
+      }, 10000); // Check every 10 seconds
+      
+      return () => clearInterval(interval);
+    }
+  }, [uploadedFileIds, checkFileStatuses]);
+
+  // Clear uploaded file IDs after successful message sending
+  const clearUploadedFileIds = useCallback(() => {
+    setUploadedFileIds([]);
+  }, []);
 
   // Delete message function
   const deleteMessage = useCallback(async (messageId) => {
