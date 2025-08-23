@@ -27,7 +27,6 @@ function App() {
   const [prompts, setPrompts] = useState([]);
   const [availableModels, setAvailableModels] = useState({ gemini: [], openrouter: [] });
   const [isLoading, setIsLoading] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
