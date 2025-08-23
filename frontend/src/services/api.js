@@ -43,7 +43,7 @@ const apiCall = async (url, options = {}) => {
   console.log(`API Call ${url}: session_id = ${sessionId}`);
   
   const defaultOptions = {
-    credentials: 'include',
+    credentials: 'omit',  // Changed from 'include' to 'omit' to work with CORS
     mode: 'cors',
     timeout: 120000, // Increased to 120 seconds to match backend timeout
     headers: {
