@@ -3,6 +3,31 @@ from datetime import datetime
 import json
 
 
+class FileUpload(db.Model):
+    __tablename__ = 'file_uploads'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    original_filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    file_size = db.Column(db.Integer, nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'filename': self.filename,
+            'original_filename': self.original_filename,
+            'file_path': self.file_path,
+            'file_size': self.file_size,
+            'mime_type': self.mime_type,
+            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None
+        }
+
+
 class ChatSession(db.Model):
     __tablename__ = 'chat_sessions'
 
@@ -51,10 +76,6 @@ class ChatMessage(db.Model):
             try:
                 file_ids = json.loads(self.files)
                 if file_ids:
-                    # Import here to avoid circular imports
-                    from src.database import db
-                    from src.models.chat import FileUpload
-                    
                     # Get file information for each file ID
                     for file_id in file_ids:
                         file_upload = FileUpload.query.get(file_id)
@@ -116,28 +137,4 @@ class PromptTemplate(db.Model):
             'usage_count': self.usage_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
-
-class FileUpload(db.Model):
-    __tablename__ = 'file_uploads'
-
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # Added user relationship
-    filename = db.Column(db.String(255), nullable=False)
-    original_filename = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(500), nullable=False)
-    file_size = db.Column(db.Integer, nullable=False)
-    mime_type = db.Column(db.String(100))
-    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'filename': self.filename,
-            'original_filename': self.original_filename,
-            'file_size': self.file_size,
-            'mime_type': self.mime_type,
-            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None
         }

@@ -4,6 +4,7 @@ from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
 from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
+from src.file_converter import FileConverter
 import uuid
 import os
 import json
@@ -305,7 +306,9 @@ def send_message(session_id):
                     user_id=current_user.id
                 ).first()
                 if file_upload:
+                    # Use the file path (which should be PDF if conversion was successful)
                     file_paths.append(file_upload.file_path)
+                    print(f"Added file to message: {file_upload.original_filename} -> {file_upload.file_path}")
 
     # Save user message first
     user_message = ChatMessage(
@@ -674,7 +677,31 @@ def upload_file():
             print(f"File save error: {save_error}")
             return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
 
-        # Get file info after saving
+        # Convert file to PDF if it's a supported format
+        converted_file_path = file_path
+        original_file_path = file_path
+        try:
+            file_ext = os.path.splitext(original_filename.lower())[1]
+            if file_ext in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.py', '.js', '.html', '.css', '.xml', '.json', '.csv']:
+                print(f"Converting {file_ext} file to PDF...")
+                converted_file_path = FileConverter.convert_to_pdf(file_path, upload_dir)
+                if converted_file_path and converted_file_path != file_path:
+                    print(f"File converted successfully to: {converted_file_path}")
+                    # Update file info for the converted file
+                    file_size = os.path.getsize(converted_file_path)
+                    mime_type = 'application/pdf'
+                    # Update the file_path to use the converted version
+                    file_path = converted_file_path
+                else:
+                    print(f"File conversion failed, using original file")
+            else:
+                print(f"File type {file_ext} doesn't require conversion")
+        except Exception as conv_error:
+            print(f"File conversion error: {conv_error}")
+            # Continue with original file if conversion fails
+            converted_file_path = file_path
+
+        # Get file info after saving (and conversion if applicable)
         file_size = os.path.getsize(file_path)
         print(f"File size: {file_size} bytes")
 
@@ -759,9 +786,9 @@ def upload_file():
         print(f"About to save file to database. User ID: {current_user.id}")
         file_upload = FileUpload(
             user_id=current_user.id,
-            filename=unique_filename,
+            filename=os.path.basename(file_path),  # Use converted filename if available
             original_filename=original_filename,  # Preserve original Cyrillic name
-            file_path=file_path,
+            file_path=file_path,  # Use converted file path if available
             file_size=file_size,
             mime_type=mime_type
         )
@@ -771,6 +798,14 @@ def upload_file():
         print("FileUpload added to session")
         db.session.commit()
         print(f"File uploaded successfully to database with ID: {file_upload.id}")
+
+        # Clean up original file if it was converted and is different
+        if converted_file_path != original_file_path and os.path.exists(original_file_path):
+            try:
+                os.remove(original_file_path)
+                print(f"Cleaned up original file: {original_file_path}")
+            except Exception as cleanup_error:
+                print(f"Warning: Could not clean up original file: {cleanup_error}")
 
         return jsonify(file_upload.to_dict()), 201
 
