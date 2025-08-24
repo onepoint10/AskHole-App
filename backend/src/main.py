@@ -118,6 +118,30 @@ def create_app():
                         connection.execute(
                             text(f'UPDATE file_uploads SET user_id = {default_user.id} WHERE user_id IS NULL'))
 
+                # Check and add device tracking columns to user_sessions table
+                if 'user_sessions' in tables:
+                    session_columns = [col['name'] for col in inspector.get_columns('user_sessions')]
+                    print(f"User sessions columns: {session_columns}")
+
+                    # Add device tracking columns if they don't exist
+                    device_columns = [
+                        ('device_id', 'VARCHAR(128)'),
+                        ('device_name', 'VARCHAR(255)'),
+                        ('device_type', 'VARCHAR(50)'),
+                        ('user_agent', 'TEXT'),
+                        ('ip_address', 'VARCHAR(45)'),
+                        ('is_remember_me', 'BOOLEAN DEFAULT 0'),
+                        ('last_used', 'DATETIME')
+                    ]
+
+                    for column_name, column_type in device_columns:
+                        if column_name not in session_columns:
+                            print(f"Adding {column_name} column to user_sessions")
+                            try:
+                                connection.execute(text(f'ALTER TABLE user_sessions ADD COLUMN {column_name} {column_type}'))
+                            except Exception as e:
+                                print(f"Error adding {column_name}: {e}")
+
                 # Commit the connection
                 connection.commit()
 

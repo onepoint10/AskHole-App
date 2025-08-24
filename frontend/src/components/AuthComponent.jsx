@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Loader2, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -15,14 +17,16 @@ const AuthComponent = ({ onAuthSuccess }) => {
   
   const [loginForm, setLoginForm] = useState({
     username: '',
-    password: ''
+    password: '',
+    rememberMe: false
   });
   
   const [registerForm, setRegisterForm] = useState({
     username: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    rememberMe: false
   });
 
   // Clear errors when switching tabs or changing form data
@@ -69,7 +73,8 @@ const AuthComponent = ({ onAuthSuccess }) => {
       
       const response = await authAPI.login({
         username: loginForm.username.trim(),
-        password: loginForm.password
+        password: loginForm.password,
+        remember_me: loginForm.rememberMe
       });
 
       console.log('Login response:', response.data);
@@ -147,7 +152,8 @@ const AuthComponent = ({ onAuthSuccess }) => {
       const response = await authAPI.register({
         username: registerForm.username.trim(),
         email: registerForm.email.trim().toLowerCase(),
-        password: registerForm.password
+        password: registerForm.password,
+        remember_me: registerForm.rememberMe
       });
 
       console.log('Registration response:', response.data);
@@ -190,12 +196,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
         username: '',
         email: '',
         password: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        rememberMe: false
       });
     } else {
       setLoginForm({
         username: '',
-        password: ''
+        password: '',
+        rememberMe: false
       });
     }
   };
@@ -256,6 +264,18 @@ const AuthComponent = ({ onAuthSuccess }) => {
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-me-login"
+                    checked={loginForm.rememberMe}
+                    onCheckedChange={(checked) => setLoginForm({ ...loginForm, rememberMe: checked })}
+                    disabled={isLoading}
+                  />
+                  <Label htmlFor="remember-me-login" className="text-sm text-muted-foreground">
+                    Remember me for 90 days
+                  </Label>
                 </div>
 
                 {errors.general && (
@@ -358,6 +378,18 @@ const AuthComponent = ({ onAuthSuccess }) => {
                   {errors.confirmPassword && (
                     <p className="text-sm text-destructive">{errors.confirmPassword}</p>
                   )}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-me-register"
+                    checked={registerForm.rememberMe}
+                    onCheckedChange={(checked) => setRegisterForm({ ...registerForm, rememberMe: checked })}
+                    disabled={isLoading}
+                  />
+                  <Label htmlFor="remember-me-register" className="text-sm text-muted-foreground">
+                    Remember me for 90 days
+                  </Label>
                 </div>
 
                 {errors.general && (

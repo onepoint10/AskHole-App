@@ -205,6 +205,25 @@ export const authAPI = {
       throw error;
     }
   },
+
+  getDevices: async () => {
+    console.log('API Request: GET /auth/devices');
+    return apiCall('/auth/devices');
+  },
+
+  revokeDevice: async (sessionId) => {
+    console.log('API Request: DELETE /auth/devices/' + sessionId);
+    return apiCall(`/auth/devices/${sessionId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  revokeAllDevices: async () => {
+    console.log('API Request: POST /auth/devices/revoke-all');
+    return apiCall('/auth/devices/revoke-all', {
+      method: 'POST',
+    });
+  },
 };
 
 // Configuration API
