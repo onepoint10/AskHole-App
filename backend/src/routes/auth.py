@@ -3,6 +3,7 @@ from src.database import db
 from src.models.user import User, UserSession
 from datetime import datetime, timedelta
 import re
+import uuid
 
 def debug_session():
     """Debug session information"""
@@ -193,85 +194,72 @@ def register():
 @auth_bp.route('/login', methods=['POST'])
 def login():
     """Login user with improved network compatibility"""
+    print("=== LOGIN ENDPOINT CALLED ===")
+    print(f"Request method: {request.method}")
+    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request cookies: {dict(request.cookies)}")
+    
     try:
         data = request.get_json()
-        username_or_email = data.get('username', '').strip()
+        print(f"Request data: {data}")
+        
+        username = data.get('username', '').strip()
         password = data.get('password', '')
 
-        print(f"Login attempt for: {username_or_email}")
+        # Validation
+        if not username or not password:
+            print("Missing username or password")
+            return jsonify({'error': 'Username and password are required'}), 400
 
-        if not username_or_email or not password:
-            return jsonify({'error': 'Username/email and password are required'}), 400
+        print(f"Attempting login for username: {username}")
 
-        # Find user by username or email
-        user = User.query.filter(
-            (User.username == username_or_email) |
-            (User.email == username_or_email.lower())
-        ).first()
+        # Find user
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            print(f"User not found: {username}")
+            return jsonify({'error': 'Invalid username or password'}), 401
 
-        if not user or not user.check_password(password):
-            return jsonify({'error': 'Invalid username/email or password'}), 401
+        # Check password
+        if not user.check_password(password):
+            print(f"Invalid password for user: {username}")
+            return jsonify({'error': 'Invalid username or password'}), 401
 
-        if not user.is_active:
-            return jsonify({'error': 'Account is disabled'}), 403
-
-        # Deactivate old sessions
-        UserSession.query.filter_by(
-            user_id=user.id,
-            is_active=True
-        ).update({'is_active': False})
+        print(f"Password check passed for user: {username}")
 
         # Create new session
-        session_id = UserSession.generate_session_id()
+        session_id = str(uuid.uuid4())
         user_session = UserSession(
             id=session_id,
             user_id=user.id,
-            expires_at=datetime.utcnow() + timedelta(days=30)
+            created_at=datetime.utcnow(),
+            expires_at=datetime.utcnow() + timedelta(days=30),
+            is_active=True
         )
 
         db.session.add(user_session)
         db.session.commit()
 
-        print(f"Created session {session_id} for user {user.id}")
+        print(f"Session created successfully: {session_id}")
 
-        # FIXED: Set Flask session for local compatibility only
-        session.clear()
-        session['session_id'] = session_id
-        session['user_id'] = user.id
-        session.permanent = True
-
-        print(f"Flask session after setting: {dict(session)}")
-
-        # Create response
-        response_data = {
-            'success': True,
-            'message': 'Login successful',
-            'user': user.to_dict(),
-            'session_id': session_id  # Always send session_id in response for network clients
-        }
-
-        response = jsonify(response_data)
-
-        # FIXED: Set cookie with network-compatible settings
-        response.set_cookie(
-            'session',
-            session_id,  # Send actual session_id, not Flask session
-            max_age=30 * 24 * 60 * 60,
-            httponly=False,
-            secure=False,  # Must be False for local network
-            samesite='Lax',  # Changed from None to Lax for better compatibility
-            domain=None,
-            path='/'
-        )
-
-        # FIXED: Always set session ID in response header for network clients
+        # Return session ID in response body and headers
+        response = jsonify({
+            'authenticated': True,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email
+            },
+            'session_id': session_id
+        })
+        
+        # Set session ID in response headers for frontend to capture
         response.headers['X-Session-ID'] = session_id
-
+        
+        print(f"Login successful for user: {username}")
         return response
 
     except Exception as e:
-        db.session.rollback()
-        print(f"Login error: {str(e)}")
+        print(f"Login error: {e}")
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
 
@@ -310,11 +298,28 @@ def get_current_user_info():
 @auth_bp.route('/check', methods=['GET'])
 def check_auth():
     """Check authentication status"""
-    user = get_current_user()
-    return jsonify({
-        'authenticated': user is not None,
-        'user': user.to_dict() if user else None
-    })
+    print("=== AUTH CHECK ENDPOINT CALLED ===")
+    print(f"Request method: {request.method}")
+    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request cookies: {dict(request.cookies)}")
+    print(f"Authorization header: {request.headers.get('Authorization', 'Not present')}")
+    
+    current_user = get_current_user()
+    print(f"Current user result: {current_user}")
+    
+    if current_user:
+        print(f"User authenticated: {current_user.username}")
+        return jsonify({
+            'authenticated': True,
+            'user': {
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email
+            }
+        })
+    else:
+        print("No authenticated user found")
+        return jsonify({'authenticated': False}), 401
 
 @auth_bp.route('/debug-session', methods=['GET'])
 def debug_session_info():

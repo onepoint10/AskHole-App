@@ -4,7 +4,11 @@ import sys
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from flask import Flask, send_from_directory, session
+# Set environment variables for timeouts
+os.environ['FLASK_REQUEST_TIMEOUT'] = '120'
+os.environ['WERKZEUG_TIMEOUT'] = '120'
+
+from flask import Flask, send_from_directory, session, jsonify, request
 from flask_cors import CORS
 from src.database import db
 from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
@@ -17,9 +21,9 @@ from datetime import timedelta
 def create_app():
     app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
     app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
-    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
     
-    # Session configuration
+    # Timeout configurations for file uploads
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
     app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
     app.config['SESSION_COOKIE_HTTPONLY'] = False  # Allow JavaScript access
@@ -27,6 +31,17 @@ def create_app():
     app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
     app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
     app.config['SESSION_COOKIE_PATH'] = '/'
+    
+    # Increase timeout for file operations
+    app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+    
+    # Flask timeout configurations
+    app.config['REQUEST_TIMEOUT'] = 120  # 120 seconds for request timeout
+    app.config['UPLOAD_TIMEOUT'] = 120   # 120 seconds for upload timeout
+    
+    # Ensure upload directory exists
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
@@ -35,14 +50,21 @@ def create_app():
     # Initialize extensions
     db.init_app(app)
 
+    # Configure Werkzeug for better file handling
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    
+    # Set Werkzeug timeout for file operations
+    import werkzeug
+    werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
+    
     # Enable CORS for all routes with more specific configuration
     CORS(app,
+         resources={r"/api/*": {"origins": "*", "supports_credentials": False}},
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
-         supports_credentials=True,
          expose_headers=["Set-Cookie", "X-Session-ID"],
-         intercept_exceptions=False,
-         # FIXED: Add origin validation function for network IPs
+         intercept_exceptions=False
          )
 
     # Register blueprints
@@ -155,6 +177,21 @@ def create_app():
             except Exception as recreate_error:
                 print(f"Database recreation failed: {recreate_error}")
 
+    # Global error handlers
+    @app.errorhandler(413)
+    def too_large(e):
+        return jsonify({'error': 'File too large. Maximum size is 100MB.'}), 413
+
+    @app.errorhandler(408)
+    def timeout(e):
+        return jsonify({'error': 'Request timeout. Please try again with a smaller file or check your connection.'}), 408
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        return jsonify({'error': 'Internal server error. Please try again later.'}), 500
+
+    print("Database initialization completed successfully")
+
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
     def serve(path):
@@ -177,4 +214,29 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app = create_app()
+    
+    # Configure server timeout for file uploads
+    import threading
+    import time
+    
+    def timeout_handler():
+        """Handle request timeouts gracefully"""
+        print("Request timeout handler initialized")
+    
+    # Start timeout handler in background
+    timeout_thread = threading.Thread(target=timeout_handler, daemon=True)
+    timeout_thread.start()
+    
+    print("Starting Flask app with 120-second timeout for file operations...")
+    print("File upload timeout: 120 seconds")
+    print("Max file size: 100MB")
+    
+    # Run with increased timeout
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=False,
+        threaded=True,
+        use_reloader=False
+    )

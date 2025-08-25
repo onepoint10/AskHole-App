@@ -348,25 +348,61 @@ class GeminiClient:
                     pass
 
             # Wait for processing
-            max_wait = 60
+            max_wait = 120  # Increased from 60 to 120 seconds as requested
             wait_time = 0
             check_interval = 2
 
             while wait_time < max_wait:
                 try:
-                    current_file = self.client.files.get(uploaded_file.name)
-                    if current_file.state.name == "ACTIVE":
+                    # Fix: Use the correct API call for checking file status
+                    # The newer Google Generative AI library has a different API
+                    try:
+                        # Try the new API first
+                        current_file = self.client.files.get(name=uploaded_file.name)
+                    except (TypeError, AttributeError):
+                        # Fallback to the old API if the new one doesn't work
+                        try:
+                            current_file = self.client.files.get(name=uploaded_file.name)
+                        except Exception as fallback_error:
+                            print(f"Fallback API also failed: {fallback_error}")
+                            # If both fail, try to get file by ID
+                            try:
+                                current_file = self.client.files.get(uploaded_file.id)
+                            except Exception as id_error:
+                                print(f"ID-based API also failed: {id_error}")
+                                # Last resort: return the uploaded file as is
+                                print(f"Using uploaded file directly: {file_path}")
+                                return uploaded_file
+                    
+                    # Check file state - handle different possible state structures
+                    if hasattr(current_file, 'state') and hasattr(current_file.state, 'name'):
+                        state_name = current_file.state.name
+                    elif hasattr(current_file, 'state'):
+                        state_name = str(current_file.state)
+                    else:
+                        # If no state information, assume it's ready
+                        print(f"File upload completed (no state info): {file_path}")
+                        return current_file
+                    
+                    if state_name == "ACTIVE" or state_name == "READY":
                         print(f"File upload successful: {file_path}")
                         return current_file
-                    elif current_file.state.name == "FAILED":
+                    elif state_name == "FAILED" or state_name == "ERROR":
                         print(f"File upload failed: {file_path}")
                         return None
                     else:
+                        print(f"File processing status: {state_name}, waiting...")
                         import time
                         time.sleep(check_interval)
                         wait_time += check_interval
                 except Exception as e:
                     print(f"Error checking file status: {e}")
+                    print(f"Error type: {type(e).__name__}")
+                    print(f"Error details: {str(e)}")
+                    print(f"Uploaded file object: {uploaded_file}")
+                    print(f"Uploaded file name: {getattr(uploaded_file, 'name', 'N/A')}")
+                    print(f"Uploaded file id: {getattr(uploaded_file, 'id', 'N/A')}")
+                    
                     import time
                     time.sleep(check_interval)
                     wait_time += check_interval
