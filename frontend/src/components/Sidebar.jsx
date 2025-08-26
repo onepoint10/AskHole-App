@@ -55,6 +55,45 @@ const Sidebar = ({
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
 
+  // Long press detection for mobile
+  const longPressTimerRef = React.useRef(null);
+  const longPressTriggeredRef = React.useRef(false);
+  const touchStartPosRef = React.useRef({ x: 0, y: 0 });
+
+  const startLongPress = (event, sessionId) => {
+    longPressTriggeredRef.current = false;
+    const touch = event.touches ? event.touches[0] : null;
+    if (touch) {
+      touchStartPosRef.current = { x: touch.clientX, y: touch.clientY };
+    }
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      const x = touch ? touch.clientX : 0;
+      const y = touch ? touch.clientY : 0;
+      setContextMenu({ isVisible: true, position: { x, y }, sessionId });
+    }, 500); // 500ms long-press
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  const maybeCancelOnMove = (event) => {
+    const touch = event.touches ? event.touches[0] : null;
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - touchStartPosRef.current.x);
+    const dy = Math.abs(touch.clientY - touchStartPosRef.current.y);
+    if (dx > 10 || dy > 10) {
+      cancelLongPress();
+    }
+  };
+
   // Calculate adaptive width based on content
   const calculateAdaptiveWidth = () => {
     if (isCollapsed) return 60; // Collapsed width
@@ -327,9 +366,21 @@ const Sidebar = ({
                   <div
                     key={session.id}
                     className="group flex items-center gap-2 p-2 rounded-lg hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
-                    onClick={() => editingSessionId !== session.id && onSessionSelect(session.id)}
+                    onClick={() => {
+                      if (editingSessionId === session.id) return;
+                      if (longPressTriggeredRef.current) {
+                        // suppress click after long-press
+                        longPressTriggeredRef.current = false;
+                        return;
+                      }
+                      onSessionSelect(session.id);
+                    }}
                     onContextMenu={(e) => handleContextMenu(e, session.id)}
                     onDoubleClick={() => handleDoubleClick(session.id)}
+                    onTouchStart={(e) => startLongPress(e, session.id)}
+                    onTouchEnd={() => cancelLongPress()}
+                    onTouchCancel={() => cancelLongPress()}
+                    onTouchMove={(e) => maybeCancelOnMove(e)}
                   >
                     <div className="flex-1 min-w-0">
                       {editingSessionId === session.id ? (

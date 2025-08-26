@@ -429,3 +429,85 @@
     transform: scale(1.2);
   }
 }
+
+/* Mobile layout and touch-friendly controls */
+@media (max-width: 768px) {
+  .mobile-root {
+    position: relative;
+  }
+  .mobile-sidebar-toggle {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 60;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+    border: 1px solid var(--sidebar-border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .mobile-sidebar-toggle:active {
+    transform: scale(0.98);
+  }
+
+  /* Sidebar overlay sheet */
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+  }
+  .sidebar-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    backdrop-filter: blur(1px);
+  }
+  .sidebar-sheet {
+    position: relative;
+    margin-left: 0;
+    width: min(88vw, 360px);
+    max-width: 88vw;
+    height: 100vh;
+    background: var(--sidebar);
+    border-right: 1px solid var(--sidebar-border);
+    box-shadow: 2px 0 16px rgba(0,0,0,0.2);
+    transform: translateX(0);
+    animation: sheetIn 180ms ease-out;
+  }
+  @keyframes sheetIn {
+    from { transform: translateX(-8px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Touch targets */
+  button, .btn-primary, .btn-secondary {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .chat-input {
+    padding: 14px 16px;
+  }
+
+  /* Typography scaling for readability */
+  .message-user, .message-assistant, .prose p {
+    font-size: 0.98rem;
+    line-height: 1.5;
+  }
+
+  /* Ensure chat takes full width */
+  .main-content {
+    width: 100%;
+  }
+
+  /* Improve spacing to avoid accidental taps */
+  .sidebar .group {
+    margin-bottom: 4px;
+  }
+}

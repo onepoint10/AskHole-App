@@ -12,6 +12,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 import PromptDialog from './components/PromptDialog';
+import { Menu } from 'lucide-react';
 
 function App() {
   // Authentication state
@@ -32,6 +33,23 @@ function App() {
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
   
+  // Mobile detection and sidebar state
+  const [isMobile, setIsMobile] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    const detectMobile = () => {
+      const isSmallViewport = window.innerWidth <= 768;
+      const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isMobileUA = /android|iphone|ipad|ipod|iemobile|blackberry|opera mini/i.test(String(ua).toLowerCase());
+      setIsMobile(isSmallViewport || (isTouchDevice && isMobileUA));
+    };
+    detectMobile();
+    window.addEventListener('resize', detectMobile);
+    return () => window.removeEventListener('resize', detectMobile);
+  }, []);
+
   // Settings stored in localStorage with improved defaults
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
     geminiApiKey: '',
@@ -340,7 +358,8 @@ function App() {
     });
     
     await loadSessionMessages(sessionId);
-  }, []);
+    if (isMobile) setIsSidebarOpen(false);
+  }, [isMobile]);
 
   // Tab management functions
   const closeTabOnly = useCallback((sessionId) => {
@@ -650,7 +669,7 @@ function App() {
       // Increment usage count
       await promptsAPI.usePrompt(prompt.id);
       
-      // Update prompts list
+    	  // Update prompts list
       setPrompts(prev => prev.map(p => 
         p.id === prompt.id ? { ...p, usage_count: p.usage_count + 1 } : p
       ));
@@ -771,21 +790,58 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="h-screen flex bg-background text-foreground">
-        <Sidebar
-          sessions={sessions}  // Show all sessions in sidebar
-          prompts={prompts}
-          currentUser={currentUser}
-          onSessionSelect={selectSession}
-          onNewSession={createNewSession}
-          onDeleteSession={deleteSession}  // Use deleteSession for actual deletion
-          onRenameSession={renameSession} 
-          onNewPrompt={createPrompt}
-          onUsePrompt={usePrompt}
-          onDeletePrompt={deletePrompt}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onLogout={handleLogout}
-        />
+      <div className={`h-screen flex bg-background text-foreground ${isMobile ? 'mobile-root' : ''}`}>
+        {/* Mobile toggle button */}
+        {isMobile && (
+          <button
+            aria-label="Open sidebar"
+            className="mobile-sidebar-toggle"
+            onClick={() => setIsSidebarOpen(true)}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+
+        {/* Desktop persistent sidebar */}
+        {!isMobile && (
+          <Sidebar
+            sessions={sessions}  // Show all sessions in sidebar
+            prompts={prompts}
+            currentUser={currentUser}
+            onSessionSelect={selectSession}
+            onNewSession={createNewSession}
+            onDeleteSession={deleteSession}  // Use deleteSession for actual deletion
+            onRenameSession={renameSession} 
+            onNewPrompt={createPrompt}
+            onUsePrompt={usePrompt}
+            onDeletePrompt={deletePrompt}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onLogout={handleLogout}
+          />
+        )}
+        
+        {/* Mobile overlay sidebar */}
+        {isMobile && isSidebarOpen && (
+          <div className="sidebar-overlay" role="dialog" aria-modal="true">
+            <div className="sidebar-backdrop" onClick={() => setIsSidebarOpen(false)} />
+            <div className="sidebar-sheet">
+              <Sidebar
+                sessions={sessions}
+                prompts={prompts}
+                currentUser={currentUser}
+                onSessionSelect={selectSession}
+                onNewSession={createNewSession}
+                onDeleteSession={deleteSession}
+                onRenameSession={renameSession}
+                onNewPrompt={createPrompt}
+                onUsePrompt={usePrompt}
+                onDeletePrompt={deletePrompt}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onLogout={handleLogout}
+              />
+            </div>
+          </div>
+        )}
         
         <div className="flex-1 flex flex-col main-content">
           <ChatTabs
