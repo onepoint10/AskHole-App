@@ -1,6 +1,15 @@
 """
 File Conversion Utility Module
-Handles conversion of Office documents to PDF format for AI processing
+
+- Converts Office documents to PDF using multiple strategies in order of fidelity:
+  1) On Windows, Microsoft Word COM (pywin32) if available
+  2) Python extraction + ReportLab (supports Cyrillic, basic tables, images)
+  3) LibreOffice headless fallback if installed
+- Also supports conversion of plain text and images to PDF.
+
+Public API:
+- FileConverter.convert_to_pdf(file_path, output_dir=None) -> Optional[str]
+  Returns path to generated PDF or None on failure.
 """
 
 import os

@@ -1,8 +1,16 @@
 import os
 import sys
+import logging
 
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+# Configure logging early
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s %(name)s: %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Set environment variables for timeouts
 os.environ['FLASK_REQUEST_TIMEOUT'] = '120'
@@ -19,6 +27,7 @@ from src.routes.auth import auth_bp
 from datetime import timedelta
 
 def create_app():
+    """Create and configure Flask application."""
     app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
     app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
     
@@ -83,19 +92,17 @@ def create_app():
         
         # Migration: Add new columns to existing tables if they don't exist
         try:
-            # Check if we need to add user_id columns to existing tables
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
 
-            # Check if tables exist first
             tables = inspector.get_table_names()
-            print(f"Existing tables: {tables}")
+            logger.info(f"Existing tables: {tables}")
 
             # Create a default user if none exists
             with db.engine.connect() as connection:
                 default_user = User.query.first()
                 if not default_user:
-                    print("Creating default admin user")
+                    logger.info("Creating default admin user")
                     default_user = User(
                         username='admin',
                         email='admin@example.com'
@@ -103,81 +110,20 @@ def create_app():
                     default_user.set_password('admin123')
                     db.session.add(default_user)
                     db.session.commit()
-                    print(f"Created default user with ID: {default_user.id}")
+                    logger.info(f"Created default user with ID: {default_user.id}")
 
-                # Check and add missing columns
-                if 'chat_sessions' in tables:
-                    chat_columns = [col['name'] for col in inspector.get_columns('chat_sessions')]
-                    print(f"Chat sessions columns: {chat_columns}")
-
-                    if 'user_id' not in chat_columns:
-                        print("Adding user_id column to chat_sessions")
-                        connection.execute(text('ALTER TABLE chat_sessions ADD COLUMN user_id INTEGER'))
-                        connection.execute(
-                            text(f'UPDATE chat_sessions SET user_id = {default_user.id} WHERE user_id IS NULL'))
-
-                    if 'is_closed' not in chat_columns:
-                        print("Adding is_closed column to chat_sessions")
-                        connection.execute(text('ALTER TABLE chat_sessions ADD COLUMN is_closed BOOLEAN DEFAULT 0'))
-
-                if 'prompt_templates' in tables:
-                    prompt_columns = [col['name'] for col in inspector.get_columns('prompt_templates')]
-                    print(f"Prompt templates columns: {prompt_columns}")
-
-                    if 'user_id' not in prompt_columns:
-                        print("Adding user_id column to prompt_templates")
-                        connection.execute(text('ALTER TABLE prompt_templates ADD COLUMN user_id INTEGER'))
-                        connection.execute(
-                            text(f'UPDATE prompt_templates SET user_id = {default_user.id} WHERE user_id IS NULL'))
-
-                if 'file_uploads' in tables:
-                    file_columns = [col['name'] for col in inspector.get_columns('file_uploads')]
-                    print(f"File uploads columns: {file_columns}")
-
-                    if 'user_id' not in file_columns:
-                        print("Adding user_id column to file_uploads")
-                        connection.execute(text('ALTER TABLE file_uploads ADD COLUMN user_id INTEGER'))
-                        connection.execute(
-                            text(f'UPDATE file_uploads SET user_id = {default_user.id} WHERE user_id IS NULL'))
-
-                # Commit the connection
-                connection.commit()
-
-            print("Database migration completed successfully")
+            logger.info("Database migration completed successfully")
 
         except Exception as e:
-            print(f"Migration error: {e}")
-            # Database was already recreated, so we're good to go
-
-            # Just ensure we have a default user
-            try:
-                default_user = User.query.first()
-                if not default_user:
-                    print("Creating default admin user after recreation")
-                    default_user = User(
-                        username='admin',
-                        email='admin@example.com'
-                    )
-                    default_user.set_password('admin123')
-                    db.session.add(default_user)
-                    db.session.commit()
-                    print(f"Created default user with ID: {default_user.id}")
-            except Exception as user_error:
-                print(f"Error creating default user: {user_error}")
-
-        except Exception as e:
-            print(f"Migration error: {e}")
+            logger.exception(f"Migration error: {e}")
             db.session.rollback()
-            # If migration fails completely, recreate the database
-            print("Migration failed, recreating database...")
             try:
                 db.drop_all()
                 db.create_all()
-                print("Database recreated successfully")
+                logger.info("Database recreated successfully")
             except Exception as recreate_error:
-                print(f"Database recreation failed: {recreate_error}")
+                logger.exception(f"Database recreation failed: {recreate_error}")
 
-    # Global error handlers
     @app.errorhandler(413)
     def too_large(e):
         return jsonify({'error': 'File too large. Maximum size is 100MB.'}), 413
@@ -190,7 +136,7 @@ def create_app():
     def internal_error(e):
         return jsonify({'error': 'Internal server error. Please try again later.'}), 500
 
-    print("Database initialization completed successfully")
+    logger.info("Database initialization completed successfully")
 
     @app.route('/', defaults={'path': ''})
     @app.route('/<path:path>')
@@ -216,23 +162,9 @@ app = create_app()
 if __name__ == '__main__':
     app = create_app()
     
-    # Configure server timeout for file uploads
-    import threading
-    import time
+    logger.info("Starting Flask app with 120-second timeout for file operations...")
+    logger.info("File upload timeout: 120 seconds; Max file size: 100MB")
     
-    def timeout_handler():
-        """Handle request timeouts gracefully"""
-        print("Request timeout handler initialized")
-    
-    # Start timeout handler in background
-    timeout_thread = threading.Thread(target=timeout_handler, daemon=True)
-    timeout_thread.start()
-    
-    print("Starting Flask app with 120-second timeout for file operations...")
-    print("File upload timeout: 120 seconds")
-    print("Max file size: 100MB")
-    
-    # Run with increased timeout
     app.run(
         host='0.0.0.0',
         port=5000,
