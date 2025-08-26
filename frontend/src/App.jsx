@@ -40,8 +40,8 @@ function App() {
   useEffect(() => {
     const detectMobile = () => {
       const isSmallViewport = window.innerWidth <= 768;
-      const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
-      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0 || (navigator.msMaxTouchPoints || 0) > 0;
+      const ua = (navigator.userAgent || navigator.vendor || (window.opera ? String(window.opera) : ''));
       const isMobileUA = /android|iphone|ipad|ipod|iemobile|blackberry|opera mini/i.test(String(ua).toLowerCase());
       setIsMobile(isSmallViewport || (isTouchDevice && isMobileUA));
     };
