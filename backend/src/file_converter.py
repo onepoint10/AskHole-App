@@ -21,7 +21,17 @@ except ImportError:
     OFFICE_LIBS_AVAILABLE = False
     logging.warning("Office document libraries not available. Document conversion will be limited.")
 
-# LibreOffice conversion (preferred method)
+# PDF generation (ReportLab)
+try:
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+    logging.warning("ReportLab not available. Falling back to LibreOffice or HTML.")
+
+# LibreOffice conversion (fallback method)
 try:
     subprocess.run(['libreoffice', '--version'], capture_output=True, check=True)
     LIBREOFFICE_AVAILABLE = True
@@ -34,151 +44,175 @@ class FileConverter:
     
     @staticmethod
     def convert_to_pdf(file_path: str, output_dir: str = None) -> Optional[str]:
-        """
-        Convert a file to PDF format
-        
-        Args:
-            file_path: Path to the input file
-            output_dir: Directory to save the converted PDF (optional)
-            
-        Returns:
-            Path to the converted PDF file, or None if conversion failed
-        """
         if not os.path.exists(file_path):
             logging.error(f"File not found: {file_path}")
             return None
-            
-        file_ext = Path(file_path).suffix.lower()
         
-        # If it's already a PDF, return the path
+        file_ext = Path(file_path).suffix.lower()
         if file_ext == '.pdf':
             return file_path
-            
-        # If it's a text file, convert to PDF
+        
+        # Prefer dedicated python conversion + reportlab for Office and text
+        if file_ext in ['.doc', '.docx']:
+            pdf = FileConverter._convert_doc_docx_to_pdf_python(file_path, output_dir)
+            if pdf:
+                return pdf
+            # fallback
+            return FileConverter._convert_with_libreoffice(file_path, output_dir)
+        
+        if file_ext in ['.xls', '.xlsx']:
+            pdf = FileConverter._convert_xls_xlsx_to_pdf_python(file_path, output_dir)
+            if pdf:
+                return pdf
+            return FileConverter._convert_with_libreoffice(file_path, output_dir)
+        
+        if file_ext in ['.ppt', '.pptx']:
+            pdf = FileConverter._convert_ppt_pptx_to_pdf_python(file_path, output_dir)
+            if pdf:
+                return pdf
+            return FileConverter._convert_with_libreoffice(file_path, output_dir)
+        
         if file_ext in ['.txt', '.md', '.py', '.js', '.html', '.css', '.xml', '.json', '.csv']:
             return FileConverter._convert_text_to_pdf(file_path, output_dir)
-            
-        # If it's an Office document, convert to PDF
-        if file_ext in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
-            return FileConverter._convert_office_to_pdf(file_path, output_dir)
-            
-        # If it's an image, convert to PDF
+        
         if file_ext in ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']:
             return FileConverter._convert_image_to_pdf(file_path, output_dir)
-            
+        
         logging.warning(f"Unsupported file type for conversion: {file_ext}")
         return None
-    
+
     @staticmethod
-    def _convert_office_to_pdf(file_path: str, output_dir: str = None) -> Optional[str]:
-        """Convert Office documents to PDF using LibreOffice or Python libraries"""
-        
-        # Try LibreOffice first (most reliable)
-        if LIBREOFFICE_AVAILABLE:
-            result = FileConverter._convert_with_libreoffice(file_path, output_dir)
-            if result:
-                return result
-        
-        # Fallback to Python libraries
-        if OFFICE_LIBS_AVAILABLE:
-            return FileConverter._convert_with_python_libs(file_path, output_dir)
-        
-        logging.error("No conversion method available for Office documents")
-        return None
-    
+    def _output_pdf_path(file_path: str, output_dir: Optional[str]) -> str:
+        if output_dir is None:
+            output_dir = os.path.dirname(file_path)
+        base = os.path.splitext(os.path.basename(file_path))[0]
+        return os.path.join(output_dir, f"{base}.pdf")
+
+    @staticmethod
+    def _convert_doc_docx_to_pdf_python(file_path: str, output_dir: Optional[str]) -> Optional[str]:
+        if not (OFFICE_LIBS_AVAILABLE and REPORTLAB_AVAILABLE):
+            return None
+        try:
+            pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
+            doc = Document(file_path)
+
+            pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+
+            title_style = ParagraphStyle(
+                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
+            )
+            story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
+            story.append(Spacer(1, 12))
+
+            for paragraph in doc.paragraphs:
+                text = paragraph.text.strip()
+                if text:
+                    story.append(Paragraph(text, styles['Normal']))
+                    story.append(Spacer(1, 6))
+
+            pdf_doc.build(story)
+            return pdf_path if os.path.exists(pdf_path) else None
+        except Exception as e:
+            logging.error(f"DOC/DOCX to PDF (python) error for {file_path}: {e}")
+            return None
+
+    @staticmethod
+    def _convert_xls_xlsx_to_pdf_python(file_path: str, output_dir: Optional[str]) -> Optional[str]:
+        if not (OFFICE_LIBS_AVAILABLE and REPORTLAB_AVAILABLE):
+            return None
+        try:
+            pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
+            wb = load_workbook(file_path, read_only=True)
+
+            pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+
+            title_style = ParagraphStyle(
+                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
+            )
+            story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
+            story.append(Spacer(1, 12))
+
+            for sheet_name in wb.sheetnames:
+                story.append(Paragraph(f"Sheet: {sheet_name}", styles['Heading2']))
+                sheet = wb[sheet_name]
+                for row in sheet.iter_rows(values_only=True):
+                    if any(cell is not None for cell in row):
+                        line = ' \u00b7 '.join(str(cell) if cell is not None else '' for cell in row)
+                        story.append(Paragraph(line, styles['Normal']))
+            wb.close()
+
+            pdf_doc.build(story)
+            return pdf_path if os.path.exists(pdf_path) else None
+        except Exception as e:
+            logging.error(f"XLS/XLSX to PDF (python) error for {file_path}: {e}")
+            return None
+
+    @staticmethod
+    def _convert_ppt_pptx_to_pdf_python(file_path: str, output_dir: Optional[str]) -> Optional[str]:
+        if not (OFFICE_LIBS_AVAILABLE and REPORTLAB_AVAILABLE):
+            return None
+        try:
+            pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
+            prs = Presentation(file_path)
+
+            pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+
+            title_style = ParagraphStyle(
+                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
+            )
+            story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
+            story.append(Spacer(1, 12))
+
+            slide_num = 1
+            for slide in prs.slides:
+                story.append(Paragraph(f"Slide {slide_num}", styles['Heading2']))
+                slide_num += 1
+                for shape in slide.shapes:
+                    if hasattr(shape, 'text'):
+                        text = (shape.text or '').strip()
+                        if text:
+                            story.append(Paragraph(text, styles['Normal']))
+                story.append(Spacer(1, 12))
+
+            pdf_doc.build(story)
+            return pdf_path if os.path.exists(pdf_path) else None
+        except Exception as e:
+            logging.error(f"PPT/PPTX to PDF (python) error for {file_path}: {e}")
+            return None
+
     @staticmethod
     def _convert_with_libreoffice(file_path: str, output_dir: str = None) -> Optional[str]:
-        """Convert Office documents using LibreOffice"""
+        if not LIBREOFFICE_AVAILABLE:
+            return None
         try:
             if output_dir is None:
                 output_dir = os.path.dirname(file_path)
-            
-            # Create temporary directory for conversion
             with tempfile.TemporaryDirectory() as temp_dir:
-                # Copy file to temp directory
                 temp_file = os.path.join(temp_dir, os.path.basename(file_path))
                 shutil.copy2(file_path, temp_file)
-                
-                # Run LibreOffice conversion
-                cmd = [
-                    'libreoffice',
-                    '--headless',
-                    '--convert-to', 'pdf',
-                    '--outdir', temp_dir,
-                    temp_file
-                ]
-                
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=60  # 60 second timeout
-                )
-                
+                cmd = ['libreoffice', '--headless', '--convert-to', 'pdf', '--outdir', temp_dir, temp_file]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
                 if result.returncode == 0:
-                    # Find the converted PDF
                     pdf_name = os.path.splitext(os.path.basename(file_path))[0] + '.pdf'
                     temp_pdf = os.path.join(temp_dir, pdf_name)
-                    
                     if os.path.exists(temp_pdf):
-                        # Move to output directory
                         output_pdf = os.path.join(output_dir, pdf_name)
                         shutil.move(temp_pdf, output_pdf)
-                        logging.info(f"Successfully converted {file_path} to {output_pdf}")
+                        logging.info(f"Successfully converted {file_path} to {output_pdf} via LibreOffice")
                         return output_pdf
-                
-                logging.error(f"LibreOffice conversion failed: {result.stderr}")
+                logging.error(f"LibreOffice conversion failed (code {result.returncode}): {result.stderr}")
                 return None
-                
         except subprocess.TimeoutExpired:
             logging.error(f"LibreOffice conversion timed out for {file_path}")
             return None
         except Exception as e:
             logging.error(f"LibreOffice conversion error for {file_path}: {e}")
-            return None
-    
-    @staticmethod
-    def _convert_with_python_libs(file_path: str, output_dir: str = None) -> Optional[str]:
-        """Convert Office documents using Python libraries"""
-        try:
-            file_ext = Path(file_path).suffix.lower()
-            
-            if output_dir is None:
-                output_dir = os.path.dirname(file_path)
-            
-            # Extract text content
-            text_content = ""
-            
-            if file_ext in ['.docx']:
-                doc = Document(file_path)
-                text_content = '\n'.join([paragraph.text for paragraph in doc.paragraphs])
-                
-            elif file_ext in ['.xlsx']:
-                wb = load_workbook(file_path, read_only=True)
-                for sheet_name in wb.sheetnames:
-                    sheet = wb[sheet_name]
-                    text_content += f"\n=== {sheet_name} ===\n"
-                    for row in sheet.iter_rows(values_only=True):
-                        if any(cell is not None for cell in row):
-                            text_content += '\t'.join(str(cell) if cell is not None else '' for cell in row) + '\n'
-                wb.close()
-                
-            elif file_ext in ['.pptx']:
-                prs = Presentation(file_path)
-                for slide in prs.slides:
-                    for shape in slide.shapes:
-                        if hasattr(shape, "text"):
-                            text_content += shape.text + '\n'
-                    text_content += '\n'
-            
-            if text_content.strip():
-                # Convert extracted text to PDF
-                return FileConverter._convert_text_to_pdf_from_content(text_content, file_path, output_dir)
-            
-            return None
-            
-        except Exception as e:
-            logging.error(f"Python library conversion error for {file_path}: {e}")
             return None
     
     @staticmethod

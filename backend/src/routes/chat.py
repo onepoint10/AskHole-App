@@ -687,8 +687,20 @@ def upload_file():
             file_ext = os.path.splitext(original_filename)[1] if '.' in original_filename else ''
             safe_filename = f"uploaded_file_{int(datetime.now().timestamp())}{file_ext}"
 
-        # Generate unique filename
-        unique_filename = f"{uuid.uuid4()}_{safe_filename}"
+        # Ensure the safe filename has an extension; secure_filename may strip non-ascii basename
+        base, ext = os.path.splitext(safe_filename)
+        if not ext:
+            # Recover extension from original filename
+            orig_ext = os.path.splitext(original_filename)[1]
+            if orig_ext:
+                ext = orig_ext if orig_ext.startswith('.') else f".{orig_ext}"
+            else:
+                ext = ''
+        # Normalize extension to lower-case
+        ext = ext.lower()
+
+        # Generate unique filename with proper extension
+        unique_filename = f"{uuid.uuid4()}_{base}{ext}"
         file_path = os.path.join(upload_dir, unique_filename)
         print(f"File will be saved as: {file_path}")
 
@@ -857,12 +869,13 @@ def upload_file():
         print(f"File uploaded successfully to database with ID: {file_upload.id}")
 
         # Clean up original file if it was converted and is different
-        if converted_file_path != original_file_path and os.path.exists(original_file_path):
-            try:
-                os.remove(original_file_path)
-                print(f"Cleaned up original file: {original_file_path}")
-            except Exception as cleanup_error:
-                print(f"Warning: Could not clean up original file: {cleanup_error}")
+        if file_was_converted and converted_file_path and (converted_file_path != original_file_path):
+            if os.path.exists(original_file_path):
+                try:
+                    os.remove(original_file_path)
+                    print(f"Cleaned up original file: {original_file_path}")
+                except Exception as cleanup_error:
+                    print(f"Warning: Could not clean up original file: {cleanup_error}")
 
         return jsonify(file_upload.to_dict()), 201
 
