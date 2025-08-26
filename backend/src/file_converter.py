@@ -4,6 +4,7 @@ Handles conversion of Office documents to PDF format for AI processing
 """
 
 import os
+import sys
 import tempfile
 import subprocess
 import shutil
@@ -25,7 +26,10 @@ except ImportError:
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+    from reportlab.lib import colors
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -39,6 +43,46 @@ except (subprocess.CalledProcessError, FileNotFoundError):
     LIBREOFFICE_AVAILABLE = False
     logging.warning("LibreOffice not available. Using Python libraries for conversion.")
 
+# Optional: MS Word COM on Windows for best fidelity
+MSWORD_AVAILABLE = False
+if sys.platform.startswith('win'):
+    try:
+        import pythoncom  # type: ignore
+        import win32com.client  # type: ignore
+        MSWORD_AVAILABLE = True
+    except Exception:
+        MSWORD_AVAILABLE = False
+        logging.warning("pywin32 not available. To enable high-fidelity DOCX->PDF on Windows, pip install pywin32.")
+
+
+def _register_cyrillic_font_if_possible():
+    """Register a font that supports Cyrillic so ReportLab renders text correctly."""
+    if not REPORTLAB_AVAILABLE:
+        return None
+    candidates = []
+    if sys.platform.startswith('win'):
+        candidates.extend([
+            r"C:\\Windows\\Fonts\\arial.ttf",
+            r"C:\\Windows\\Fonts\\ARIALUNI.TTF",  # Arial Unicode MS
+            r"C:\\Windows\\Fonts\\segoeui.ttf",
+        ])
+    else:
+        candidates.extend([
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+            "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        ])
+    for path in candidates:
+        try:
+            if os.path.exists(path):
+                pdfmetrics.registerFont(TTFont('DocBodyFont', path))
+                return 'DocBodyFont'
+        except Exception as e:
+            logging.warning(f"Failed to register font {path}: {e}")
+    # Fallback to built-in Helvetica (may not render Cyrillic correctly)
+    return None
+
+
 class FileConverter:
     """Handles conversion of various file formats to PDF"""
     
@@ -51,6 +95,12 @@ class FileConverter:
         file_ext = Path(file_path).suffix.lower()
         if file_ext == '.pdf':
             return file_path
+        
+        # Prefer MS Word on Windows for highest fidelity
+        if file_ext in ['.doc', '.docx'] and MSWORD_AVAILABLE:
+            pdf = FileConverter._convert_with_msword(file_path, output_dir)
+            if pdf:
+                return pdf
         
         # Prefer dedicated python conversion + reportlab for Office and text
         if file_ext in ['.doc', '.docx']:
@@ -89,6 +139,30 @@ class FileConverter:
         return os.path.join(output_dir, f"{base}.pdf")
 
     @staticmethod
+    def _convert_with_msword(file_path: str, output_dir: Optional[str]) -> Optional[str]:
+        if not MSWORD_AVAILABLE:
+            return None
+        try:
+            pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
+            pythoncom.CoInitialize()
+            word = win32com.client.Dispatch('Word.Application')
+            word.Visible = False
+            doc = word.Documents.Open(file_path)
+            wdFormatPDF = 17
+            doc.ExportAsFixedFormat(OutputFileName=pdf_path, ExportFormat=wdFormatPDF)
+            doc.Close(False)
+            word.Quit()
+            pythoncom.CoUninitialize()
+            return pdf_path if os.path.exists(pdf_path) else None
+        except Exception as e:
+            logging.error(f"MS Word COM conversion failed for {file_path}: {e}")
+            try:
+                word.Quit()
+            except Exception:
+                pass
+            return None
+
+    @staticmethod
     def _convert_doc_docx_to_pdf_python(file_path: str, output_dir: Optional[str]) -> Optional[str]:
         if not (OFFICE_LIBS_AVAILABLE and REPORTLAB_AVAILABLE):
             return None
@@ -96,21 +170,68 @@ class FileConverter:
             pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
             doc = Document(file_path)
 
+            # Register font for Cyrillic if possible
+            body_font = _register_cyrillic_font_if_possible()
+
             pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
             styles = getSampleStyleSheet()
+            if body_font:
+                styles['Normal'].fontName = body_font
+                styles['Heading1'].fontName = body_font
+                styles['Heading2'].fontName = body_font
             story = []
 
-            title_style = ParagraphStyle(
-                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
-            )
+            title_style = ParagraphStyle('ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=12)
             story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
-            story.append(Spacer(1, 12))
+            story.append(Spacer(1, 8))
 
+            # Render body paragraphs
             for paragraph in doc.paragraphs:
-                text = paragraph.text.strip()
-                if text:
+                text = paragraph.text
+                if text and text.strip():
                     story.append(Paragraph(text, styles['Normal']))
+                    story.append(Spacer(1, 4))
+
+            # Render tables (basic text-only rendering)
+            if doc.tables:
+                story.append(Spacer(1, 8))
+                story.append(Paragraph("Tables:", styles['Heading2']))
+                for t in doc.tables:
+                    data = []
+                    for row in t.rows:
+                        cells = []
+                        for cell in row.cells:
+                            cell_text = '\n'.join(p.text for p in cell.paragraphs)
+                            cells.append(cell_text or '')
+                        data.append(cells)
+                    tbl = Table(data, repeatRows=1)
+                    tbl.setStyle(TableStyle([
+                        ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
+                        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ]))
+                    story.append(tbl)
                     story.append(Spacer(1, 6))
+
+            # Attempt to include images referenced in the document (best effort)
+            try:
+                related = getattr(doc.part, 'related_parts', {})
+                if related:
+                    story.append(Spacer(1, 8))
+                    story.append(Paragraph("Images:", styles['Heading2']))
+                    for rel_id, part in related.items():
+                        if hasattr(part, 'content_type') and 'image' in part.content_type:
+                            img_bytes = part.blob
+                            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(part.partname).suffix)
+                            tmp.write(img_bytes)
+                            tmp.close()
+                            try:
+                                story.append(RLImage(tmp.name, width=400, preserveAspectRatio=True, mask='auto'))
+                                story.append(Spacer(1, 6))
+                            finally:
+                                # Defer deletion until after build to keep file available
+                                pass
+            except Exception as e:
+                logging.warning(f"Image extraction warning: {e}")
 
             pdf_doc.build(story)
             return pdf_path if os.path.exists(pdf_path) else None
@@ -126,23 +247,33 @@ class FileConverter:
             pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
             wb = load_workbook(file_path, read_only=True)
 
+            body_font = _register_cyrillic_font_if_possible()
             pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
             styles = getSampleStyleSheet()
+            if body_font:
+                styles['Normal'].fontName = body_font
+                styles['Heading1'].fontName = body_font
+                styles['Heading2'].fontName = body_font
             story = []
 
-            title_style = ParagraphStyle(
-                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
-            )
+            title_style = ParagraphStyle('ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=12)
             story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
-            story.append(Spacer(1, 12))
+            story.append(Spacer(1, 8))
 
             for sheet_name in wb.sheetnames:
                 story.append(Paragraph(f"Sheet: {sheet_name}", styles['Heading2']))
                 sheet = wb[sheet_name]
+                data = []
                 for row in sheet.iter_rows(values_only=True):
-                    if any(cell is not None for cell in row):
-                        line = ' \u00b7 '.join(str(cell) if cell is not None else '' for cell in row)
-                        story.append(Paragraph(line, styles['Normal']))
+                    data.append(["" if v is None else str(v) for v in row])
+                if data:
+                    tbl = Table(data, repeatRows=1)
+                    tbl.setStyle(TableStyle([
+                        ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
+                        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                    ]))
+                    story.append(tbl)
+                story.append(Spacer(1, 6))
             wb.close()
 
             pdf_doc.build(story)
@@ -159,15 +290,18 @@ class FileConverter:
             pdf_path = FileConverter._output_pdf_path(file_path, output_dir)
             prs = Presentation(file_path)
 
+            body_font = _register_cyrillic_font_if_possible()
             pdf_doc = SimpleDocTemplate(pdf_path, pagesize=letter)
             styles = getSampleStyleSheet()
+            if body_font:
+                styles['Normal'].fontName = body_font
+                styles['Heading1'].fontName = body_font
+                styles['Heading2'].fontName = body_font
             story = []
 
-            title_style = ParagraphStyle(
-                'ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=20
-            )
+            title_style = ParagraphStyle('ConvertedTitle', parent=styles['Heading1'], fontSize=16, spaceAfter=12)
             story.append(Paragraph(f"Converted from: {os.path.basename(file_path)}", title_style))
-            story.append(Spacer(1, 12))
+            story.append(Spacer(1, 8))
 
             slide_num = 1
             for slide in prs.slides:
@@ -178,7 +312,7 @@ class FileConverter:
                         text = (shape.text or '').strip()
                         if text:
                             story.append(Paragraph(text, styles['Normal']))
-                story.append(Spacer(1, 12))
+                story.append(Spacer(1, 8))
 
             pdf_doc.build(story)
             return pdf_path if os.path.exists(pdf_path) else None
