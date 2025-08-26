@@ -328,7 +328,13 @@ def delete_session(session_id):
 
 @chat_bp.route('/sessions/<session_id>/messages', methods=['POST'])
 def send_message(session_id):
-    """Send a message in a chat session"""
+    """Send a message in a chat session.
+
+    - Validates session and user
+    - Resolves attached files, preferring converted PDFs
+    - For Gemini/OpenRouter, rehydrates session history if needed
+    - Persists user and assistant messages
+    """
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -350,46 +356,47 @@ def send_message(session_id):
     if not message_content or not message_content.strip():
         return jsonify({'error': 'Message content cannot be empty'}), 400
 
-    # Convert file IDs to actual file paths (only user's files)
+    # Convert file IDs to actual file paths (batch lookup for performance)
     file_paths = []
+    passthrough_paths = []
+    id_candidates = []
     if file_ids:
-        for file_id in file_ids:
-            # If file_id is actually a path (backward compatibility)
-            if isinstance(file_id, str) and ('/' in file_id or '\\' in file_id):
-                file_paths.append(file_id)
+        for fid in file_ids:
+            if isinstance(fid, str) and ('/' in fid or '\\' in fid):
+                passthrough_paths.append(fid)
             else:
-                # Look up file by ID (only user's files)
-                file_upload = FileUpload.query.filter_by(
-                    id=file_id,
-                    user_id=current_user.id
-                ).first()
-                if file_upload:
-                    # Use the file path (which should be PDF if conversion was successful)
-                    print(f"File upload found: ID={file_upload.id}")
-                    print(f"  Original filename: {file_upload.original_filename}")
-                    print(f"  Stored filename: {file_upload.filename}")
-                    print(f"  File path: {file_upload.file_path}")
-                    print(f"  MIME type: {file_upload.mime_type}")
-                    print(f"  File exists: {os.path.exists(file_upload.file_path)}")
-                    
-                    if os.path.exists(file_upload.file_path):
-                        file_paths.append(file_upload.file_path)
-                        print(f"✅ Added file to message: {file_upload.original_filename} -> {file_upload.file_path}")
-                    else:
-                        print(f"❌ File not found on disk: {file_upload.file_path}")
-                        # Try to find the file with different extensions
-                        file_dir = os.path.dirname(file_upload.file_path)
-                        file_base = os.path.splitext(os.path.basename(file_upload.file_path))[0]
-                        for ext in ['.pdf', '.html', '.txt']:
-                            alt_path = os.path.join(file_dir, file_base + ext)
-                            if os.path.exists(alt_path):
-                                print(f"✅ Found alternative file: {alt_path}")
-                                file_paths.append(alt_path)
-                                break
+                id_candidates.append(fid)
+
+        if id_candidates:
+            try:
+                records = FileUpload.query.filter(
+                    FileUpload.id.in_(id_candidates),
+                    FileUpload.user_id == current_user.id
+                ).all()
+                by_id = {r.id: r for r in records}
+                for fid in id_candidates:
+                    rec = by_id.get(fid)
+                    if rec:
+                        exists = os.path.exists(rec.file_path)
+                        logger.debug(f"Resolved file id={fid} path={rec.file_path} exists={exists}")
+                        if exists:
+                            file_paths.append(rec.file_path)
                         else:
-                            print(f"❌ No alternative file found for: {file_upload.original_filename}")
-                else:
-                    print(f"❌ File upload not found for ID: {file_id}")
+                            # Try alternative known extensions
+                            base = os.path.splitext(rec.file_path)[0]
+                            for ext in ('.pdf', '.html', '.txt'):
+                                alt = base + ext
+                                if os.path.exists(alt):
+                                    logger.debug(f"Found alternative file for id={fid}: {alt}")
+                                    file_paths.append(alt)
+                                    break
+                    else:
+                        logger.warning(f"FileUpload missing for id={fid} user={current_user.id}")
+            except Exception as e:
+                logger.exception(f"Batch file lookup failed: {e}")
+
+        # Append passthrough at end to preserve relative order roughly
+        file_paths.extend(passthrough_paths)
 
     # Save user message first
     user_message = ChatMessage(
@@ -413,21 +420,15 @@ def send_message(session_id):
                 # Rehydrate Gemini chat session with DB history on first use if needed
                 history_messages = None
                 try:
-                    # Only build history when GeminiClient does not have this session
                     if session_id not in getattr(gemini_client, 'chat_sessions', {}):
-                        # Load prior messages from DB and convert to Gemini format
                         prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
                         history_messages = []
                         for m in prior_messages:
                             role = 'user' if m.role == 'user' else 'model'
                             text = m.content or ''
-                            # Minimal history element for Gemini SDK
-                            history_messages.append({
-                                'role': role,
-                                'parts': [text]
-                            })
+                            history_messages.append({'role': role, 'parts': [text]})
                 except Exception as hist_err:
-                    print(f"History build error for session {session_id}: {hist_err}")
+                    logger.warning(f"History build error for session {session_id}: {hist_err}")
                 response_content = gemini_client.chat_message(
                     session_id=session_id,
                     message=message_content,
@@ -439,7 +440,6 @@ def send_message(session_id):
             elif session.client_type == 'openrouter':
                 if not openrouter_client:
                     raise Exception("OpenRouter client not configured. Please check your API key in settings.")
-                # Rehydrate OpenRouter conversation history if missing
                 try:
                     if session_id not in getattr(openrouter_client, 'chat_sessions', {}):
                         prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
@@ -447,13 +447,10 @@ def send_message(session_id):
                         for m in prior_messages:
                             role = 'user' if m.role == 'user' else 'assistant'
                             text = m.content or ''
-                            history_messages.append({
-                                'role': role,
-                                'content': [{ 'type': 'text', 'text': text }]
-                            })
+                            history_messages.append({'role': role, 'content': [{ 'type': 'text', 'text': text }]})
                         openrouter_client.chat_sessions[session_id] = history_messages
                 except Exception as or_hist_err:
-                    print(f"OpenRouter history build error for session {session_id}: {or_hist_err}")
+                    logger.warning(f"OpenRouter history build error for session {session_id}: {or_hist_err}")
                 response_content = openrouter_client.chat_message(
                     session_id=session_id,
                     message=message_content,
@@ -464,11 +461,9 @@ def send_message(session_id):
             else:
                 raise Exception(f"Unknown client type: {session.client_type}")
 
-            # Validate response content
             if not response_content or not response_content.strip():
                 response_content = "I apologize, but I couldn't generate a response. Please try again."
 
-            # Save assistant response
             assistant_message = ChatMessage(
                 session_id=session_id,
                 role='assistant',
@@ -476,18 +471,14 @@ def send_message(session_id):
             )
             db.session.add(assistant_message)
 
-            # Update session timestamp and title
             session.updated_at = datetime.utcnow()
 
-            # Auto-generate title if this is the first message
             if session.title == 'New Chat':
-                # Count existing messages (excluding the ones we're adding)
                 existing_message_count = ChatMessage.query.filter_by(session_id=session_id).count()
-                if existing_message_count == 0:  # This is the first exchange
+                if existing_message_count == 0:
                     title_words = message_content.split()[:5]
                     session.title = ' '.join(title_words) + ('...' if len(title_words) == 5 else '')
 
-            # Commit all changes
             db.session.commit()
 
             return jsonify({
@@ -498,7 +489,7 @@ def send_message(session_id):
 
         except Exception as e:
             db.session.rollback()
-            print(f"Error in send_message: {str(e)}")
+            logger.exception(f"Error in send_message: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
 
