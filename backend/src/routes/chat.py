@@ -11,6 +11,64 @@ import json
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import mimetypes
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def _guess_mime_type(safe_filename: str, original_filename: str) -> str:
+    """Guess MIME type using multiple strategies, with a manual fallback map."""
+    # 1) Standard guess based on safe filename
+    mime_type, _ = mimetypes.guess_type(safe_filename)
+    if mime_type:
+        return mime_type
+    # 2) Try the original filename
+    mime_type, _ = mimetypes.guess_type(original_filename.lower())
+    if mime_type:
+        return mime_type
+    # 3) Manual fallback by extension
+    file_ext = os.path.splitext(original_filename.lower())[1]
+    ext_to_mime = {
+        '.pdf': 'application/pdf',
+        '.txt': 'text/plain',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.ppt': 'application/vnd.ms-powerpoint',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.svg': 'image/svg+xml',
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav',
+        '.ogg': 'audio/ogg',
+        '.mp4': 'video/mp4',
+        '.avi': 'video/x-msvideo',
+        '.mov': 'video/quicktime',
+        '.csv': 'text/csv',
+        '.json': 'application/json',
+        '.xml': 'application/xml',
+        '.html': 'text/html',
+        '.css': 'text/css',
+        '.js': 'text/javascript',
+        '.py': 'text/x-python',
+        '.java': 'text/x-java-source',
+        '.cpp': 'text/x-c++src',
+        '.c': 'text/x-csrc',
+        '.h': 'text/x-chdr',
+        '.md': 'text/markdown',
+        '.rtf': 'application/rtf',
+        '.zip': 'application/zip',
+        '.tar': 'application/x-tar',
+        '.gz': 'application/gzip'
+    }
+    return ext_to_mime.get(file_ext, 'application/octet-stream')
+
 
 def determine_client_from_model(model: str):
     """Determine client type based on model name"""
@@ -641,37 +699,35 @@ def test_auth():
 def upload_file():
     """Upload a file with better Cyrillic filename support and timeout handling"""
     try:
-        print(f"File upload request received. Headers: {dict(request.headers)}")
-        print(f"Request method: {request.method}")
-        print(f"Request files: {list(request.files.keys()) if request.files else 'No files'}")
-        print(f"Authorization header: {request.headers.get('Authorization', 'Not present')}")
-        print(f"Cookies: {dict(request.cookies)}")
+        logger.info(f"File upload request received. Headers: {dict(request.headers)}")
+        logger.info(f"Request method: {request.method}")
+        logger.info(f"Request files: {list(request.files.keys()) if request.files else 'No files'}")
+        logger.info(f"Authorization header: {request.headers.get('Authorization', 'Not present')}")
+        logger.info(f"Cookies: {dict(request.cookies)}")
         
         current_user = get_current_user()
-        print(f"Current user result: {current_user}")
+        logger.info(f"Current user result: {current_user}")
         if not current_user:
-            print("Authentication failed - no current user")
+            logger.warning("Authentication failed - no current user")
             return jsonify({'error': 'Authentication required'}), 401
 
         if 'file' not in request.files:
-            print("No file in request.files")
+            logger.warning("No file in request.files")
             return jsonify({'error': 'No file provided'}), 400
 
         file = request.files['file']
         if file.filename == '':
-            print("Empty filename")
+            logger.warning("Empty filename")
             return jsonify({'error': 'No file selected'}), 400
 
-        print(f"Processing file: {file.filename}")
+        logger.info(f"Processing file: {file.filename}")
 
         # Create uploads directory if it doesn't exist
-        print(f"Current app root path: {current_app.root_path}")
+        logger.debug(f"Current app root path: {current_app.root_path}")
         upload_dir = os.path.join(current_app.root_path, 'uploads')
-        print(f"Upload directory path: {upload_dir}")
+        logger.debug(f"Upload directory path: {upload_dir}")
         os.makedirs(upload_dir, exist_ok=True)
-        print(f"Upload directory: {upload_dir}")
-        print(f"Upload directory exists: {os.path.exists(upload_dir)}")
-        print(f"Upload directory is writable: {os.access(upload_dir, os.W_OK)}")
+        logger.debug(f"Upload directory exists: {os.path.exists(upload_dir)}; writable: {os.access(upload_dir, os.W_OK)}")
 
         # Handle Cyrillic and special characters in filename
         original_filename = file.filename
@@ -702,14 +758,14 @@ def upload_file():
         # Generate unique filename with proper extension
         unique_filename = f"{uuid.uuid4()}_{base}{ext}"
         file_path = os.path.join(upload_dir, unique_filename)
-        print(f"File will be saved as: {file_path}")
+        logger.debug(f"File will be saved as: {file_path}")
 
         # Save the file first with timeout handling
         try:
             file.save(file_path)
-            print(f"File saved successfully to: {file_path}")
+            logger.info(f"File saved successfully: {file_path}")
         except Exception as save_error:
-            print(f"File save error: {save_error}")
+            logger.exception(f"File save error: {save_error}")
             return jsonify({'error': f'Failed to save file: {str(save_error)}'}), 500
 
         # Convert file to PDF if it's a supported format
@@ -718,17 +774,17 @@ def upload_file():
         file_was_converted = False
         try:
             file_ext = os.path.splitext(original_filename.lower())[1]
-            print(f"File extension detected: {file_ext}")
-            print(f"Original file_path: {file_path}")
+            logger.debug(f"File extension detected: {file_ext}")
+            logger.debug(f"Original file_path: {file_path}")
             
             if file_ext in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.py', '.js', '.html', '.css', '.xml', '.json', '.csv']:
-                print(f"Converting {file_ext} file to PDF...")
-                print(f"Calling FileConverter.convert_to_pdf({file_path}, {upload_dir})")
+                logger.info(f"Converting {file_ext} file to PDF...")
+                logger.debug(f"Calling FileConverter.convert_to_pdf({file_path}, {upload_dir})")
                 converted_file_path = FileConverter.convert_to_pdf(file_path, upload_dir)
-                print(f"FileConverter.convert_to_pdf returned: {converted_file_path}")
+                logger.debug(f"FileConverter.convert_to_pdf returned: {converted_file_path}")
                 
                 if converted_file_path and converted_file_path != file_path:
-                    print(f"File converted successfully to: {converted_file_path}")
+                    logger.info(f"File converted successfully to: {converted_file_path}")
                     # Update file info for the converted file
                     file_size = os.path.getsize(converted_file_path)
                     mime_type = 'application/pdf'
@@ -736,94 +792,38 @@ def upload_file():
                     old_file_path = file_path
                     file_path = converted_file_path
                     file_was_converted = True
-                    print(f"Updated file_path from {old_file_path} to converted version: {file_path}")
-                    print(f"New file size: {file_size} bytes")
-                    print(f"New MIME type: {mime_type}")
+                    logger.debug(f"Updated file_path from {old_file_path} to converted version: {file_path}")
+                    logger.debug(f"New file size: {file_size} bytes")
+                    logger.debug(f"New MIME type: {mime_type}")
                 else:
-                    print(f"File conversion failed or returned same path, using original file")
-                    print(f"converted_file_path: {converted_file_path}")
-                    print(f"file_path: {file_path}")
+                    logger.warning("File conversion failed or returned same path; using original file")
+                    logger.debug(f"converted_file_path={converted_file_path}, file_path={file_path}")
             else:
-                print(f"File type {file_ext} doesn't require conversion")
+                logger.debug(f"File type {file_ext} doesn't require conversion")
         except Exception as conv_error:
-            print(f"File conversion error: {conv_error}")
-            import traceback
-            traceback.print_exc()
+            logger.exception(f"File conversion error: {conv_error}")
             # Continue with original file if conversion fails
             converted_file_path = file_path
 
         # Get file info after saving (and conversion if applicable)
         if not file_was_converted:
             file_size = os.path.getsize(file_path)
-            print(f"File size: {file_size} bytes")
+            logger.debug(f"File size (no conversion): {file_size} bytes")
 
-        # Improved MIME type detection (only if not converted)
+        # Determine MIME type (converted files keep application/pdf)
         if not file_was_converted:
-            mime_type = None
-
-            # Try multiple methods to determine MIME type
-            # 1. Try mimetypes based on file extension
-            mime_type, _ = mimetypes.guess_type(safe_filename)
-
-            if not mime_type:
-                # 2. Try with original filename (might work better for some extensions)
-                mime_type, _ = mimetypes.guess_type(original_filename.lower())
-
-            if not mime_type:
-                # 3. Determine by file extension manually for common types
-                file_ext = os.path.splitext(original_filename.lower())[1]
-                ext_to_mime = {
-                    '.pdf': 'application/pdf',
-                    '.txt': 'text/plain',
-                    '.doc': 'application/msword',
-                    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    '.xls': 'application/vnd.ms-excel',
-                    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    '.ppt': 'application/vnd.ms-powerpoint',
-                    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-                    '.jpg': 'image/jpeg',
-                    '.jpeg': 'image/jpeg',
-                    '.png': 'image/png',
-                    '.gif': 'image/gif',
-                    '.webp': 'image/webp',
-                    '.bmp': 'image/bmp',
-                    '.svg': 'image/svg+xml',
-                    '.mp3': 'audio/mpeg',
-                    '.wav': 'audio/wav',
-                    '.ogg': 'audio/ogg',
-                    '.mp4': 'video/mp4',
-                    '.avi': 'video/x-msvideo',
-                    '.mov': 'video/quicktime',
-                    '.csv': 'text/csv',
-                    '.json': 'application/json',
-                    '.xml': 'application/xml',
-                    '.html': 'text/html',
-                    '.css': 'text/css',
-                    '.js': 'text/javascript',
-                    '.py': 'text/x-python',
-                    '.java': 'text/x-java-source',
-                    '.cpp': 'text/x-c++src',
-                    '.c': 'text/x-csrc',
-                    '.h': 'text/x-chdr',
-                    '.md': 'text/markdown',
-                    '.rtf': 'application/rtf',
-                    '.zip': 'application/zip',
-                    '.tar': 'application/x-tar',
-                    '.gz': 'application/gzip'
-                }
-                mime_type = ext_to_mime.get(file_ext, 'application/octet-stream')
+            mime_type = _guess_mime_type(safe_filename, original_filename)
         else:
-            print(f"Using converted file MIME type: {mime_type}")
-        
-        print(f"Final file_path before database save: {file_path}")
-        print(f"Final filename: {os.path.basename(file_path)}")
-        print(f"Final MIME type: {mime_type}")
-        print(f"File exists: {os.path.exists(file_path)}")
-        
+            logger.debug(f"Using converted file MIME type: {mime_type}")
+
+        logger.debug(f"Final file_path before database save: {file_path}")
+        logger.debug(f"Final filename: {os.path.basename(file_path)}")
+        logger.debug(f"Final MIME type: {mime_type}")
+        logger.debug(f"File exists: {os.path.exists(file_path)}")
+
         # Normalize the file path for the current operating system
         file_path = os.path.normpath(file_path)
-        print(f"Normalized file_path: {file_path}")
-        print(f"File exists after normalization: {os.path.exists(file_path)}")
+        logger.debug(f"Normalized file_path: {file_path}; exists={os.path.exists(file_path)}")
 
         # Validate file size (20MB limit)
         max_size = 20 * 1024 * 1024  # 20MB
@@ -848,10 +848,8 @@ def upload_file():
             return jsonify({'error': 'File appears to be empty or corrupted'}), 400
 
         # Save to database with original filename preserved
-        print(f"About to save file to database. User ID: {current_user.id}")
-        print(f"Storing file_path: {file_path}")
-        print(f"Storing filename: {os.path.basename(file_path)}")
-        print(f"Storing mime_type: {mime_type}")
+        logger.info(f"About to save file to database. User ID: {current_user.id}")
+        logger.debug(f"Storing file_path={file_path}, filename={os.path.basename(file_path)}, mime_type={mime_type}")
         
         file_upload = FileUpload(
             user_id=current_user.id,
@@ -862,37 +860,37 @@ def upload_file():
             mime_type=mime_type
         )
 
-        print(f"FileUpload object created: {file_upload}")
+        logger.info(f"FileUpload object created: {file_upload}")
         db.session.add(file_upload)
-        print("FileUpload added to session")
+        logger.info(f"FileUpload added to session")
         db.session.commit()
-        print(f"File uploaded successfully to database with ID: {file_upload.id}")
+        logger.info(f"File uploaded successfully to database with ID: {file_upload.id}")
 
         # Clean up original file if it was converted and is different
         if file_was_converted and converted_file_path and (converted_file_path != original_file_path):
             if os.path.exists(original_file_path):
                 try:
                     os.remove(original_file_path)
-                    print(f"Cleaned up original file: {original_file_path}")
+                    logger.warning(f"Cleaned up original file: {original_file_path}")
                 except Exception as cleanup_error:
-                    print(f"Warning: Could not clean up original file: {cleanup_error}")
+                    logger.warning(f"Warning: Could not clean up original file: {cleanup_error}")
 
         return jsonify(file_upload.to_dict()), 201
 
     except UnicodeDecodeError as e:
-        print(f"Unicode decode error: {e}")
+        logger.exception(f"Unicode decode error: {e}")
         return jsonify({'error': f'Filename encoding error: {str(e)}'}), 400
     except Exception as e:
-        print(f"Unexpected error in upload_file: {e}")
-        print(f"Error type: {type(e).__name__}")
+        logger.exception(f"Unexpected error in upload_file: {e}")
+        logger.debug(f"Error type: {type(e).__name__}")
         import traceback
-        print(f"Traceback: {traceback.format_exc()}")
+        logger.debug(f"Traceback: {traceback.format_exc()}")
         
         # Clean up file if database save fails
         if 'file_path' in locals() and os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                print(f"Cleaned up file: {file_path}")
+                logger.debug(f"Cleaned up file: {file_path}")
             except:
                 pass
         return jsonify({'error': f'Upload failed: {str(e)}'}), 500
