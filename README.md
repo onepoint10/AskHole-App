@@ -1,6 +1,6 @@
 # AskHole - AI Chat Assistant
 
-A modern, full-stack AI chat application that separates the original Python tkinter application into a Flask backend and React frontend. Features include chat history, tab-based sessions, prompt database, and support for both Gemini and OpenRouter APIs.
+A modern, full-stack AI chat application with Flask backend and React frontend. Features include chat history, tab-based sessions, prompt database, and support for both Gemini and OpenRouter APIs.
 
 ## Features
 
