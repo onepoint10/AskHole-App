@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -435,10 +435,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                 {/* Display images */}
                                 {images.length > 0 && (
                                   <div className="space-y-2">
-                                    <div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
+                                    {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
                                       <span>🖼️</span>
                                       <span>Images:</span>
-                                    </div>
+                                    </div>*/}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                       {images.map((image, index) => (
                                         <div key={`image-${index}`} className="relative group">
@@ -637,9 +637,21 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             </div>
           </div>
         ))}
+        {/* Loading indicator */}
         {isLoading && (
-          <div className="flex justify-center py-8">
-            <p className="text-muted-foreground">Loading messages...</p>
+          <div className="fade-in flex justify-start">
+            <div className="flex gap-3 max-w-[85%]">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted border border-border">
+                <Bot className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50">
+                <div className="typing-indicator flex space-x-1">
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         {!isLoading && messages.length === 0 && (
