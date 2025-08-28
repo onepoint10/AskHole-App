@@ -43,7 +43,9 @@ const Sidebar = ({
   onUsePrompt,
   onDeletePrompt,
   onOpenSettings,
-  onLogout
+  onLogout,
+  isMobileOverlay = false,
+  onRequestClose
 }) => {
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
   const [editingSessionId, setEditingSessionId] = useState(null);
@@ -191,6 +193,10 @@ const Sidebar = ({
   };
 
   const toggleCollapse = () => {
+    if (isMobileOverlay && onRequestClose) {
+      onRequestClose();
+      return;
+    }
     setIsCollapsed(!isCollapsed);
   };
 
@@ -374,6 +380,7 @@ const Sidebar = ({
                         return;
                       }
                       onSessionSelect(session.id);
+                      if (isMobileOverlay && onRequestClose) onRequestClose();
                     }}
                     onContextMenu={(e) => handleContextMenu(e, session.id)}
                     onDoubleClick={() => handleDoubleClick(session.id)}

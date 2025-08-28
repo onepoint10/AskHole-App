@@ -794,11 +794,21 @@ function App() {
         {/* Mobile toggle button */}
         {isMobile && (
           <button
-            aria-label="Open sidebar"
+            aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
             className="mobile-sidebar-toggle"
-            onClick={() => setIsSidebarOpen(true)}
+            onClick={() => setIsSidebarOpen(prev => !prev)}
           >
             <Menu className="h-5 w-5" />
+          </button>
+        )}
+        {/* Mobile new chat button */}
+        {isMobile && (
+          <button
+            aria-label="New chat"
+            className="mobile-newchat-button"
+            onClick={() => createNewSession()}
+          >
+            +
           </button>
         )}
 
@@ -838,6 +848,8 @@ function App() {
                 onDeletePrompt={deletePrompt}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onLogout={handleLogout}
+                isMobileOverlay={true}
+                onRequestClose={() => setIsSidebarOpen(false)}
               />
             </div>
           </div>
