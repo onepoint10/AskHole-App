@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -277,26 +277,22 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
-    const match = /language-(\w+)/.exec(className || '');
+    const match = /language-(\w+)/.exec(className || '') || [];
     const codeString = String(children).replace(/\n$/, '');
-    // Create a more unique ID that includes content hash for better state tracking
-    const codeId = `code-${Math.abs(codeString.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
-      return a & a;
-    }, 0))}`;
-    
-    if (inline || !match) {
+    const codeId = node && node.position ? `${node.position.start.line}-${node.position.end.line}` : Math.random().toString(36).slice(2);
+
+    if (inline) {
       return (
-        <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+        <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono overflow-x-auto inline-block max-w-full align-middle">
           {children}
         </code>
       );
     }
 
     return (
-      <div className="relative my-4">
-        <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <div className="code-block rounded-lg border border-border overflow-hidden">
+        <div className="flex items-center justify-between px-3 py-2 text-xs bg-muted/60 border-b border-border/50">
+          <span className="font-mono text-muted-foreground truncate">
             {match[1]}
           </span>
           <Button
@@ -317,15 +313,17 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             )}
           </Button>
         </div>
-        <SyntaxHighlighter
-          style={isDark ? oneDark : oneLight}
-          language={match[1]}
-          PreTag="div"
-          className="!mt-0 !rounded-t-none !border-t-0"
-          {...props}
-        >
-          {codeString}
-        </SyntaxHighlighter>
+        <div className="code-scroller custom-scrollbar">
+          <SyntaxHighlighter
+            style={isDark ? oneDark : oneLight}
+            language={match[1]}
+            PreTag="div"
+            className="!mt-0 !rounded-t-none !border-t-0"
+            {...props}
+          >
+            {codeString}
+          </SyntaxHighlighter>
+        </div>
       </div>
     );
   }, [copyToClipboard, copiedCodeId, isDark]);

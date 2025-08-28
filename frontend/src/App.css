@@ -558,3 +558,14 @@
     -webkit-overflow-scrolling: touch;
   }
 }
+
+.code-scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.code-scroller > * {
+  min-width: 100%;
+}
