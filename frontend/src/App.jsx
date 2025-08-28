@@ -856,16 +856,14 @@ function App() {
         )}
         
         <div className="flex-1 flex flex-col main-content">
-          {!isMobile && (
-            <ChatTabs
-              sessions={openTabSessions}  // Only show open tab sessions
-              activeSessionId={activeSessionId}
-              onSessionSelect={selectSession}
-              onNewSession={createNewSession}
-              onCloseTab={closeTabOnly}  // Use closeTabOnly for tab closure
-              onRenameSession={renameSession}
-            />
-          )}
+          <ChatTabs
+            sessions={openTabSessions}  // Only show open tab sessions
+            activeSessionId={activeSessionId}
+            onSessionSelect={selectSession}
+            onNewSession={createNewSession}
+            onCloseTab={closeTabOnly}  // Use closeTabOnly for tab closure
+            onRenameSession={renameSession}
+          />
           
           <MessageList
             messages={currentMessages}

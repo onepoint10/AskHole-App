@@ -234,28 +234,15 @@ const Sidebar = ({
             )}
           </div>
           {!isCollapsed && (
-            <div className="flex items-center gap-1">
-              {isMobileOverlay && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={onNewSession}
-                  className="hover:bg-sidebar-accent flex-shrink-0"
-                  title="New Chat"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              )}
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onOpenSettings}
-                className="hover:bg-sidebar-accent flex-shrink-0"
-                title="Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onOpenSettings}
+              className="hover:bg-sidebar-accent flex-shrink-0"
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
           )}
         </div>
         
@@ -546,10 +533,7 @@ const Sidebar = ({
                   <div
                     key={prompt.id}
                     className="group p-2 rounded-lg border border-sidebar-border hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
-                    onClick={() => {
-                      onUsePrompt(prompt);
-                      if (isMobileOverlay && onRequestClose) onRequestClose();
-                    }}
+                    onClick={() => onUsePrompt(prompt)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
