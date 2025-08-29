@@ -60,6 +60,7 @@ function App() {
     openrouterApiKey: '',
     customProviders: [],
     customModels: [],
+    customModelBindings: {},
     defaultModel: 'gemini-2.5-flash',
     temperature: 1.0,
     theme: 'system',
@@ -85,8 +86,16 @@ function App() {
       return 'gemini';
     }
     
-    // Check if it's a custom model
+    // Custom bindings override
     if (settings.customModels && settings.customModels.includes(model)) {
+      const bound = settings.customModelBindings?.[model];
+      if (bound) {
+        // Map custom provider keys back to logical clients for backend routing
+        if (bound === 'gemini') return 'gemini';
+        if (bound === 'openrouter') return 'openrouter';
+        // Any other key means a user-defined provider
+        return 'custom';
+      }
       return 'custom';
     }
     

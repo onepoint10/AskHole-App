@@ -68,9 +68,17 @@ const SettingsDialog = ({
   };
 
   const handleAddModel = (modelName) => {
+    // Support both legacy string and new object { name, providerKey }
+    const incoming = typeof modelName === 'string' ? { name: modelName, providerKey: '' } : modelName;
     const customModels = localSettings.customModels || [];
-    const newModels = [...customModels, modelName];
+    const newModels = [...customModels, incoming.name];
+    const existingBindings = localSettings.customModelBindings || {};
+    const newBindings = { ...existingBindings };
+    if (incoming.providerKey) {
+      newBindings[incoming.name] = incoming.providerKey;
+    }
     updateSetting('customModels', newModels);
+    updateSetting('customModelBindings', newBindings);
   };
 
   const handleRemoveProvider = (index) => {
@@ -81,8 +89,14 @@ const SettingsDialog = ({
 
   const handleRemoveModel = (index) => {
     const customModels = localSettings.customModels || [];
+    const modelToRemove = customModels[index];
     const newModels = customModels.filter((_, i) => i !== index);
+    const existingBindings = { ...(localSettings.customModelBindings || {}) };
+    if (modelToRemove && existingBindings[modelToRemove]) {
+      delete existingBindings[modelToRemove];
+    }
     updateSetting('customModels', newModels);
+    updateSetting('customModelBindings', existingBindings);
   };
 
   return (
@@ -257,6 +271,11 @@ const SettingsDialog = ({
                       <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                         <div className="flex-1">
                           <div className="font-medium">{model}</div>
+                          {localSettings.customModelBindings?.[model] && (
+                            <div className="text-xs text-muted-foreground">
+                              Bound to: {localSettings.customModelBindings[model]}
+                            </div>
+                          )}
                         </div>
                         <Button
                           type="button"
@@ -422,6 +441,11 @@ const SettingsDialog = ({
         isOpen={isAddModelOpen}
         onClose={() => setIsAddModelOpen(false)}
         onAddModel={handleAddModel}
+        availableProviders={[
+          { key: 'gemini', label: 'Gemini' },
+          { key: 'openrouter', label: 'OpenRouter' },
+          ...((localSettings.customProviders || []).map((p, idx) => ({ key: `custom:${idx}`, label: `Custom: ${p.name}` })))
+        ]}
       />
     </Dialog>
   );
