@@ -434,7 +434,17 @@
 @media (max-width: 768px) {
   .mobile-root {
     position: relative;
+    width: 100vw;
+    overflow-x: hidden;
   }
+  
+  /* **ADD: Force full viewport containment** */
+  body, html, #root {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
   .mobile-sidebar-toggle {
     position: fixed;
     top: 12px;
@@ -537,24 +547,139 @@
     line-height: 1.5;
   }
 
-  /* Ensure chat takes full width */
+  /* Ensure chat takes full width and prevents overflow */
   .main-content {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Mobile content width fix */
+  .message-scroll-area {
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  
+  /* Fix message bubble widths** */
+  .fade-in {
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
+  }
+
+  .fade-in > div {
+    max-width: calc(100vw - 16px);
+    box-sizing: border-box;
+  }
+
+  .fade-in > div > div {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* User and assistant message bubbles** */
+  .message-user,
+  .message-assistant,
+  .group > div:last-child {
+    max-width: calc(100vw - 60px);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    box-sizing: border-box;
+  }
+
+  /* Code block mobile width */
+  .prose pre,
+  .code-block,
+  pre code,
+  .message-assistant pre,
+  .prose .relative {
+    width: calc(100vw - 80px) !important;
+    max-width: calc(100vw - 80px) !important;
+    overflow-x: auto;
+    white-space: pre;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+  }
+
+  /* Syntax highlighter containers** */
+  .prose .relative > div:last-child,
+  [class*="language-"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto;
+    box-sizing: border-box;
+  }
+
+  /* Ensure all prose content fits */
+  .prose {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .prose * {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Table overflow on mobile** */
+  .prose table {
+    width: 100%;
+    max-width: calc(100vw - 80px);
+    overflow-x: auto;
+    display: block;
+    white-space: nowrap;
+  }
+
+  .prose tbody,
+  .prose thead,
+  .prose tr {
+    display: table;
     width: 100%;
   }
 
-  /* Improve spacing to avoid accidental taps */
+  /* Image containers** */
+  .prose img,
+  img {
+    max-width: calc(100vw - 80px) !important;
+    height: auto;
+    box-sizing: border-box;
+  }
+
+  /* Improve spacing to avoid accidental taps** */
   .sidebar .group {
     margin-bottom: 4px;
   }
 
-  /* Responsive code blocks that scroll horizontally */
-  .prose pre,
-  .code-block,
-  pre code,
-  .message-assistant pre {
+  /* Remaining overflow */
+  * {
     max-width: 100vw;
-    overflow-x: auto;
-    white-space: pre;
-    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box;
+  }
+}
+
+/* Universal mobile overflow prevention */
+@media (max-width: 768px) {
+  .max-w-4xl {
+    max-width: calc(100vw - 16px) !important;
+    margin-left: 8px !important;
+    margin-right: 8px !important;
+  }
+
+  .px-4 {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  /* Specific component widths that might cause overflow */
+  .rounded-2xl,
+  .bg-primary,
+  .bg-muted\/50 {
+    max-width: calc(100% - 8px);
+    box-sizing: border-box;
   }
 }

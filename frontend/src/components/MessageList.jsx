@@ -294,7 +294,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
 
     return (
-      <div className="relative my-4">
+      <div className={`relative my-4 ${isMobileDevice ? 'w-full max-w-full' : ''}`}>
         <div className="flex items-center justify-between bg-muted/50 px-4 py-2 rounded-t-lg border-b border-border">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {match[1]}
@@ -317,23 +317,34 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             )}
           </Button>
         </div>
-        <SyntaxHighlighter
-          style={isDark ? oneDark : oneLight}
-          language={match[1]}
-          PreTag="div"
-          className="!mt-0 !rounded-t-none !border-t-0"
-          {...props}
-        >
-          {codeString}
-        </SyntaxHighlighter>
+        <div className={`${isMobileDevice ? 'w-full overflow-x-auto' : ''}`}>
+          <SyntaxHighlighter
+            style={isDark ? oneDark : oneLight}
+            language={match[1]}
+            PreTag="div"
+            className={`!mt-0 !rounded-t-none !border-t-0 ${
+              isMobileDevice ? '!w-full !max-w-full !overflow-x-auto' : ''
+            }`}
+            customStyle={isMobileDevice ? {
+              width: '100%',
+              maxWidth: '100%',
+              overflowX: 'auto',
+              fontSize: '0.875rem',
+              lineHeight: '1.25rem'
+            } : {}}
+            {...props}
+          >
+            {codeString}
+          </SyntaxHighlighter>
+        </div>
       </div>
     );
-  }, [copyToClipboard, copiedCodeId, isDark]);
+  }, [copyToClipboard, copiedCodeId, isDark, isMobileDevice]);
 
   // Markdown components configuration
   const markdownComponents = {
     code: CodeBlock,
-    pre: ({ children }) => <div>{children}</div>,
+    pre: ({ children }) => <div className={isMobileDevice ? 'w-full overflow-x-auto' : ''}>{children}</div>,
     p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
     h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
     h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
@@ -357,36 +368,48 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className="my-3 w-full overflow-x-auto">
-        <table className="w-full border-collapse text-sm">{children}</table>
+      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
+        <table className={`border-collapse text-sm ${
+          isMobileDevice ? 'min-w-full' : 'w-full'
+        }`}>{children}</table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
     th: ({ children }) => (
-      <th className="border border-border px-3 py-2 text-left font-semibold bg-muted/30">
+      <th className={`border border-border text-left font-semibold bg-muted/30 ${
+        isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
+      }`}>
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className="border border-border px-3 py-2">{children}</td>
+      <td className={`border border-border ${
+        isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
+      }`}>{children}</td>
     ),
-  };
+  }; 
 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
-      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+      <div className={`mx-auto px-4 py-6 space-y-6 ${isMobileDevice ? 'max-w-full w-full' : 'max-w-4xl'}`}>
         {messages.map((message) => (
           <div
             key={message.id}
-            className={`fade-in ${
+            className={`fade-in ${isMobileDevice ? 'w-full' : ''} ${
               message.role === 'user' ? 'flex justify-end' : 'flex justify-start'
             }`}
           >
             <div
-              className={`flex gap-3 max-w-[85%] ${
-                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+              className={`flex gap-3 ${
+                isMobileDevice 
+                  ? message.role === 'user' 
+                    ? 'max-w-[90%] w-full flex-row-reverse' 
+                    : 'max-w-[95%] w-full flex-row'
+                  : message.role === 'user'
+                    ? 'max-w-[85%] flex-row-reverse'
+                    : 'max-w-[85%] flex-row'
               }`}
             >
               {/* Avatar */}
@@ -408,7 +431,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
               {message.role === 'user' ? (
                 <CM>
                   <ContextMenuTrigger asChild>
-                    <div className="group relative px-4 py-3 rounded-2xl bg-primary text-primary-foreground max-w-full">
+                    <div className={`group relative px-4 py-3 rounded-2xl bg-primary text-primary-foreground ${
+                      isMobileDevice ? 'max-w-full w-full' : 'max-w-full'
+                    }`}>
                       <div className="whitespace-pre-wrap leading-relaxed break-words">
                         {message.content}
                       </div>
@@ -435,17 +460,15 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                 {/* Display images */}
                                 {images.length > 0 && (
                                   <div className="space-y-2">
-                                    {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
-                                      <span>🖼️</span>
-                                      <span>Images:</span>
-                                    </div>*/}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
                                       {images.map((image, index) => (
                                         <div key={`image-${index}`} className="relative group">
                                           <img
                                             src={getFileUrl(image)}
                                             alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
-                                            className="max-w-full h-auto max-h-48 rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                            className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
+                                              isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
+                                            }`}
                                             onClick={(e) => {
                                               // Open image in new tab on click
                                               const imgSrc = e.target.src;
@@ -468,10 +491,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                 {/* Display other files */}
                                 {otherFiles.length > 0 && (
                                   <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
-                                    {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
-                                      <span>📎</span>
-                                      <span>Attached files:</span>
-                                    </div>*/}
                                     <div className="flex flex-wrap gap-1">
                                       {otherFiles.map((file, index) => (
                                         <span 
@@ -480,7 +499,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                           title={getFileDisplayName(file)}
                                         >
                                           <span>📄</span>
-                                          <span className="max-w-[200px] truncate">
+                                          <span className={`truncate ${isMobileDevice ? 'max-w-[120px]' : 'max-w-[200px]'}`}>
                                             {getFileDisplayName(file)}
                                           </span>
                                         </span>
@@ -518,11 +537,17 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                   </ContextMenuContent>
                 </CM>
               ) : (
-                <div className="relative group w-full min-h-[60px]">
+                <div className={`relative group min-h-[60px] ${
+                  isMobileDevice ? 'w-full max-w-full' : 'w-full'
+                }`}>
                   <CM>
                     <ContextMenuTrigger asChild>
-                      <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50 relative">
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <div className={`px-4 py-3 rounded-2xl bg-muted/50 border border-border/50 relative ${
+                        isMobileDevice ? 'max-w-full overflow-x-hidden' : ''
+                      }`}>
+                        <div className={`prose prose-sm dark:prose-invert max-w-none ${
+                          isMobileDevice ? 'overflow-x-hidden' : ''
+                        }`}>
                           <ReactMarkdown
                             remarkPlugins={remarkPlugins}
                             components={markdownComponents}
@@ -556,13 +581,15 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                         <span>🖼️</span>
                                         <span>Referenced images:</span>
                                       </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
                                         {images.map((image, index) => (
                                           <div key={`image-${index}`} className="relative group">
                                             <img
                                               src={getFileUrl(image)}
                                               alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
-                                              className="max-w-full h-auto max-h-48 rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                              className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
+                                                isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
+                                              }`}
                                               onClick={(e) => {
                                                 const imgSrc = e.target.src;
                                                 window.open(imgSrc, '_blank');
@@ -583,10 +610,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                   {/* Display other files */}
                                   {otherFiles.length > 0 && (
                                     <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
-                                      {/*<div className="flex items-center gap-1 text-xs text-primary-foreground/80 font-medium">
-                                        <span>📎</span>
-                                        <span>Attached files:</span>
-                                      </div>*/}
                                       <div className="flex flex-wrap gap-1">
                                         {otherFiles.map((file, index) => (
                                           <span 
@@ -595,7 +618,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                             title={getFileDisplayName(file)}
                                           >
                                             <span>📄</span>
-                                            <span className="max-w-[200px] truncate">
+                                            <span className={`truncate ${isMobileDevice ? 'max-w-[120px]' : 'max-w-[200px]'}`}>
                                               {getFileDisplayName(file)}
                                             </span>
                                           </span>
@@ -640,7 +663,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         {/* Loading indicator */}
         {isLoading && (
           <div className="fade-in flex justify-start">
-            <div className="flex gap-3 max-w-[85%]">
+            <div className={`flex gap-3 ${isMobileDevice ? 'max-w-[95%]' : 'max-w-[85%]'}`}>
               <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted border border-border">
                 <Bot className="h-4 w-4 text-muted-foreground" />
               </div>
