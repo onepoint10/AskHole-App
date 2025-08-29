@@ -157,7 +157,7 @@ const MessageInput = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80"
+                className="absolute bottom-2 right-8 h-8 w-8 p-0 hover:bg-muted/80"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isLoading}
               >
@@ -169,16 +169,19 @@ const MessageInput = ({
                 multiple
                 className="hidden"
                 onChange={handleFileSelect}
-                accept=".txt,.pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.html,.css,.xml"
+                accept=".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,jsx,.html,.css,.xml"
               />
-            </div>
-            <Button
-              type="submit"
-              disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
-              className="btn-primary h-[52px] px-4 flex-shrink-0"
-            >
-              <Send className="h-4 w-4" />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="sm"
+                disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
+                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80"
+              >
+                <Send className="h-4 w-4" />
             </Button>
+            </div>
+            
           </div>
           
           {/* Model selector - bottom left corner, only shown for new/empty chats */}

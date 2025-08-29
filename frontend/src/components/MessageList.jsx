@@ -431,7 +431,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
               {message.role === 'user' ? (
                 <CM>
                   <ContextMenuTrigger asChild>
-                    <div className={`group relative px-4 py-3 rounded-2xl bg-primary text-primary-foreground ${
+                    <div className={`group relative px-4 py-3 rounded-2xl bg-message-primary text-primary-foreground ${
                       isMobileDevice ? 'max-w-full w-full' : 'max-w-full'
                     }`}>
                       <div className="whitespace-pre-wrap leading-relaxed break-words">

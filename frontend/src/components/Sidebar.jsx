@@ -588,8 +588,8 @@ const Sidebar = ({
             )}
           </ScrollArea>
 
-          {/* *** ADD THIS: Fixed Bottom Panel for Expanded State *** */}
-          <div className="border-t border-sidebar-border p-3 bg-background">
+          {/* Fixed Bottom Panel for Expanded State */}
+          <div className="border-sidebar-border p-3 bg-background">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Button

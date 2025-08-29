@@ -15,6 +15,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-message-primary: var(--message-primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -42,15 +43,16 @@
 }
 
 :root {
-  --radius: 0.5rem;
-  /* Claude-inspired light theme */
+  --radius: 0.7rem;
+  /* light theme */
   --background: #ffffff;
   --foreground: #2d3748;
   --card: #ffffff;
   --card-foreground: #2d3748;
   --popover: #ffffff;
   --popover-foreground: #2d3748;
-  --primary: #d97706;
+  --primary: #D9AE8E;
+  --message-primary: #4D5149;
   --primary-foreground: #ffffff;
   --secondary: #f7fafc;
   --secondary-foreground: #4a5568;
@@ -78,14 +80,15 @@
 }
 
 .dark {
-  /* Claude-inspired dark theme */
+  /* dark theme */
   --background: #1a1a1a;
   --foreground: #f5f5f5;
   --card: #262626;
   --card-foreground: #f5f5f5;
   --popover: #262626;
   --popover-foreground: #f5f5f5;
-  --primary: #f97316;
+  --primary: #d97706;
+  --message-primary: #141411;
   --primary-foreground: #ffffff;
   --secondary: #404040;
   --secondary-foreground: #d4d4d8;
@@ -135,7 +138,7 @@
   z-index: 100;
 }
 
-/* Claude-style message bubbles */
+/* message bubbles */
 .message-user {
   @apply bg-primary text-primary-foreground rounded-2xl px-4 py-3 max-w-[80%] ml-auto;
 }
@@ -144,17 +147,17 @@
   @apply bg-muted text-foreground rounded-2xl px-4 py-3 max-w-[85%];
 }
 
-/* Claude-style input */
+/* input */
 .chat-input {
   @apply border-2 border-border rounded-2xl px-4 py-3 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200;
 }
 
-/* Claude-style sidebar */
+/* sidebar */
 .sidebar {
   @apply bg-sidebar border-r border-sidebar-border;
 }
 
-/* Claude-style tabs */
+/* tabs */
 .chat-tab {
   @apply rounded-t-lg border-b-2 border-transparent hover:border-primary/30 transition-all duration-200;
 }
@@ -163,7 +166,7 @@
   @apply border-primary bg-background;
 }
 
-/* Claude-style buttons */
+/* buttons */
 .btn-primary {
   @apply bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg px-4 py-2 font-medium transition-all duration-200;
 }
@@ -172,12 +175,12 @@
   @apply bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg px-4 py-2 font-medium transition-all duration-200;
 }
 
-/* Claude-style code blocks */
+/* code blocks */
 .code-block {
   @apply bg-muted rounded-lg p-4 font-mono text-sm border border-border;
 }
 
-/* Claude-style scrollbars */
+/* scrollbars */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -203,7 +206,7 @@
   background: #6b7280;
 }
 
-/* Claude-style animations */
+/* animations */
 .fade-in {
   animation: fadeIn 0.2s ease-in-out;
 }
@@ -234,12 +237,12 @@
   }
 }
 
-/* Claude-style focus states */
+/* focus states */
 .focus-ring {
   @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary;
 }
 
-/* Claude-style typography */
+/* typography */
 .prose {
   @apply text-foreground;
 }
@@ -276,7 +279,7 @@
   @apply text-primary hover:text-primary/80 underline;
 }
 
-/* Claude-style loading animation */
+/* loading animation */
 .typing-indicator {
   @apply flex space-x-1;
 }
