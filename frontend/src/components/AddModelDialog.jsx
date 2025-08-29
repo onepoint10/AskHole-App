@@ -4,28 +4,38 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 
-const AddModelDialog = ({ isOpen, onClose, onAddModel }) => {
+const AddModelDialog = ({ isOpen, onClose, onAddModel, availableProviders = [] }) => {
   const [modelName, setModelName] = useState('');
+  const [selectedProvider, setSelectedProvider] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!modelName.trim()) {
+    if (!modelName.trim() || !selectedProvider) {
       return;
     }
 
-    onAddModel(modelName.trim());
+    onAddModel({ name: modelName.trim(), providerKey: selectedProvider });
     setModelName('');
+    setSelectedProvider('');
     onClose();
   };
 
   const handleCancel = () => {
     setModelName('');
+    setSelectedProvider('');
     onClose();
   };
 
@@ -51,6 +61,28 @@ const AddModelDialog = ({ isOpen, onClose, onAddModel }) => {
             />
             <p className="text-xs text-muted-foreground">
               The model identifier from your provider
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="provider-select">Bind to Provider</Label>
+            <Select
+              value={selectedProvider}
+              onValueChange={setSelectedProvider}
+            >
+              <SelectTrigger id="provider-select">
+                <SelectValue placeholder="Select provider" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableProviders.map((p) => (
+                  <SelectItem key={p.key} value={p.key}>
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Choose which provider this model belongs to
             </p>
           </div>
 
