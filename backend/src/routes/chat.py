@@ -4,6 +4,7 @@ from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
 from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
+from src.custom_client import CustomClient
 from src.file_converter import FileConverter
 import uuid
 import os
@@ -79,20 +80,29 @@ def determine_client_from_model(model: str):
 
     if any(model.startswith(gm.split('-')[0] + '-') or model == gm for gm in gemini_models):
         return 'gemini'
-    else:
-        return 'openrouter'
+    
+    # Check if it's a custom model by looking through custom clients
+    for client in custom_clients.values():
+        try:
+            if model in client.get_available_models():
+                return 'custom'
+        except:
+            continue
+    
+    return 'openrouter'
 
 chat_bp = Blueprint('chat', __name__)
 
 # Global clients - will be initialized when API keys are provided
 gemini_client = None
 openrouter_client = None
+custom_clients = {}  # Dictionary to store custom clients by provider name
 
 
 @chat_bp.route('/config', methods=['POST'])
 def set_config():
     """Set API keys and initialize clients"""
-    global gemini_client, openrouter_client
+    global gemini_client, openrouter_client, custom_clients
 
     # Check authentication
     current_user = get_current_user()
@@ -102,6 +112,7 @@ def set_config():
     data = request.get_json()
     gemini_key = data.get('gemini_api_key')
     openrouter_key = data.get('openrouter_api_key')
+    custom_providers = data.get('custom_providers', [])
 
     try:
         if gemini_key:
@@ -112,11 +123,25 @@ def set_config():
             if (openrouter_client is None) or (getattr(openrouter_client, 'api_key', None) != openrouter_key):
                 openrouter_client = OpenRouterClient(openrouter_key)
 
+        # Handle custom providers
+        custom_clients.clear()  # Clear existing custom clients
+        for provider in custom_providers:
+            try:
+                custom_client = CustomClient(
+                    provider_name=provider['name'],
+                    base_url=provider['base_url'],
+                    api_key=provider['api_key']
+                )
+                custom_clients[provider['name']] = custom_client
+            except Exception as e:
+                logger.error(f"Failed to initialize custom client for {provider['name']}: {e}")
+
         return jsonify({
             'success': True,
             'message': 'API keys configured successfully',
             'gemini_available': gemini_client is not None,
-            'openrouter_available': openrouter_client is not None
+            'openrouter_available': openrouter_client is not None,
+            'custom_providers_available': list(custom_clients.keys())
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 400
@@ -132,7 +157,8 @@ def get_models():
 
     models = {
         'gemini': [],
-        'openrouter': []
+        'openrouter': [],
+        'custom': []
     }
 
     if gemini_client:
@@ -140,6 +166,14 @@ def get_models():
 
     if openrouter_client:
         models['openrouter'] = openrouter_client.get_available_models()
+
+    # Add models from custom providers
+    for client in custom_clients.values():
+        try:
+            custom_models = client.get_available_models()
+            models['custom'].extend(custom_models)
+        except Exception as e:
+            logger.error(f"Failed to get models from custom client: {e}")
 
     return jsonify(models)
 
@@ -458,6 +492,40 @@ def send_message(session_id):
                     files=file_paths,
                     temperature=session.temperature
                 )
+            elif session.client_type == 'custom':
+                # Find the appropriate custom client for this model
+                custom_client = None
+                for client in custom_clients.values():
+                    try:
+                        if session.model in client.get_available_models():
+                            custom_client = client
+                            break
+                    except:
+                        continue
+                
+                if not custom_client:
+                    raise Exception(f"Custom client not found for model: {session.model}. Please check your custom provider configuration.")
+                
+                try:
+                    if session_id not in getattr(custom_client, 'chat_sessions', {}):
+                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                        history_messages = []
+                        for m in prior_messages:
+                            role = 'user' if m.role == 'user' else 'assistant'
+                            text = m.content or ''
+                            history_messages.append({'role': role, 'content': text})
+                        custom_client.chat_sessions[session_id] = history_messages
+                except Exception as custom_hist_err:
+                    logger.warning(f"Custom client history build error for session {session_id}: {custom_hist_err}")
+                
+                response = custom_client.send_message(
+                    session_id=session_id,
+                    message=message_content,
+                    model=session.model,
+                    files=file_paths,
+                    temperature=session.temperature
+                )
+                response_content = response.get('response', '')
             else:
                 raise Exception(f"Unknown client type: {session.client_type}")
 

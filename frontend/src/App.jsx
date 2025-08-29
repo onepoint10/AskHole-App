@@ -26,7 +26,11 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [currentMessages, setCurrentMessages] = useState([]);
   const [prompts, setPrompts] = useState([]);
-  const [availableModels, setAvailableModels] = useState({ gemini: [], openrouter: [] });
+  const [availableModels, setAvailableModels] = useState({ 
+    gemini: [], 
+    openrouter: [],
+    custom: []
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -54,6 +58,8 @@ function App() {
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
     geminiApiKey: '',
     openrouterApiKey: '',
+    customProviders: [],
+    customModels: [],
     defaultModel: 'gemini-2.5-flash',
     temperature: 1.0,
     theme: 'system',
@@ -78,6 +84,12 @@ function App() {
     if (model.startsWith('gemini') || geminiModels.includes(model)) {
       return 'gemini';
     }
+    
+    // Check if it's a custom model
+    if (settings.customModels && settings.customModels.includes(model)) {
+      return 'custom';
+    }
+    
     return 'openrouter';
   };
 
@@ -198,11 +210,12 @@ function App() {
   const initializeApp = async () => {
     try {
       // Configure API if we have keys
-      if (settings.geminiApiKey || settings.openrouterApiKey) {
+      if (settings.geminiApiKey || settings.openrouterApiKey || (settings.customProviders && settings.customProviders.length > 0)) {
         try {
           await configAPI.setConfig({
             gemini_api_key: settings.geminiApiKey,
             openrouter_api_key: settings.openrouterApiKey,
+            custom_providers: settings.customProviders || [],
           });
         } catch (error) {
           console.error('Failed to configure API keys:', error);
@@ -214,14 +227,20 @@ function App() {
       try {
         const modelsResponse = await configAPI.getModels();
         if (modelsResponse && modelsResponse.data) {
-          setAvailableModels(modelsResponse.data);
+          // Add custom models to the available models
+          const modelsWithCustom = {
+            ...modelsResponse.data,
+            custom: settings.customModels || []
+          };
+          setAvailableModels(modelsWithCustom);
         }
       } catch (error) {
         console.error('Failed to load models:', error);
         // Set default models if API call fails
         setAvailableModels({
           gemini: ['gemini-2.5-flash', 'gemini-1.5-pro'],
-          openrouter: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4']
+          openrouter: ['anthropic/claude-3.5-sonnet', 'openai/gpt-4'],
+          custom: settings.customModels || []
         });
       }
 
@@ -740,24 +759,40 @@ function App() {
     setSettings(newSettings);
     
     try {
-      if (newSettings.geminiApiKey || newSettings.openrouterApiKey) {
+      if (newSettings.geminiApiKey || newSettings.openrouterApiKey || (newSettings.customProviders && newSettings.customProviders.length > 0)) {
         await configAPI.setConfig({
           gemini_api_key: newSettings.geminiApiKey,
           openrouter_api_key: newSettings.openrouterApiKey,
+          custom_providers: newSettings.customProviders || [],
         });
         
         // Try to reload models
         try {
           const modelsResponse = await configAPI.getModels();
           if (modelsResponse && modelsResponse.data) {
-            setAvailableModels(modelsResponse.data);
+            // Add custom models to the available models
+            const modelsWithCustom = {
+              ...modelsResponse.data,
+              custom: newSettings.customModels || []
+            };
+            setAvailableModels(modelsWithCustom);
           }
           toast.success("Settings updated successfully.");
         } catch (modelError) {
           console.error('Failed to reload models:', modelError);
+          // Set custom models even if API call fails
+          setAvailableModels(prev => ({
+            ...prev,
+            custom: newSettings.customModels || []
+          }));
           toast.success("Settings saved, but couldn't reload models. They will be available on next restart.");
         }
       } else {
+        // Update custom models even if no API keys changed
+        setAvailableModels(prev => ({
+          ...prev,
+          custom: newSettings.customModels || []
+        }));
         toast.success("Settings saved.");
       }
     } catch (error) {

@@ -6,8 +6,12 @@ import {
   Sliders,
   Moon,
   Sun,
-  Monitor
+  Monitor,
+  Plus,
+  Trash2
 } from 'lucide-react';
+import AddProviderDialog from './AddProviderDialog';
+import AddModelDialog from './AddModelDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,6 +45,8 @@ const SettingsDialog = ({
   availableModels 
 }) => {
   const [localSettings, setLocalSettings] = useState(settings);
+  const [isAddProviderOpen, setIsAddProviderOpen] = useState(false);
+  const [isAddModelOpen, setIsAddModelOpen] = useState(false);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -53,6 +59,30 @@ const SettingsDialog = ({
 
   const updateSetting = (key, value) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAddProvider = (provider) => {
+    const customProviders = localSettings.customProviders || [];
+    const newProviders = [...customProviders, provider];
+    updateSetting('customProviders', newProviders);
+  };
+
+  const handleAddModel = (modelName) => {
+    const customModels = localSettings.customModels || [];
+    const newModels = [...customModels, modelName];
+    updateSetting('customModels', newModels);
+  };
+
+  const handleRemoveProvider = (index) => {
+    const customProviders = localSettings.customProviders || [];
+    const newProviders = customProviders.filter((_, i) => i !== index);
+    updateSetting('customProviders', newProviders);
+  };
+
+  const handleRemoveModel = (index) => {
+    const customModels = localSettings.customModels || [];
+    const newModels = customModels.filter((_, i) => i !== index);
+    updateSetting('customModels', newModels);
   };
 
   return (
@@ -107,6 +137,48 @@ const SettingsDialog = ({
                   Get your API key from OpenRouter.ai
                 </p>
               </div>
+
+              {/* Custom Providers Section */}
+              <div className="space-y-4 pt-6 border-t">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-md font-medium">Custom Providers</h4>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsAddProviderOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Provider
+                  </Button>
+                </div>
+
+                {(localSettings.customProviders || []).length > 0 ? (
+                  <div className="space-y-2">
+                    {localSettings.customProviders.map((provider, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium">{provider.name}</div>
+                          <div className="text-sm text-muted-foreground">{provider.base_url}</div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRemoveProvider(index)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No custom providers added yet. Click "Add Provider" to add your own API provider.
+                  </p>
+                )}
+              </div>
             </div>
           </TabsContent>
 
@@ -137,6 +209,11 @@ const SettingsDialog = ({
                         {model} (OpenRouter)
                       </SelectItem>
                     ))}
+                    {availableModels.custom?.map((model) => (
+                      <SelectItem key={model} value={model}>
+                        {model} (Custom)
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -157,6 +234,47 @@ const SettingsDialog = ({
                 <p className="text-xs text-muted-foreground">
                   Controls randomness in responses. Lower values are more focused, higher values are more creative.
                 </p>
+              </div>
+
+              {/* Custom Models Section */}
+              <div className="space-y-4 pt-6 border-t">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-md font-medium">Custom Models</h4>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setIsAddModelOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Model
+                  </Button>
+                </div>
+
+                {(localSettings.customModels || []).length > 0 ? (
+                  <div className="space-y-2">
+                    {localSettings.customModels.map((model, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-medium">{model}</div>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRemoveModel(index)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No custom models added yet. Click "Add Model" to add your own model.
+                  </p>
+                )}
               </div>
             </div>
           </TabsContent>
@@ -291,6 +409,20 @@ const SettingsDialog = ({
           </Button>
         </div>
       </DialogContent>
+
+      {/* Add Provider Dialog */}
+      <AddProviderDialog
+        isOpen={isAddProviderOpen}
+        onClose={() => setIsAddProviderOpen(false)}
+        onAddProvider={handleAddProvider}
+      />
+
+      {/* Add Model Dialog */}
+      <AddModelDialog
+        isOpen={isAddModelOpen}
+        onClose={() => setIsAddModelOpen(false)}
+        onAddModel={handleAddModel}
+      />
     </Dialog>
   );
 };

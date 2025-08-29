@@ -16,7 +16,8 @@ const ModelSelector = ({
 }) => {
   const allModels = [
     ...((availableModels.gemini || []).map(model => ({ value: model, label: `${model} (Gemini)`, type: 'gemini' }))),
-    ...((availableModels.openrouter || []).map(model => ({ value: model, label: `${model} (OpenRouter)`, type: 'openrouter' })))
+    ...((availableModels.openrouter || []).map(model => ({ value: model, label: `${model} (OpenRouter)`, type: 'openrouter' }))),
+    ...((availableModels.custom || []).map(model => ({ value: model, label: `${model} (Custom)`, type: 'custom' })))
   ];
 
   return (
