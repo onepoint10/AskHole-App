@@ -414,7 +414,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             >
               {/* Avatar */}
               <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                className={`flex-shrink-0 w-8 h-8 mt-2 rounded-full flex items-center justify-center ${
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted border border-border'
@@ -431,7 +431,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
               {message.role === 'user' ? (
                 <CM>
                   <ContextMenuTrigger asChild>
-                    <div className={`group relative px-4 py-3 rounded-2xl bg-message-primary text-primary-foreground ${
+                    <div className={`group relative px-4 py-2 rounded-3xl rounded-tr-sm bg-message-primary text-primary-foreground ${
                       isMobileDevice ? 'max-w-full w-full' : 'max-w-full'
                     }`}>
                       <div className="whitespace-pre-wrap leading-relaxed break-words">
@@ -542,7 +542,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                 }`}>
                   <CM>
                     <ContextMenuTrigger asChild>
-                      <div className={`px-4 py-3 rounded-2xl bg-muted/50 border border-border/50 relative ${
+                      <div className={`px-4 py-3 rounded-3xl rounded-tl-sm bg-muted/50 border border-border/50 relative ${
                         isMobileDevice ? 'max-w-full overflow-x-hidden' : ''
                       }`}>
                         <div className={`prose prose-sm dark:prose-invert max-w-none ${

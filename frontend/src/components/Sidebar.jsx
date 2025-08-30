@@ -353,7 +353,7 @@ const Sidebar = ({
       ) : (
         <>
           {/* Search */}
-          <div className="px-2 py-3 border-b border-sidebar-border">
+          <div className="px-3 py-3 border-sidebar-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -368,8 +368,8 @@ const Sidebar = ({
           {/* Content */}
           <ScrollArea className="flex-1 custom-scrollbar message-scroll-area">
             {activeTab === 'history' && (
-              <div className="px-3 py-2 space-y-2">
-                <div className="flex items-center justify-between mb-3">
+              <div className="px-2 py-2 space-y-2">
+                <div className="flex items-center justify-between mb-3 pr-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Recent Chats</h3>
                   <Button 
                     variant="ghost" 
@@ -384,7 +384,7 @@ const Sidebar = ({
                 {filteredSessions.map((session) => (
                   <div
                     key={session.id}
-                    className="group flex items-center gap-2 p-2 rounded-lg hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
+                    className="group flex items-center gap-0 p-2 rounded-lg hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
                     onClick={() => {
                       if (editingSessionId === session.id) return;
                       if (longPressTriggeredRef.current) {

@@ -104,7 +104,7 @@ const MessageInput = ({
   const shouldShowModelSelector = !currentSession || currentSession.message_count === 0;
 
   return (
-    <div className="border-t border-border bg-background">
+    <div className="border-border bg-background">
       <div className="max-w-4xl mx-auto p-4">
         {attachedFiles.length > 0 && (
           <div className="mb-3 space-y-2">
@@ -140,8 +140,8 @@ const MessageInput = ({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Message AskHole..."}
-                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 text-base leading-relaxed"
+                placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
+                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 text-base leading-relaxed custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={1}
                 style={{
@@ -157,7 +157,7 @@ const MessageInput = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute bottom-2 right-8 h-8 w-8 p-0 hover:bg-muted/80"
+                className="absolute bottom-2 right-9 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isLoading}
               >
@@ -176,7 +176,7 @@ const MessageInput = ({
                 variant="ghost"
                 size="sm"
                 disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
-                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80"
+                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary"
               >
                 <Send className="h-4 w-4" />
             </Button>
