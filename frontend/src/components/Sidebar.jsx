@@ -230,19 +230,32 @@ const Sidebar = ({
               )}
             </div>
             {!isCollapsed && (
-              <h2 className="text-lg font-semibold text-sidebar-foreground whitespace-nowrap">AskHole</h2>
+              <h2 className="px-2 text-lg font-semibold text-sidebar-foreground whitespace-nowrap">AskHole</h2>
             )}
           </div>
           {!isCollapsed && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={onOpenSettings}
-              className="hover:bg-sidebar-accent flex-shrink-0"
-              title="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
+             <div className="flex items-center gap-1">
+              {isMobileOverlay && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onNewSession}
+                  className="hover:bg-sidebar-accent flex-shrink-0"
+                  title="New Chat"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onOpenSettings}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title="Settings"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
           )}
         </div>
         
@@ -314,7 +327,7 @@ const Sidebar = ({
           </div>
           
           {/* Fixed Bottom Panel for Collapsed State */}
-          <div className="border-t border-sidebar-border p-2 bg-background">
+          <div className="border-sidebar-border p-2 bg-background">
             <div className="flex flex-col items-center space-y-2">
               <Button
                 variant="ghost"

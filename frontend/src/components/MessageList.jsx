@@ -631,6 +631,24 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                             })()}
                           </div>
                         )}
+                        {/* Copy button for assistant messages - positioned inside the message */}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            copyToClipboard(message.content, message.id);
+                          }}
+                          title="Copy message"
+                        >
+                          {copiedId === message.id ? (
+                            <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 transition-transform hover:scale-110" />
+                          )}
+                        </Button>
                       </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent>
@@ -678,10 +696,11 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           </div>
         )}
         {!isLoading && messages.length === 0 && (
-          <div className="flex justify-center py-8">
+          <div className="flex justify-center items-center py-50">
             <p className="text-muted-foreground">No messages yet. Start a conversation!</p>
           </div>
         )}
+        {/* Scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
     </ScrollArea>

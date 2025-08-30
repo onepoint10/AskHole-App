@@ -357,13 +357,18 @@ function App() {
       const newSession = response.data;
       setSessions(prev => [newSession, ...prev]);
       
-      // FIXED: Immediately set as active session and open tab
+      // Immediately set as active session and open tab
       setActiveSessionId(newSession.id);
       setOpenTabIds(prev => [newSession.id, ...prev]);
       setCurrentMessages([]); // Clear messages for new session
 
       // Update sessions list immediately to ensure the new session is available
       setSessions(prev => [newSession, ...prev.filter(s => s.id !== newSession.id)]);
+
+      // Close sidebar on mobile after creating new session
+      if (isMobile && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
 
       console.log('New session created and activated:', newSession.id);
       return newSession;
@@ -846,8 +851,9 @@ function App() {
           </button>
         )}
         {/* Mobile new chat button */}
-        {isMobile && (
+        {isMobile && !isSidebarOpen && (
           <button
+            variant="ghost"
             aria-label="New chat"
             className="mobile-newchat-button"
             onClick={() => createNewSession()}
@@ -900,14 +906,16 @@ function App() {
         )}
         
         <div className="flex-1 flex flex-col main-content">
-          <ChatTabs
-            sessions={openTabSessions}  // Only show open tab sessions
-            activeSessionId={activeSessionId}
-            onSessionSelect={selectSession}
-            onNewSession={createNewSession}
-            onCloseTab={closeTabOnly}  // Use closeTabOnly for tab closure
-            onRenameSession={renameSession}
-          />
+          {!isMobile && (
+            <ChatTabs
+              sessions={openTabSessions}  // Only show open tab sessions
+              activeSessionId={activeSessionId}
+              onSessionSelect={selectSession}
+              onNewSession={createNewSession}
+              onCloseTab={closeTabOnly}  // Use closeTabOnly for tab closure
+              onRenameSession={renameSession}
+            />
+          )}
           
           <MessageList
             messages={currentMessages}
