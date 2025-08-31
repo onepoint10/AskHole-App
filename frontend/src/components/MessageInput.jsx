@@ -141,7 +141,7 @@ const MessageInput = ({
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
-                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 text-base leading-relaxed custom-scrollbar"
+                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 rounded-3xl text-base leading-relaxed custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={1}
                 style={{

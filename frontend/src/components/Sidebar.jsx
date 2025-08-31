@@ -368,7 +368,7 @@ const Sidebar = ({
           {/* Content */}
           <ScrollArea className="flex-1 custom-scrollbar message-scroll-area">
             {activeTab === 'history' && (
-              <div className="px-2 py-2 space-y-2">
+              <div className="py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3 pr-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Recent Chats</h3>
                   <Button 
