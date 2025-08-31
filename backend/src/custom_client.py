@@ -37,7 +37,7 @@ class CustomClient:
             return []
 
     def send_message(self, session_id: str, message: str, model: str, files: List[str] = None, 
-                    temperature: float = 1.0, max_tokens: int = 4096, stream: bool = False) -> dict:
+                    temperature: float = 1.0, max_tokens: int = 8192, stream: bool = False) -> dict:
         """Send a message to the custom provider"""
         try:
             # Prepare messages for the API
@@ -49,6 +49,7 @@ class CustomClient:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                extra_body={"chat_template_kwargs": {"thinking": True}},
                 stream=stream
             )
 
