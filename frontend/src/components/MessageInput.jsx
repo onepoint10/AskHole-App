@@ -12,13 +12,18 @@ const MessageInput = ({
   currentSession,
   onModelChange,
   onCreateNewSession,
+  isMobileOverlay = false,
   settings
 }) => {
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const dragCounterRef = useRef(0);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
+  const dropZoneRef = useRef(null);
 
   // Update selected model when session changes
   useEffect(() => {
@@ -30,6 +35,70 @@ const MessageInput = ({
       }
     }
   }, [currentSession, settings?.defaultModel]);
+
+
+  // Drag and drop functionality
+  useEffect(() => {
+    const dropZone = dropZoneRef.current;
+    if (!dropZone || disabled) return;
+
+    const handleDragEnter = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Increment counter and activate drag state only on first enter
+      dragCounterRef.current++;
+      if (dragCounterRef.current === 1) {
+        setIsDragOver(true);
+      }
+    };
+
+    const handleDragLeave = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Decrement counter and deactivate only when all drags have left
+      dragCounterRef.current--;
+      if (dragCounterRef.current === 0) {
+        setIsDragOver(false);
+      }
+    };
+
+    const handleDragOver = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Set the drop effect to show the correct cursor
+      e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Reset everything on drop
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        setAttachedFiles(prev => [...prev, ...files]);
+      }
+    };
+
+    dropZone.addEventListener('dragenter', handleDragEnter);
+    dropZone.addEventListener('dragleave', handleDragLeave);
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('drop', handleDrop);
+
+    return () => {
+      // Reset counter on cleanup
+      dragCounterRef.current = 0;
+      dropZone.removeEventListener('dragenter', handleDragEnter);
+      dropZone.removeEventListener('dragleave', handleDragLeave);
+      dropZone.removeEventListener('dragover', handleDragOver);
+      dropZone.removeEventListener('drop', handleDrop);
+    };
+  }, [disabled]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,7 +165,7 @@ const MessageInput = ({
     
     // Calculate the height needed for content
     const contentHeight = textarea.scrollHeight;
-    const lineHeight = 24; // Approximate line height in pixels
+    const lineHeight = 20; // Approximate line height in pixels
     const minRows = 2;
     const bottomRowHeight = lineHeight; // Reserve space for one row at bottom
     
@@ -141,7 +210,7 @@ const MessageInput = ({
             {attachedFiles.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 bg-muted/50 rounded-lg p-3 border border-border/50"
+                className="flex items-center gap-3 bg-muted/50 rounded-3xl p-3 border border-border/50"
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -164,19 +233,36 @@ const MessageInput = ({
         )}
         
         <form onSubmit={handleSubmit} className="relative">
-          <div className="relative flex items-end gap-2">
-            <div className="flex-1 relative">
+          <div 
+            ref={dropZoneRef}
+            className={`relative flex items-end gap-2 transition-all duration-200 rounded-3xl ${
+              isDragOver 
+                ? '' 
+                : ''
+            }`}
+          >
+            {/* Drag overlay */}
+            {isDragOver && (
+              <div className="absolute inset-0 bg-primary/5 border-2 border-primary/30 border-dashed rounded-4xl z-20 flex items-center justify-center">
+                <div className="text-center p-4">
+                  <Paperclip className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="text-sm font-medium text-primary">Drop files here to attach</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex-1 rounded-3xl relative">{/* existing textarea content */}
               <Textarea
                 ref={textareaRef}
                 value={message}
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
-                className="chat-input resize-none pr-12 text-base leading-relaxed custom-scrollbar"
+                className="chat-input resize-none pr-12 text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
                 style={{
-                  minHeight: '72px', // 2 rows + bottom reserved row (24px * 3)
+                  minHeight: '48px', // 2 rows + bottom reserved row (24px * 3)
                   paddingBottom: '32px', // Extra padding for bottom row elements
                   lineHeight: '24px'
                 }}
