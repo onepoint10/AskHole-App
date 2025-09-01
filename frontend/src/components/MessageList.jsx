@@ -558,7 +558,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                         
                         {/* File attachments and images for assistant messages */}
                         {message.files && message.files.length > 0 && (
-                          <div className="mt-2 pt-2 border-border/30">
+                          <div className="mt-2 pt-2">
                             {(() => {
                               const images = message.files.filter(file => {
                                 const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
@@ -609,7 +609,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
                                   {/* Display other files */}
                                   {otherFiles.length > 0 && (
-                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
+                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-primary-foreground/10' : ''}`}>
                                       <div className="flex flex-wrap gap-1">
                                         {otherFiles.map((file, index) => (
                                           <span 
@@ -682,10 +682,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         {isLoading && (
           <div className="fade-in flex justify-start">
             <div className={`flex gap-3 ${isMobileDevice ? 'max-w-[95%]' : 'max-w-[85%]'}`}>
-              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-muted border border-border">
+              <div className="flex-shrink-0 w-8 h-8 rounded-3xl flex items-center justify-center bg-muted border border-border">
                 <Bot className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div className="px-4 py-3 rounded-2xl bg-muted/50 border border-border/50">
+              <div className="px-4 py-3 rounded-3xl bg-muted/50 border border-border/50">
                 <div className="typing-indicator flex space-x-1">
                   <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
                   <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>

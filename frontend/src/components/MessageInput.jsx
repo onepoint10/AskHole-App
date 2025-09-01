@@ -17,6 +17,7 @@ const MessageInput = ({
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
+  const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
 
   // Update selected model when session changes
@@ -58,6 +59,10 @@ const MessageInput = ({
       if (result && result.success) {
         setMessage('');
         setAttachedFiles([]);
+        // Reset textarea height after clearing
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
       } else if (result && !result.success) {
         // On error, restore the original message and files
         setMessage(result.originalMessage || message);
@@ -80,6 +85,31 @@ const MessageInput = ({
       e.preventDefault();
       handleSubmit(e);
     }
+  };
+
+  const handleTextChange = (e) => {
+    setMessage(e.target.value);
+    
+    // Auto-resize textarea while keeping bottom row reserved
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    
+    // Calculate the height needed for content
+    const contentHeight = textarea.scrollHeight;
+    const lineHeight = 24; // Approximate line height in pixels
+    const minRows = 2;
+    const bottomRowHeight = lineHeight; // Reserve space for one row at bottom
+    
+    // Calculate minimum height (2 rows)
+    const minHeight = (minRows * lineHeight) + bottomRowHeight;
+    
+    // Calculate maximum height (prevent excessive growth)
+    const maxRows = 8; // Adjust as needed
+    const maxHeight = (maxRows * lineHeight) + bottomRowHeight;
+    
+    // Set height ensuring minimum and maximum bounds
+    const newHeight = Math.max(minHeight, Math.min(contentHeight + bottomRowHeight, maxHeight));
+    textarea.style.height = newHeight + 'px';
   };
 
   const handleFileSelect = (e) => {
@@ -105,7 +135,7 @@ const MessageInput = ({
 
   return (
     <div className="border-border bg-background">
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="max-w-4xl mx-auto p-4 px-2">
         {attachedFiles.length > 0 && (
           <div className="mb-3 space-y-2">
             {attachedFiles.map((file, index) => (
@@ -137,64 +167,66 @@ const MessageInput = ({
           <div className="relative flex items-end gap-2">
             <div className="flex-1 relative">
               <Textarea
+                ref={textareaRef}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
-                className="chat-input min-h-[52px] max-h-32 resize-none pr-12 py-3 rounded-3xl text-base leading-relaxed custom-scrollbar"
+                className="chat-input resize-none pr-12 text-base leading-relaxed custom-scrollbar"
                 disabled={disabled || isLoading}
-                rows={1}
+                rows={2}
                 style={{
-                  height: 'auto',
-                  minHeight: '52px',
-                }}
-                onInput={(e) => {
-                  e.target.style.height = 'auto';
-                  e.target.style.height = Math.min(e.target.scrollHeight, 128) + 'px';
+                  minHeight: '72px', // 2 rows + bottom reserved row (24px * 3)
+                  paddingBottom: '32px', // Extra padding for bottom row elements
+                  lineHeight: '24px'
                 }}
               />
+              
+              {/* Model selector - positioned in reserved bottom area */}
+              {shouldShowModelSelector && !disabled && (
+                <div className="absolute bottom-2 left-2 z-10">
+                  <ModelSelector
+                    availableModels={availableModels}
+                    selectedModel={selectedModel}
+                    onModelChange={handleModelChange}
+                    disabled={disabled || isLoading}
+                  />
+                </div>
+              )}
+              
+              {/* File attachment button - positioned in reserved bottom area */}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute bottom-2 right-9 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary"
+                className="absolute bottom-2 right-9 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary z-10"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isLoading}
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
+              
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
                 className="hidden"
                 onChange={handleFileSelect}
-                accept=".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,jsx,.html,.css,.xml"
+                accept=".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.jsx,.html,.css,.xml"
               />
+              
+              {/* Send button - positioned in reserved bottom area */}
               <Button
                 type="submit"
                 variant="ghost"
                 size="sm"
                 disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
-                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary"
+                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary z-10"
               >
                 <Send className="h-4 w-4" />
-            </Button>
+              </Button>
             </div>
-            
           </div>
-          
-          {/* Model selector - bottom left corner, only shown for new/empty chats */}
-          {shouldShowModelSelector && !disabled && (
-            <div className="py-3 absolute left-0">
-              <ModelSelector
-                availableModels={availableModels}
-                selectedModel={selectedModel}
-                onModelChange={handleModelChange}
-                disabled={disabled || isLoading}
-              />
-            </div>
-          )}
         </form>
         
         {disabled && (

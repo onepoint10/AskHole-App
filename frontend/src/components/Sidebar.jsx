@@ -202,7 +202,7 @@ const Sidebar = ({
 
   // Handler for documentation link
   const handleDocumentationClick = () => {
-    window.open('http://192.168.1.138:3000/', '_blank');
+    window.open('http://askhole.ru:3000/', '_blank');
   };
 
   return (
@@ -368,8 +368,8 @@ const Sidebar = ({
           {/* Content */}
           <ScrollArea className="flex-1 custom-scrollbar message-scroll-area">
             {activeTab === 'history' && (
-              <div className="py-2 space-y-2">
-                <div className="flex items-center justify-between mb-3 pr-3">
+              <div className="px-2 py-2 space-y-2">
+                <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Recent Chats</h3>
                   <Button 
                     variant="ghost" 
