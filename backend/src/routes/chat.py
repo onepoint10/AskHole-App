@@ -1061,18 +1061,25 @@ def search_content():
                 match_content = prompt.title
             elif category_match:
                 match_type = 'category'
-                match_content = prompt.category
+                # For category matches, show the actual prompt content as the match content
+                match_content = prompt.content[:200] + '...' if len(prompt.content) > 200 else prompt.content
             else:
                 # Fallback (shouldn't happen with the if condition above)
                 match_type = 'title'
                 match_content = prompt.title
+                
+            # Safely handle tags
+            try:
+                tags = json.loads(prompt.tags) if prompt.tags and prompt.tags.strip() else []
+            except (json.JSONDecodeError, ValueError):
+                tags = []
                 
             prompts_results.append({
                 'id': prompt.id,
                 'title': prompt.title,
                 'content': prompt.content,
                 'category': prompt.category,
-                'tags': prompt.tags,
+                'tags': tags,
                 'created_at': prompt.created_at.isoformat() if prompt.created_at else None,
                 'updated_at': prompt.updated_at.isoformat() if prompt.updated_at else None,
                 'match_type': match_type,
