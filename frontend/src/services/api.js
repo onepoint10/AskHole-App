@@ -277,6 +277,11 @@ export const sessionsAPI = {
     });
   },
 
+  searchContent: async (query) => {
+    console.log('API Request: GET /search?q=' + query);
+    return apiCall(`/search?q=${encodeURIComponent(query)}`);
+  },
+
   sendMessage: async (sessionId, messageData) => {
     console.log('API Request: POST /sessions/' + sessionId + '/messages');
     
