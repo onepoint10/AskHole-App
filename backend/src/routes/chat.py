@@ -1037,21 +1037,35 @@ def search_content():
     prompts_results = []
     prompts = PromptTemplate.query.filter_by(user_id=current_user.id).all()
     
+    print(f"DEBUG: Found {len(prompts)} prompts to search through")
+    print(f"DEBUG: Search query: '{query}'")
+    
     for prompt in prompts:
+        # Debug: Print prompt details
+        print(f"DEBUG: Checking prompt '{prompt.title}' - content length: {len(prompt.content) if prompt.content else 0}")
+        
         # Check if query matches prompt title, content, or category
-        if (query_lower in prompt.title.lower() or 
-            query_lower in prompt.content.lower() or 
-            query_lower in prompt.category.lower()):
+        title_match = query_lower in prompt.title.lower()
+        content_match = query_lower in prompt.content.lower() if prompt.content else False
+        category_match = query_lower in prompt.category.lower() if prompt.category else False
+        
+        if title_match or content_match or category_match:
+            print(f"DEBUG: Prompt '{prompt.title}' matches - title: {title_match}, content: {content_match}, category: {category_match}")
             
-            match_type = 'title'
-            match_content = prompt.title
-            
-            if query_lower in prompt.content.lower():
+            # Determine match type and content with priority: content > title > category
+            if content_match:
                 match_type = 'content'
                 match_content = prompt.content[:200] + '...' if len(prompt.content) > 200 else prompt.content
-            elif query_lower in prompt.category.lower():
+            elif title_match:
+                match_type = 'title'
+                match_content = prompt.title
+            elif category_match:
                 match_type = 'category'
                 match_content = prompt.category
+            else:
+                # Fallback (shouldn't happen with the if condition above)
+                match_type = 'title'
+                match_content = prompt.title
                 
             prompts_results.append({
                 'id': prompt.id,
@@ -1068,6 +1082,8 @@ def search_content():
     # Sort results by relevance (title matches first, then by recency)
     sessions_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
     prompts_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
+    
+    print(f"DEBUG: Final results - sessions: {len(sessions_results)}, prompts: {len(prompts_results)}")
     
     return jsonify({
         'sessions': sessions_results,
