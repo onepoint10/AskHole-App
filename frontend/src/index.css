@@ -2,3 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  .line-clamp-3 {
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    display: -webkit-box;
+    overflow: hidden;
+  }
+}
+

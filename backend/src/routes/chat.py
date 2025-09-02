@@ -982,6 +982,123 @@ def download_file(file_id):
     )
 
 
+@chat_bp.route('/search', methods=['GET'])
+def search_content():
+    """Search through sessions and prompts content"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'sessions': [], 'prompts': []})
+
+    query_lower = query.lower()
+    
+    # Search in sessions (including message content)
+    sessions_results = []
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).all()
+    
+    for session in sessions:
+        # Check if query matches session title
+        if query_lower in session.title.lower():
+            sessions_results.append({
+                'id': session.id,
+                'title': session.title,
+                'model': session.model,
+                'client_type': session.client_type,
+                'created_at': session.created_at.isoformat() if session.created_at else None,
+                'updated_at': session.updated_at.isoformat() if session.updated_at else None,
+                'message_count': len(session.messages),
+                'match_type': 'title',
+                'match_content': session.title
+            })
+            continue
+            
+        # Check if query matches any message content
+        for message in session.messages:
+            if query_lower in message.content.lower():
+                sessions_results.append({
+                    'id': session.id,
+                    'title': session.title,
+                    'model': session.model,
+                    'client_type': session.client_type,
+                    'created_at': session.created_at.isoformat() if session.created_at else None,
+                    'updated_at': session.updated_at.isoformat() if session.updated_at else None,
+                    'message_count': len(session.messages),
+                    'match_type': 'message',
+                    'match_content': message.content[:200] + '...' if len(message.content) > 200 else message.content,
+                    'message_role': message.role,
+                    'message_timestamp': message.timestamp.isoformat() if message.timestamp else None
+                })
+                break  # Only add session once even if multiple messages match
+    
+    # Search in prompts
+    prompts_results = []
+    prompts = PromptTemplate.query.filter_by(user_id=current_user.id).all()
+    
+    print(f"DEBUG: Found {len(prompts)} prompts to search through")
+    print(f"DEBUG: Search query: '{query}'")
+    
+    for prompt in prompts:
+        # Debug: Print prompt details
+        print(f"DEBUG: Checking prompt '{prompt.title}' - content length: {len(prompt.content) if prompt.content else 0}")
+        
+        # Check if query matches prompt title, content, or category
+        title_match = query_lower in prompt.title.lower()
+        content_match = query_lower in prompt.content.lower() if prompt.content else False
+        category_match = query_lower in prompt.category.lower() if prompt.category else False
+        
+        if title_match or content_match or category_match:
+            print(f"DEBUG: Prompt '{prompt.title}' matches - title: {title_match}, content: {content_match}, category: {category_match}")
+            
+            # Determine match type and content with priority: content > title > category
+            if content_match:
+                match_type = 'content'
+                match_content = prompt.content[:200] + '...' if len(prompt.content) > 200 else prompt.content
+            elif title_match:
+                match_type = 'title'
+                match_content = prompt.title
+            elif category_match:
+                match_type = 'category'
+                # For category matches, show the actual prompt content as the match content
+                match_content = prompt.content[:200] + '...' if len(prompt.content) > 200 else prompt.content
+            else:
+                # Fallback (shouldn't happen with the if condition above)
+                match_type = 'title'
+                match_content = prompt.title
+                
+            # Safely handle tags
+            try:
+                tags = json.loads(prompt.tags) if prompt.tags and prompt.tags.strip() else []
+            except (json.JSONDecodeError, ValueError):
+                tags = []
+                
+            prompts_results.append({
+                'id': prompt.id,
+                'title': prompt.title,
+                'content': prompt.content,
+                'category': prompt.category,
+                'tags': tags,
+                'created_at': prompt.created_at.isoformat() if prompt.created_at else None,
+                'updated_at': prompt.updated_at.isoformat() if prompt.updated_at else None,
+                'match_type': match_type,
+                'match_content': match_content
+            })
+    
+    # Sort results by relevance (title matches first, then by recency)
+    sessions_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
+    prompts_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
+    
+    print(f"DEBUG: Final results - sessions: {len(sessions_results)}, prompts: {len(prompts_results)}")
+    
+    return jsonify({
+        'sessions': sessions_results,
+        'prompts': prompts_results,
+        'query': query
+    })
+
+
 @chat_bp.route('/files', methods=['GET'])
 def get_files():
     """Get all uploaded files for current user"""
