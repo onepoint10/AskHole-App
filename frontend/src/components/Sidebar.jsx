@@ -622,7 +622,7 @@ const Sidebar = ({
                           <Badge variant="secondary" className="text-xs">
                             {prompt.category}
                           </Badge>
-                          {prompt.usage_count > 0 && (
+                          {prompt.usage_count && prompt.usage_count > 0 && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Star className="h-3 w-3" />
                               {prompt.usage_count}
@@ -643,7 +643,7 @@ const Sidebar = ({
                             <div className="line-clamp-3">{prompt.match_content}</div>
                           </div>
                         )}
-                        {prompt.tags && prompt.tags.length > 0 && (
+                        {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {prompt.tags.slice(0, 3).map((tag, index) => (
                               <Badge key={index} variant="outline" className="text-xs">
