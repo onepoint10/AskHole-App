@@ -127,13 +127,19 @@ class PromptTemplate(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def to_dict(self):
+        # Safely parse tags, handling None and empty strings
+        try:
+            tags = json.loads(self.tags) if self.tags and self.tags.strip() else []
+        except (json.JSONDecodeError, ValueError):
+            tags = []
+            
         return {
             'id': self.id,
             'user_id': self.user_id,
             'title': self.title,
             'content': self.content,
             'category': self.category,
-            'tags': json.loads(self.tags) if self.tags else [],
+            'tags': tags,
             'usage_count': self.usage_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
