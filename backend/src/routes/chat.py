@@ -982,6 +982,100 @@ def download_file(file_id):
     )
 
 
+@chat_bp.route('/search', methods=['GET'])
+def search_content():
+    """Search through sessions and prompts content"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({'sessions': [], 'prompts': []})
+
+    query_lower = query.lower()
+    
+    # Search in sessions (including message content)
+    sessions_results = []
+    sessions = ChatSession.query.filter_by(user_id=current_user.id).all()
+    
+    for session in sessions:
+        # Check if query matches session title
+        if query_lower in session.title.lower():
+            sessions_results.append({
+                'id': session.id,
+                'title': session.title,
+                'model': session.model,
+                'client_type': session.client_type,
+                'created_at': session.created_at.isoformat() if session.created_at else None,
+                'updated_at': session.updated_at.isoformat() if session.updated_at else None,
+                'message_count': len(session.messages),
+                'match_type': 'title',
+                'match_content': session.title
+            })
+            continue
+            
+        # Check if query matches any message content
+        for message in session.messages:
+            if query_lower in message.content.lower():
+                sessions_results.append({
+                    'id': session.id,
+                    'title': session.title,
+                    'model': session.model,
+                    'client_type': session.client_type,
+                    'created_at': session.created_at.isoformat() if session.created_at else None,
+                    'updated_at': session.updated_at.isoformat() if session.updated_at else None,
+                    'message_count': len(session.messages),
+                    'match_type': 'message',
+                    'match_content': message.content[:200] + '...' if len(message.content) > 200 else message.content,
+                    'message_role': message.role,
+                    'message_timestamp': message.timestamp.isoformat() if message.timestamp else None
+                })
+                break  # Only add session once even if multiple messages match
+    
+    # Search in prompts
+    prompts_results = []
+    prompts = PromptTemplate.query.filter_by(user_id=current_user.id).all()
+    
+    for prompt in prompts:
+        # Check if query matches prompt title, content, or category
+        if (query_lower in prompt.title.lower() or 
+            query_lower in prompt.content.lower() or 
+            query_lower in prompt.category.lower()):
+            
+            match_type = 'title'
+            match_content = prompt.title
+            
+            if query_lower in prompt.content.lower():
+                match_type = 'content'
+                match_content = prompt.content[:200] + '...' if len(prompt.content) > 200 else prompt.content
+            elif query_lower in prompt.category.lower():
+                match_type = 'category'
+                match_content = prompt.category
+                
+            prompts_results.append({
+                'id': prompt.id,
+                'title': prompt.title,
+                'content': prompt.content,
+                'category': prompt.category,
+                'tags': prompt.tags,
+                'created_at': prompt.created_at.isoformat() if prompt.created_at else None,
+                'updated_at': prompt.updated_at.isoformat() if prompt.updated_at else None,
+                'match_type': match_type,
+                'match_content': match_content
+            })
+    
+    # Sort results by relevance (title matches first, then by recency)
+    sessions_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
+    prompts_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
+    
+    return jsonify({
+        'sessions': sessions_results,
+        'prompts': prompts_results,
+        'query': query
+    })
+
+
 @chat_bp.route('/files', methods=['GET'])
 def get_files():
     """Get all uploaded files for current user"""

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Settings, 
   Database, 
@@ -30,6 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
 import InlineEdit from './InlineEdit';
+import { sessionsAPI } from '@/services/api';
 
 const Sidebar = ({ 
   sessions = [],
@@ -51,6 +52,8 @@ const Sidebar = ({
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [activeTab, setActiveTab] = useState('history');
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState({ sessions: [], prompts: [] });
+  const [isSearching, setIsSearching] = useState(false);
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -120,16 +123,45 @@ const Sidebar = ({
     setSidebarWidth(newWidth);
   }, [sessions, isCollapsed]);
 
-  // Filter sessions and prompts with safety checks
-  const filteredSessions = Array.isArray(sessions) ? sessions.filter(session =>
-    session.title.toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  // Search effect
+  useEffect(() => {
+    const searchContent = async () => {
+      if (!searchTerm.trim()) {
+        setSearchResults({ sessions: [], prompts: [] });
+        return;
+      }
 
-  const filteredPrompts = Array.isArray(prompts) ? prompts.filter(prompt =>
-    prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    prompt.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    prompt.category.toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+      setIsSearching(true);
+      try {
+        const response = await sessionsAPI.searchContent(searchTerm);
+        setSearchResults(response.data || { sessions: [], prompts: [] });
+      } catch (error) {
+        console.error('Search failed:', error);
+        setSearchResults({ sessions: [], prompts: [] });
+      } finally {
+        setIsSearching(false);
+      }
+    };
+
+    // Debounce search to avoid too many API calls
+    const timeoutId = setTimeout(searchContent, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Use search results when searching, otherwise use filtered local results
+  const filteredSessions = searchTerm.trim() ? 
+    searchResults.sessions : 
+    (Array.isArray(sessions) ? sessions.filter(session =>
+      session.title.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : []);
+
+  const filteredPrompts = searchTerm.trim() ? 
+    searchResults.prompts : 
+    (Array.isArray(prompts) ? prompts.filter(prompt =>
+      prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prompt.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prompt.category.toLowerCase().includes(searchTerm.toLowerCase())
+    ) : []);
 
   const handleCreatePrompt = () => {
     if (newPrompt.title.trim() && newPrompt.content.trim()) {
@@ -362,6 +394,11 @@ const Sidebar = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 bg-sidebar-accent border-sidebar-border focus:border-sidebar-primary"
               />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -416,6 +453,24 @@ const Sidebar = ({
                       <div className="text-xs text-muted-foreground mt-1">
                         {formatDate(session.updated_at)} • {session.message_count} messages
                       </div>
+                      {searchTerm.trim() && session.match_type && (
+                        <div className="text-xs text-primary mt-1">
+                          <Badge variant="secondary" className="text-xs">
+                            {session.match_type === 'title' ? 'Title match' : 'Message match'}
+                          </Badge>
+                          {session.match_type === 'message' && session.message_role && (
+                            <span className="ml-2 text-muted-foreground">
+                              {session.message_role}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {searchTerm.trim() && session.match_content && session.match_type === 'message' && (
+                        <div className="text-xs text-muted-foreground mt-1 p-2 bg-sidebar-accent/50 rounded border-l-2 border-primary">
+                          <div className="font-medium mb-1">Matched content:</div>
+                          <div className="line-clamp-3">{session.match_content}</div>
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant="outline" className="text-xs flex-shrink-0">
                           {session.client_type}
@@ -565,6 +620,20 @@ const Sidebar = ({
                             </div>
                           )}
                         </div>
+                        {searchTerm.trim() && prompt.match_type && (
+                          <div className="text-xs text-primary mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {prompt.match_type === 'title' ? 'Title match' : 
+                               prompt.match_type === 'content' ? 'Content match' : 'Category match'}
+                            </Badge>
+                          </div>
+                        )}
+                        {searchTerm.trim() && prompt.match_content && prompt.match_type !== 'title' && (
+                          <div className="text-xs text-muted-foreground mt-1 p-2 bg-sidebar-accent/50 rounded border-l-2 border-primary">
+                            <div className="font-medium mb-1">Matched content:</div>
+                            <div className="line-clamp-3">{prompt.match_content}</div>
+                          </div>
+                        )}
                         {prompt.tags && prompt.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {prompt.tags.slice(0, 3).map((tag, index) => (
