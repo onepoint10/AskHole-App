@@ -36,6 +36,7 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
+  const [messageInputContent, setMessageInputContent] = useState('');
   
   // Mobile detection and sidebar state
   const [isMobile, setIsMobile] = useState(false);
@@ -702,20 +703,20 @@ function App() {
       // Increment usage count
       await promptsAPI.usePrompt(prompt.id);
       
-    	  // Update prompts list
+      // Update prompts list
       setPrompts(prev => prev.map(p => 
         p.id === prompt.id ? { ...p, usage_count: p.usage_count + 1 } : p
       ));
 
-      // Send the prompt as a message
-      await sendMessage(prompt.content);
+      // Set the prompt content in the message input instead of sending it
+      setMessageInputContent(prompt.content);
       
-      toast.success(`Applied "${prompt.title}" template.`);
+      toast.success(`Applied "${prompt.title}" template to message input.`);
     } catch (error) {
       console.error('Failed to use prompt:', error);
       toast.error("Failed to use prompt template.");
     }
-  }, [sendMessage]);
+  }, []);
 
   const deletePrompt = useCallback(async (promptId) => {
     try {
@@ -933,6 +934,8 @@ function App() {
             onModelChange={changeSessionModel}
             onCreateNewSession={createNewSession}
             settings={settings}
+            initialContent={messageInputContent}
+            onContentSet={() => setMessageInputContent('')}
           />
         </div>
 

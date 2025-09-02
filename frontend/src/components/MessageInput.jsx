@@ -13,7 +13,9 @@ const MessageInput = ({
   onModelChange,
   onCreateNewSession,
   isMobileOverlay = false,
-  settings
+  settings,
+  initialContent,
+  onContentSet
 }) => {
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
@@ -35,6 +37,19 @@ const MessageInput = ({
       }
     }
   }, [currentSession, settings?.defaultModel]);
+
+  // Handle initial content changes
+  useEffect(() => {
+    if (initialContent && initialContent !== message) {
+      setMessage(initialContent);
+      // Notify parent that content has been set so it can clear the initial content
+      if (onContentSet && initialContent) {
+        setTimeout(() => {
+          onContentSet();
+        }, 100);
+      }
+    }
+  }, [initialContent, onContentSet]);
 
 
   // Drag and drop functionality
