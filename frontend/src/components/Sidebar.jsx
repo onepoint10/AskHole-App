@@ -134,6 +134,8 @@ const Sidebar = ({
       setIsSearching(true);
       try {
         const response = await sessionsAPI.searchContent(searchTerm);
+        console.log('Search response:', response);
+        console.log('Search results:', response.data);
         setSearchResults(response.data || { sessions: [], prompts: [] });
       } catch (error) {
         console.error('Search failed:', error);
@@ -159,9 +161,16 @@ const Sidebar = ({
     searchResults.prompts : 
     (Array.isArray(prompts) ? prompts.filter(prompt =>
       prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prompt.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prompt.category.toLowerCase().includes(searchTerm.toLowerCase())
+      (prompt.content && prompt.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (prompt.category && prompt.category.toLowerCase().includes(searchTerm.toLowerCase()))
     ) : []);
+
+  // Debug logging
+  if (searchTerm.trim()) {
+    console.log('Search term:', searchTerm);
+    console.log('Search results prompts:', searchResults.prompts);
+    console.log('Filtered prompts:', filteredPrompts);
+  }
 
   const handleCreatePrompt = () => {
     if (newPrompt.title.trim() && newPrompt.content.trim()) {
