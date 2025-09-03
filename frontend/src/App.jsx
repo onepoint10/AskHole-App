@@ -729,6 +729,18 @@ function App() {
     }
   }, []);
 
+  const updatePrompt = useCallback(async (promptId, updates) => {
+    try {
+      const response = await promptsAPI.updatePrompt(promptId, updates);
+      const updated = response.data;
+      setPrompts(prev => prev.map(p => p.id === promptId ? { ...p, ...updated } : p));
+      toast.success("Prompt updated successfully.");
+    } catch (error) {
+      console.error('Failed to update prompt:', error);
+      toast.error("Failed to update prompt template.");
+    }
+  }, []);
+
   const renameSession = useCallback(async (sessionId, newTitle) => {
     try {
       await sessionsAPI.updateSession(sessionId, {
@@ -876,6 +888,7 @@ function App() {
             onNewPrompt={createPrompt}
             onUsePrompt={usePrompt}
             onDeletePrompt={deletePrompt}
+            onEditPrompt={updatePrompt}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onLogout={handleLogout}
           />
@@ -897,6 +910,7 @@ function App() {
                 onNewPrompt={createPrompt}
                 onUsePrompt={usePrompt}
                 onDeletePrompt={deletePrompt}
+                onEditPrompt={updatePrompt}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onLogout={handleLogout}
                 isMobileOverlay={true}
