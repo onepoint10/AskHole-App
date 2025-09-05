@@ -43,12 +43,14 @@ const Sidebar = ({
   onNewPrompt,
   onUsePrompt,
   onDeletePrompt,
+  onEditPrompt,
   onOpenSettings,
   onLogout,
   isMobileOverlay = false,
   onRequestClose
 }) => {
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
+  const [promptContextMenu, setPromptContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, promptId: null });
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [activeTab, setActiveTab] = useState('history');
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,6 +58,8 @@ const Sidebar = ({
   const [isSearching, setIsSearching] = useState(false);
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
+  const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState({ id: null, title: '', content: '', category: 'General', tags: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
@@ -239,6 +243,60 @@ const Sidebar = ({
       return;
     }
     setIsCollapsed(!isCollapsed);
+  };
+
+  // Prompt context menu handlers
+  const handlePromptContextMenu = (e, promptId) => {
+    e.preventDefault();
+    setPromptContextMenu({
+      isVisible: true,
+      position: { x: e.clientX, y: e.clientY },
+      promptId
+    });
+  };
+
+  const handleClosePromptContextMenu = () => {
+    setPromptContextMenu({ isVisible: false, position: { x: 0, y: 0 }, promptId: null });
+  };
+
+  const beginEditPrompt = (prompt) => {
+    if (!prompt) return;
+    setEditingPrompt({
+      id: prompt.id,
+      title: prompt.title || '',
+      category: prompt.category || 'General',
+      content: prompt.content || '',
+      tags: Array.isArray(prompt.tags) ? prompt.tags.join(', ') : (prompt.tags || '')
+    });
+    setIsEditPromptDialogOpen(true);
+  };
+
+  const handlePromptEditFromContext = () => {
+    const prompt = prompts.find(p => p.id === promptContextMenu.promptId);
+    beginEditPrompt(prompt);
+    handleClosePromptContextMenu();
+  };
+
+  const handlePromptDeleteFromContext = () => {
+    if (promptContextMenu.promptId) {
+      onDeletePrompt(promptContextMenu.promptId);
+    }
+    handleClosePromptContextMenu();
+  };
+
+  const handleSaveEditPrompt = () => {
+    if (!editingPrompt.id) return;
+    const tags = String(editingPrompt.tags || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    onEditPrompt && onEditPrompt(editingPrompt.id, {
+      title: editingPrompt.title,
+      category: editingPrompt.category,
+      content: editingPrompt.content,
+      tags
+    });
+    setIsEditPromptDialogOpen(false);
   };
 
   // Handler for documentation link
@@ -611,6 +669,7 @@ const Sidebar = ({
                     key={prompt.id}
                     className="group p-2 items-center gap-0 rounded-lg border border-sidebar-border hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
                     onClick={() => onUsePrompt(prompt)}
+                    onContextMenu={(e) => handlePromptContextMenu(e, prompt.id)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
@@ -654,18 +713,32 @@ const Sidebar = ({
                           </div>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeletePrompt(prompt.id);
-                        }}
-                        title="Delete Prompt"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                      <div className="flex items-center gap-1 ml-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-accent transition-opacity flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            beginEditPrompt(prompt);
+                          }}
+                          title="Edit Prompt"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-opacity flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeletePrompt(prompt.id);
+                          }}
+                          title="Delete Prompt"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -719,6 +792,77 @@ const Sidebar = ({
         onRename={handleRename}
         onDelete={handleDelete}
         onClose={handleCloseContextMenu}
+      />
+      {/* Edit Prompt Dialog */}
+      <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Prompt</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-title">Title</Label>
+              <Input
+                id="edit-title"
+                value={editingPrompt.title}
+                onChange={(e) => setEditingPrompt(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter prompt title"
+                className="focus-ring"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-category">Category</Label>
+              <Input
+                id="edit-category"
+                value={editingPrompt.category}
+                onChange={(e) => setEditingPrompt(prev => ({ ...prev, category: e.target.value }))}
+                placeholder="e.g., Writing, Coding, Analysis"
+                className="focus-ring"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
+              <Input
+                id="edit-tags"
+                value={editingPrompt.tags}
+                onChange={(e) => setEditingPrompt(prev => ({ ...prev, tags: e.target.value }))}
+                placeholder="e.g., creative, technical, analysis"
+                className="focus-ring"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-content">Prompt Content</Label>
+              <Textarea
+                id="edit-content"
+                value={editingPrompt.content}
+                onChange={(e) => setEditingPrompt(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter your prompt template..."
+                className="min-h-[100px] focus-ring"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleSaveEditPrompt} className="btn-primary flex-1">
+                Save Changes
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEditPromptDialogOpen(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <ContextMenu
+        isVisible={promptContextMenu.isVisible}
+        position={promptContextMenu.position}
+        onRename={handlePromptEditFromContext}
+        onDelete={handlePromptDeleteFromContext}
+        onClose={handleClosePromptContextMenu}
+        deleteLabel="Delete Prompt"
+        renameLabel="Edit"
       />
     </div>
   );

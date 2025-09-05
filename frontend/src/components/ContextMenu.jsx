@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Edit3, Trash2, X } from 'lucide-react';
 
-const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose, deleteLabel = "Delete" }) => {
+const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose, deleteLabel = "Delete", renameLabel = "Rename" }) => {
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -46,7 +46,7 @@ const ContextMenu = ({ isVisible, position, onRename, onDelete, onClose, deleteL
         onClick={onRename}
       >
         <Edit3 className="h-4 w-4" />
-        Rename
+        {renameLabel}
       </button>
       <button
         className={`w-full px-3 py-2 text-sm text-left flex items-center gap-2 ${
