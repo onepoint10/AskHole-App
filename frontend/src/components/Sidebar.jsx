@@ -804,6 +804,7 @@ const Sidebar = ({
                 </div>
               </div>
             )}
+          </ScrollArea>
 
           {/* Fixed Bottom Panel for Expanded State */}
           <div className="border-sidebar-border p-3 bg-background">
@@ -839,6 +840,7 @@ const Sidebar = ({
         </>
       )}
       
+      {/* Context Menus and Dialogs - These should be outside the main content area */}
       <ContextMenu
         isVisible={contextMenu.isVisible}
         position={contextMenu.position}
