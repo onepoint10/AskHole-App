@@ -19,7 +19,7 @@ os.environ['WERKZEUG_TIMEOUT'] = '120'
 from flask import Flask, send_from_directory, session, jsonify, request
 from flask_cors import CORS
 from src.database import db
-from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
+from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload, PromptLike
 from src.models.user import User, UserSession
 from src.routes.user import user_bp
 from src.routes.chat import chat_bp

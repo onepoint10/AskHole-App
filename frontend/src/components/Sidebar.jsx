@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,8 @@ import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
 import CustomLogo from './CustomLogo';
 import InlineEdit from './InlineEdit';
+import PromptDialog from './PromptDialog';
+import PublicPromptsLibrary from './PublicPromptsLibrary';
 import { sessionsAPI } from '@/services/api';
 
 const Sidebar = ({ 
@@ -60,6 +63,7 @@ const Sidebar = ({
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
+  const [isPublicPromptsOpen, setIsPublicPromptsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState({ id: null, title: '', content: '', category: 'General', tags: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
@@ -377,11 +381,20 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'prompts' ? 'default' : 'ghost'}
               size="sm"
-              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              className={`flex-1 rounded-none ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
               onClick={() => setActiveTab('prompts')}
             >
               <Database className="h-4 w-4 mr-1" />
               Prompts
+            </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'public' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              onClick={() => setActiveTab('public')}
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              Public
             </Button>
           </div>
         )}
@@ -408,6 +421,15 @@ const Sidebar = ({
               title="Prompts"
             >
               <Database className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('public')}
+              className="w-10 h-10 p-0"
+              title="Public Prompts"
+            >
+              <Globe className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
@@ -596,77 +618,7 @@ const Sidebar = ({
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Prompt Library</h3>
-                  <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                        title="New Prompt"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create New Prompt</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="title">Title</Label>
-                          <Input
-                            id="title"
-                            value={newPrompt.title}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, title: e.target.value }))}
-                            placeholder="Enter prompt title"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="category">Category</Label>
-                          <Input
-                            id="category"
-                            value={newPrompt.category}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, category: e.target.value }))}
-                            placeholder="e.g., Writing, Coding, Analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="tags">Tags (comma-separated)</Label>
-                          <Input
-                            id="tags"
-                            value={newPrompt.tags}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                            placeholder="e.g., creative, technical, analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="content">Prompt Content</Label>
-                          <Textarea
-                            id="content"
-                            value={newPrompt.content}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, content: e.target.value }))}
-                            placeholder="Enter your prompt template..."
-                            className="min-h-[100px] focus-ring"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button onClick={handleCreatePrompt} className="btn-primary flex-1">
-                            Create Prompt
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setIsPromptDialogOpen(false)}
-                            className="btn-secondary"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  
                 </div>
                 {filteredPrompts.map((prompt) => (
                   <div
@@ -754,6 +706,35 @@ const Sidebar = ({
                 )}
               </div>
             )}
+
+            {activeTab === 'public' && (
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-sidebar-foreground">Public Prompts</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setIsPublicPromptsOpen(true)}
+                    className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
+                    title="Browse Public Prompts"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-center text-muted-foreground text-sm py-6">
+                  <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Discover prompts shared by the community</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsPublicPromptsOpen(true)}
+                    className="mt-3"
+                  >
+                    Browse Public Library
+                  </Button>
+                </div>
+              </div>
+            )}
           </ScrollArea>
 
           {/* Fixed Bottom Panel for Expanded State */}
@@ -790,6 +771,7 @@ const Sidebar = ({
         </>
       )}
       
+      {/* Context Menus and Dialogs - These should be outside the main content area */}
       <ContextMenu
         isVisible={contextMenu.isVisible}
         position={contextMenu.position}
@@ -797,68 +779,43 @@ const Sidebar = ({
         onDelete={handleDelete}
         onClose={handleCloseContextMenu}
       />
-      {/* Edit Prompt Dialog */}
-      <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Prompt</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={editingPrompt.title}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter prompt title"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-category">Category</Label>
-              <Input
-                id="edit-category"
-                value={editingPrompt.category}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g., Writing, Coding, Analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
-              <Input
-                id="edit-tags"
-                value={editingPrompt.tags}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                placeholder="e.g., creative, technical, analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-content">Prompt Content</Label>
-              <Textarea
-                id="edit-content"
-                value={editingPrompt.content}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter your prompt template..."
-                className="min-h-[100px] focus-ring"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleSaveEditPrompt} className="btn-primary flex-1">
-                Save Changes
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditPromptDialogOpen(false)}
-                className="btn-secondary"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+
+      {/* NEW: Updated Prompt Creation Dialog - Replace the old one */}
+      <PromptDialog
+        isOpen={isPromptDialogOpen}
+        onClose={setIsPromptDialogOpen}
+        onCreate={(promptData) => {
+          onNewPrompt(promptData);
+          setIsPromptDialogOpen(false);
+        }}
+        editMode={false}
+      />
+
+      {/* NEW: Updated Prompt Edit Dialog - Replace the old one */}
+      <PromptDialog
+        isOpen={isEditPromptDialogOpen}
+        onClose={setIsEditPromptDialogOpen}
+        onCreate={(updatedPrompt) => {
+          if (editingPrompt.id) {
+            onEditPrompt(editingPrompt.id, updatedPrompt);
+          }
+          setIsEditPromptDialogOpen(false);
+        }}
+        editMode={true}
+        initialPrompt={editingPrompt}
+      />
+      
+      {/* Public Prompts Library Dialog */}
+      <Dialog open={isPublicPromptsOpen} onOpenChange={setIsPublicPromptsOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <PublicPromptsLibrary 
+            onUsePrompt={onUsePrompt}
+            onClose={() => setIsPublicPromptsOpen(false)}
+          />
         </DialogContent>
       </Dialog>
+      
+      {/* Prompt Context Menu */}
       <ContextMenu
         isVisible={promptContextMenu.isVisible}
         position={promptContextMenu.position}
