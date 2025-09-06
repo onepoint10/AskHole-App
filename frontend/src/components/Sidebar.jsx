@@ -29,6 +29,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
+import CustomLogo from './CustomLogo';
 import InlineEdit from './InlineEdit';
 import { sessionsAPI } from '@/services/api';
 
@@ -325,11 +326,14 @@ const Sidebar = ({
                   <ChevronRight className="h-4 w-4 text-primary-foreground" /> : 
                   <ChevronLeft className="h-4 w-4 text-primary-foreground" />
               ) : (
-                <MessageSquare className="h-4 w-4 text-primary-foreground" />
+                <CustomLogo className="h-7 w-7 text-primary-foreground" />
               )}
             </div>
             {!isCollapsed && (
-              <h2 className="px-2 text-lg font-semibold text-sidebar-foreground whitespace-nowrap">AskHole</h2>
+              <h2 className={`text-lg text-sidebar-foreground whitespace-nowrap ${isMobileOverlay ? 'pl-2' : ''}`}>
+                <span className="font-semibold">Ask</span>
+                <span className="font-light">Hole</span>
+              </h2>
             )}
           </div>
           {!isCollapsed && (
