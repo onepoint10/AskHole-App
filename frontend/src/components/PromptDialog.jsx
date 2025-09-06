@@ -19,14 +19,31 @@ const defaultPrompt = {
   is_public: false,
 };
 
-const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
+const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate, editMode = false, initialPrompt = null }) => {
   const [prompt, setPrompt] = useState(defaultPrompt);
 
   useEffect(() => {
     if (isOpen) {
-      setPrompt(prev => ({ ...defaultPrompt, content: initialContent || '' }));
+      if (editMode && initialPrompt) {
+        // Edit mode - populate with existing prompt data
+        setPrompt({
+          title: initialPrompt.title || '',
+          category: initialPrompt.category || 'General',
+          tags: Array.isArray(initialPrompt.tags) 
+            ? initialPrompt.tags.join(', ') 
+            : (initialPrompt.tags || ''),
+          content: initialPrompt.content || '',
+          is_public: initialPrompt.is_public || false,
+        });
+      } else {
+        // Create mode - use default with optional initial content
+        setPrompt(prev => ({ 
+          ...defaultPrompt, 
+          content: initialContent || '' 
+        }));
+      }
     }
-  }, [isOpen, initialContent]);
+  }, [isOpen, initialContent, editMode, initialPrompt]);
 
   const handleCreate = () => {
     if (!prompt.title.trim() || !prompt.content.trim()) return;
@@ -41,13 +58,16 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
       tags: tagsArray,
       is_public: prompt.is_public,
     });
+    onClose?.(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Create New Prompt</DialogTitle>
+          <DialogTitle>
+            {editMode ? 'Edit Prompt' : 'Create New Prompt'}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -96,11 +116,18 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
               checked={prompt.is_public}
               onCheckedChange={(checked) => setPrompt(prev => ({ ...prev, is_public: checked }))}
             />
-            <Label htmlFor="prompt-public">Make this prompt public</Label>
+            <Label htmlFor="prompt-public" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Make this prompt public
+            </Label>
           </div>
+          {prompt.is_public && (
+            <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded-md">
+              Public prompts can be discovered and used by other users in the community.
+            </div>
+          )}
           <div className="flex gap-2">
             <Button onClick={handleCreate} className="btn-primary flex-1">
-              Create Prompt
+              {editMode ? 'Save Changes' : 'Create Prompt'}
             </Button>
             <Button
               variant="outline"
@@ -117,4 +144,3 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
 };
 
 export default PromptDialog;
-

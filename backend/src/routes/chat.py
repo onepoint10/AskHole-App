@@ -841,6 +841,52 @@ def like_prompt(prompt_id):
     })
 
 
+@chat_bp.route('/api/prompts/<int:prompt_id>/like', methods=['POST'])
+@jwt_required()
+def toggle_prompt_like(prompt_id):
+    """Like or unlike a prompt"""
+    try:
+        user_id = get_jwt_identity()
+
+        # Check if prompt exists and is public
+        prompt = PromptTemplate.query.filter_by(id=prompt_id, is_public=True).first()
+        if not prompt:
+            return jsonify({'success': False, 'error': 'Prompt not found'}), 404
+
+        # Check if user already liked this prompt
+        existing_like = PromptLike.query.filter_by(
+            user_id=user_id,
+            prompt_id=prompt_id
+        ).first()
+
+        if existing_like:
+            # Unlike - remove the like
+            db.session.delete(existing_like)
+            prompt.likes_count = max(0, (prompt.likes_count or 0) - 1)
+            action = 'unliked'
+        else:
+            # Like - add new like
+            new_like = PromptLike(user_id=user_id, prompt_id=prompt_id)
+            db.session.add(new_like)
+            prompt.likes_count = (prompt.likes_count or 0) + 1
+            action = 'liked'
+
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'action': action,
+                'likes_count': prompt.likes_count
+            }
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @chat_bp.route('/prompts/<int:prompt_id>/like-status', methods=['GET'])
 def get_prompt_like_status(prompt_id):
     """Get like status for a prompt"""

@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
 import CustomLogo from './CustomLogo';
 import InlineEdit from './InlineEdit';
+import PromptDialog from './PromptDialog';
 import PublicPromptsLibrary from './PublicPromptsLibrary';
 import { sessionsAPI } from '@/services/api';
 
@@ -617,77 +618,7 @@ const Sidebar = ({
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Prompt Library</h3>
-                  <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                        title="New Prompt"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create New Prompt</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="title">Title</Label>
-                          <Input
-                            id="title"
-                            value={newPrompt.title}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, title: e.target.value }))}
-                            placeholder="Enter prompt title"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="category">Category</Label>
-                          <Input
-                            id="category"
-                            value={newPrompt.category}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, category: e.target.value }))}
-                            placeholder="e.g., Writing, Coding, Analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="tags">Tags (comma-separated)</Label>
-                          <Input
-                            id="tags"
-                            value={newPrompt.tags}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                            placeholder="e.g., creative, technical, analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="content">Prompt Content</Label>
-                          <Textarea
-                            id="content"
-                            value={newPrompt.content}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, content: e.target.value }))}
-                            placeholder="Enter your prompt template..."
-                            className="min-h-[100px] focus-ring"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button onClick={handleCreatePrompt} className="btn-primary flex-1">
-                            Create Prompt
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setIsPromptDialogOpen(false)}
-                            className="btn-secondary"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  
                 </div>
                 {filteredPrompts.map((prompt) => (
                   <div
@@ -848,68 +779,31 @@ const Sidebar = ({
         onDelete={handleDelete}
         onClose={handleCloseContextMenu}
       />
-      {/* Edit Prompt Dialog */}
-      <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Prompt</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={editingPrompt.title}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter prompt title"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-category">Category</Label>
-              <Input
-                id="edit-category"
-                value={editingPrompt.category}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g., Writing, Coding, Analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
-              <Input
-                id="edit-tags"
-                value={editingPrompt.tags}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                placeholder="e.g., creative, technical, analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-content">Prompt Content</Label>
-              <Textarea
-                id="edit-content"
-                value={editingPrompt.content}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter your prompt template..."
-                className="min-h-[100px] focus-ring"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleSaveEditPrompt} className="btn-primary flex-1">
-                Save Changes
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditPromptDialogOpen(false)}
-                className="btn-secondary"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
+      {/* NEW: Updated Prompt Creation Dialog - Replace the old one */}
+      <PromptDialog
+        isOpen={isPromptDialogOpen}
+        onClose={setIsPromptDialogOpen}
+        onCreate={(promptData) => {
+          onNewPrompt(promptData);
+          setIsPromptDialogOpen(false);
+        }}
+        editMode={false}
+      />
+
+      {/* NEW: Updated Prompt Edit Dialog - Replace the old one */}
+      <PromptDialog
+        isOpen={isEditPromptDialogOpen}
+        onClose={setIsEditPromptDialogOpen}
+        onCreate={(updatedPrompt) => {
+          if (editingPrompt.id) {
+            onEditPrompt(editingPrompt.id, updatedPrompt);
+          }
+          setIsEditPromptDialogOpen(false);
+        }}
+        editMode={true}
+        initialPrompt={editingPrompt}
+      />
       
       {/* Public Prompts Library Dialog */}
       <Dialog open={isPublicPromptsOpen} onOpenChange={setIsPublicPromptsOpen}>
@@ -921,6 +815,7 @@ const Sidebar = ({
         </DialogContent>
       </Dialog>
       
+      {/* Prompt Context Menu */}
       <ContextMenu
         isVisible={promptContextMenu.isVisible}
         position={promptContextMenu.position}
