@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
-  LogOut
+  LogOut,
+  Globe
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
 import CustomLogo from './CustomLogo';
 import InlineEdit from './InlineEdit';
+import PublicPromptsLibrary from './PublicPromptsLibrary';
 import { sessionsAPI } from '@/services/api';
 
 const Sidebar = ({ 
@@ -60,6 +62,7 @@ const Sidebar = ({
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
+  const [isPublicPromptsOpen, setIsPublicPromptsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState({ id: null, title: '', content: '', category: 'General', tags: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
@@ -377,11 +380,20 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'prompts' ? 'default' : 'ghost'}
               size="sm"
-              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              className={`flex-1 rounded-none ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
               onClick={() => setActiveTab('prompts')}
             >
               <Database className="h-4 w-4 mr-1" />
               Prompts
+            </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'public' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              onClick={() => setActiveTab('public')}
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              Public
             </Button>
           </div>
         )}
@@ -408,6 +420,15 @@ const Sidebar = ({
               title="Prompts"
             >
               <Database className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('public')}
+              className="w-10 h-10 p-0"
+              title="Public Prompts"
+            >
+              <Globe className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
@@ -754,7 +775,35 @@ const Sidebar = ({
                 )}
               </div>
             )}
-          </ScrollArea>
+
+            {activeTab === 'public' && (
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-sidebar-foreground">Public Prompts</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setIsPublicPromptsOpen(true)}
+                    className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
+                    title="Browse Public Prompts"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-center text-muted-foreground text-sm py-6">
+                  <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Discover prompts shared by the community</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsPublicPromptsOpen(true)}
+                    className="mt-3"
+                  >
+                    Browse Public Library
+                  </Button>
+                </div>
+              </div>
+            )}
 
           {/* Fixed Bottom Panel for Expanded State */}
           <div className="border-sidebar-border p-3 bg-background">
@@ -859,6 +908,17 @@ const Sidebar = ({
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Public Prompts Library Dialog */}
+      <Dialog open={isPublicPromptsOpen} onOpenChange={setIsPublicPromptsOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <PublicPromptsLibrary 
+            onUsePrompt={onUsePrompt}
+            onClose={() => setIsPublicPromptsOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
+      
       <ContextMenu
         isVisible={promptContextMenu.isVisible}
         position={promptContextMenu.position}

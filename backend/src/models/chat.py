@@ -113,6 +113,26 @@ class ChatMessage(db.Model):
         }
 
 
+class PromptLike(db.Model):
+    __tablename__ = 'prompt_likes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    prompt_id = db.Column(db.Integer, db.ForeignKey('prompt_templates.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Ensure a user can only like a prompt once
+    __table_args__ = (db.UniqueConstraint('user_id', 'prompt_id', name='unique_user_prompt_like'),)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'prompt_id': self.prompt_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class PromptTemplate(db.Model):
     __tablename__ = 'prompt_templates'
 
@@ -123,6 +143,8 @@ class PromptTemplate(db.Model):
     category = db.Column(db.String(100), default='General')
     tags = db.Column(db.Text)  # JSON string of tags
     usage_count = db.Column(db.Integer, default=0)
+    is_public = db.Column(db.Boolean, default=False)  # New field for public visibility
+    likes_count = db.Column(db.Integer, default=0)  # New field for likes count
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -135,6 +157,8 @@ class PromptTemplate(db.Model):
             'category': self.category,
             'tags': json.loads(self.tags) if self.tags else [],
             'usage_count': self.usage_count,
+            'is_public': self.is_public,
+            'likes_count': self.likes_count,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

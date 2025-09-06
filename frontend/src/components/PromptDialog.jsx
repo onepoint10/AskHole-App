@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ const defaultPrompt = {
   category: 'General',
   tags: '',
   content: '',
+  is_public: false,
 };
 
 const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
@@ -37,6 +39,7 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
       content: prompt.content,
       category: prompt.category.trim() || 'General',
       tags: tagsArray,
+      is_public: prompt.is_public,
     });
   };
 
@@ -86,6 +89,14 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
               placeholder="Enter your prompt template..."
               className="min-h-[120px] focus-ring"
             />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="prompt-public"
+              checked={prompt.is_public}
+              onCheckedChange={(checked) => setPrompt(prev => ({ ...prev, is_public: checked }))}
+            />
+            <Label htmlFor="prompt-public">Make this prompt public</Label>
           </div>
           <div className="flex gap-2">
             <Button onClick={handleCreate} className="btn-primary flex-1">

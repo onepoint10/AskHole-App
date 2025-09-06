@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from src.database import db
-from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
+from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload, PromptLike
+from src.models.user import User
 from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
@@ -650,7 +651,8 @@ def create_prompt():
         title=data.get('title', 'Untitled Prompt'),
         content=data.get('content', ''),
         category=data.get('category', 'General'),
-        tags=json.dumps(data.get('tags', []))
+        tags=json.dumps(data.get('tags', [])),
+        is_public=data.get('is_public', False)
     )
 
     db.session.add(prompt)
@@ -684,6 +686,8 @@ def update_prompt(prompt_id):
         prompt.category = data['category']
     if 'tags' in data:
         prompt.tags = json.dumps(data['tags'])
+    if 'is_public' in data:
+        prompt.is_public = data['is_public']
 
     prompt.updated_at = datetime.utcnow()
     db.session.commit()
@@ -731,6 +735,131 @@ def use_prompt(prompt_id):
     db.session.commit()
 
     return jsonify(prompt.to_dict())
+
+
+@chat_bp.route('/public-prompts', methods=['GET'])
+def get_public_prompts():
+    """Get all public prompt templates"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Get query parameters for search and pagination
+    search_query = request.args.get('search', '').strip()
+    category_filter = request.args.get('category', '').strip()
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    
+    # Build query for public prompts
+    query = PromptTemplate.query.filter_by(is_public=True)
+    
+    # Apply search filter
+    if search_query:
+        query = query.filter(
+            db.or_(
+                PromptTemplate.title.ilike(f'%{search_query}%'),
+                PromptTemplate.content.ilike(f'%{search_query}%'),
+                PromptTemplate.tags.ilike(f'%{search_query}%')
+            )
+        )
+    
+    # Apply category filter
+    if category_filter:
+        query = query.filter(PromptTemplate.category.ilike(f'%{category_filter}%'))
+    
+    # Order by likes count and creation date
+    query = query.order_by(PromptTemplate.likes_count.desc(), PromptTemplate.created_at.desc())
+    
+    # Apply pagination
+    paginated_prompts = query.paginate(
+        page=page, 
+        per_page=per_page, 
+        error_out=False
+    )
+    
+    # Get author information for each prompt
+    prompts_with_authors = []
+    for prompt in paginated_prompts.items:
+        prompt_dict = prompt.to_dict()
+        # Get author username
+        author = User.query.get(prompt.user_id)
+        prompt_dict['author'] = author.username if author else 'Unknown'
+        prompts_with_authors.append(prompt_dict)
+    
+    return jsonify({
+        'prompts': prompts_with_authors,
+        'pagination': {
+            'page': paginated_prompts.page,
+            'per_page': paginated_prompts.per_page,
+            'total': paginated_prompts.total,
+            'pages': paginated_prompts.pages,
+            'has_next': paginated_prompts.has_next,
+            'has_prev': paginated_prompts.has_prev
+        }
+    })
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/like', methods=['POST'])
+def like_prompt(prompt_id):
+    """Like or unlike a public prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.get_or_404(prompt_id)
+    
+    # Check if prompt is public
+    if not prompt.is_public:
+        return jsonify({'error': 'Cannot like private prompts'}), 403
+    
+    # Check if user already liked this prompt
+    existing_like = PromptLike.query.filter_by(
+        user_id=current_user.id,
+        prompt_id=prompt_id
+    ).first()
+    
+    if existing_like:
+        # Unlike: remove the like
+        db.session.delete(existing_like)
+        prompt.likes_count = max(0, prompt.likes_count - 1)
+        liked = False
+    else:
+        # Like: add the like
+        new_like = PromptLike(
+            user_id=current_user.id,
+            prompt_id=prompt_id
+        )
+        db.session.add(new_like)
+        prompt.likes_count += 1
+        liked = True
+    
+    db.session.commit()
+    
+    return jsonify({
+        'liked': liked,
+        'likes_count': prompt.likes_count
+    })
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/like-status', methods=['GET'])
+def get_prompt_like_status(prompt_id):
+    """Get like status for a prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.get_or_404(prompt_id)
+    
+    # Check if user has liked this prompt
+    existing_like = PromptLike.query.filter_by(
+        user_id=current_user.id,
+        prompt_id=prompt_id
+    ).first()
+    
+    return jsonify({
+        'liked': existing_like is not None,
+        'likes_count': prompt.likes_count
+    })
 
 
 @chat_bp.route('/test-auth', methods=['GET'])

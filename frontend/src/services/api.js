@@ -347,6 +347,31 @@ export const promptsAPI = {
       method: 'POST',
     });
   },
+
+  getPublicPrompts: async (params = {}) => {
+    console.log('API Request: GET /public-prompts');
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.category) queryParams.append('category', params.category);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.per_page) queryParams.append('per_page', params.per_page);
+    
+    const queryString = queryParams.toString();
+    const url = queryString ? `/public-prompts?${queryString}` : '/public-prompts';
+    return apiCall(url);
+  },
+
+  likePrompt: async (promptId) => {
+    console.log('API Request: POST /prompts/' + promptId + '/like');
+    return apiCall(`/prompts/${promptId}/like`, {
+      method: 'POST',
+    });
+  },
+
+  getPromptLikeStatus: async (promptId) => {
+    console.log('API Request: GET /prompts/' + promptId + '/like-status');
+    return apiCall(`/prompts/${promptId}/like-status`);
+  },
 };
 
 // Files API
