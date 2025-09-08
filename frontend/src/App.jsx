@@ -356,15 +356,12 @@ function App() {
       const response = await sessionsAPI.createSession(sessionData);
       
       const newSession = response.data;
-      setSessions(prev => [newSession, ...prev]);
+      setSessions(prev => [newSession, ...prev.filter(s => s.id !== newSession.id)]);
       
       // Immediately set as active session and open tab
       setActiveSessionId(newSession.id);
       setOpenTabIds(prev => [newSession.id, ...prev]);
       setCurrentMessages([]); // Clear messages for new session
-
-      // Update sessions list immediately to ensure the new session is available
-      setSessions(prev => [newSession, ...prev.filter(s => s.id !== newSession.id)]);
 
       // Close sidebar on mobile after creating new session
       if (isMobile && isSidebarOpen) {

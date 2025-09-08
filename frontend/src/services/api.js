@@ -319,18 +319,52 @@ export const promptsAPI = {
   },
 
   createPrompt: async (promptData) => {
-    console.log('API Request: POST /prompts');
+    console.log('API Request: POST /prompts', { title: promptData.title, is_public: promptData.is_public });
+    
+    // Validate required fields on frontend
+    if (!promptData.title?.trim()) {
+      throw new Error('Title is required');
+    }
+    if (!promptData.content?.trim()) {
+      throw new Error('Content is required');
+    }
+    
+    // Clean data before sending
+    const cleanData = {
+      title: promptData.title.trim(),
+      content: promptData.content.trim(),
+      category: (promptData.category || 'General').trim(),
+      tags: Array.isArray(promptData.tags) ? promptData.tags : [],
+      is_public: Boolean(promptData.is_public)
+    };
+    
     return apiCall('/prompts', {
       method: 'POST',
-      body: JSON.stringify(promptData),
+      body: JSON.stringify(cleanData),
     });
   },
 
   updatePrompt: async (promptId, updates) => {
-    console.log('API Request: PUT /prompts/' + promptId);
+    console.log('API Request: PUT /prompts/' + promptId, { is_public: updates.is_public });
+    
+    // Validate if updating title or content
+    if ('title' in updates && !updates.title?.trim()) {
+      throw new Error('Title cannot be empty');
+    }
+    if ('content' in updates && !updates.content?.trim()) {
+      throw new Error('Content cannot be empty');
+    }
+    
+    // Clean updates data
+    const cleanUpdates = { ...updates };
+    if (cleanUpdates.title) cleanUpdates.title = cleanUpdates.title.trim();
+    if (cleanUpdates.content) cleanUpdates.content = cleanUpdates.content.trim();
+    if (cleanUpdates.category) cleanUpdates.category = cleanUpdates.category.trim();
+    if ('is_public' in cleanUpdates) cleanUpdates.is_public = Boolean(cleanUpdates.is_public);
+    
     return apiCall(`/prompts/${promptId}`, {
       method: 'PUT',
-      body: JSON.stringify(updates),
+      body: JSON.stringify(cleanUpdates),
     });
   },
 
@@ -346,6 +380,57 @@ export const promptsAPI = {
     return apiCall(`/prompts/${promptId}/use`, {
       method: 'POST',
     });
+  },
+
+  getPublicPrompts: async (params = {}) => {
+    console.log('API Request: GET /public-prompts', params);
+    
+    // Validate parameters
+    const validatedParams = {
+      page: Math.max(1, parseInt(params.page) || 1),
+      per_page: Math.min(100, Math.max(1, parseInt(params.per_page) || 20)),
+    };
+    
+    if (params.search?.trim()) {
+      validatedParams.search = params.search.trim();
+    }
+    if (params.category?.trim()) {
+      validatedParams.category = params.category.trim();
+    }
+    
+    const queryParams = new URLSearchParams();
+    Object.entries(validatedParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        queryParams.append(key, value.toString());
+      }
+    });
+    
+    const queryString = queryParams.toString();
+    const url = queryString ? `/public-prompts?${queryString}` : '/public-prompts';
+    
+    return apiCall(url);
+  },
+
+  likePrompt: async (promptId) => {
+    console.log('API Request: POST /prompts/' + promptId + '/like');
+    
+    if (!promptId || isNaN(promptId)) {
+      throw new Error('Invalid prompt ID');
+    }
+    
+    return apiCall(`/prompts/${promptId}/like`, {
+      method: 'POST',
+    });
+  },
+
+  getPromptLikeStatus: async (promptId) => {
+    console.log('API Request: GET /prompts/' + promptId + '/like-status');
+    
+    if (!promptId || isNaN(promptId)) {
+      throw new Error('Invalid prompt ID');
+    }
+    
+    return apiCall(`/prompts/${promptId}/like-status`);
   },
 };
 

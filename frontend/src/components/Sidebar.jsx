@@ -13,7 +13,10 @@ import {
   ChevronLeft,
   ChevronRight,
   HelpCircle,
-  LogOut
+  LogOut,
+  Globe,
+  User,
+  Heart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +34,9 @@ import { Label } from '@/components/ui/label';
 import ContextMenu from './ContextMenu';
 import CustomLogo from './CustomLogo';
 import InlineEdit from './InlineEdit';
-import { sessionsAPI } from '@/services/api';
+import PromptDialog from './PromptDialog';
+import PublicPromptsLibrary from './PublicPromptsLibrary';
+import { sessionsAPI, promptsAPI } from '@/services/api';
 
 const Sidebar = ({ 
   sessions = [],
@@ -60,10 +65,16 @@ const Sidebar = ({
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [isEditPromptDialogOpen, setIsEditPromptDialogOpen] = useState(false);
+  const [isPublicPromptsOpen, setIsPublicPromptsOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState({ id: null, title: '', content: '', category: 'General', tags: '' });
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(320); // Default 320px (w-80)
+  const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
+  
+  // Public prompts state
+  const [publicPrompts, setPublicPrompts] = useState([]);
+  const [publicPromptsLoading, setPublicPromptsLoading] = useState(false);
+  const [publicPromptsError, setPublicPromptsError] = useState(null);
 
   // Long press detection for mobile
   const longPressTimerRef = React.useRef(null);
@@ -84,7 +95,7 @@ const Sidebar = ({
       const x = touch ? touch.clientX : 0;
       const y = touch ? touch.clientY : 0;
       setContextMenu({ isVisible: true, position: { x, y }, sessionId });
-    }, 500); // 500ms long-press
+    }, 500);
   };
 
   const cancelLongPress = () => {
@@ -104,56 +115,92 @@ const Sidebar = ({
     }
   };
 
+  // Load public prompts when public tab is selected
+  useEffect(() => {
+    if (activeTab === 'public') {
+      loadPublicPrompts();
+    }
+  }, [activeTab]);
+
+  const loadPublicPrompts = async () => {
+    try {
+      setPublicPromptsLoading(true);
+      setPublicPromptsError(null);
+      const response = await promptsAPI.getPublicPrompts({
+        page: 1,
+        per_page: 50,
+        search: searchTerm.trim()
+      });
+      setPublicPrompts(response.data.prompts || []);
+    } catch (error) {
+      console.error('Failed to load public prompts for sidebar:', error);
+      setPublicPromptsError('Failed to load public prompts');
+      setPublicPrompts([]);
+    } finally {
+      setPublicPromptsLoading(false);
+    }
+  };
+
   // Calculate adaptive width based on content
   const calculateAdaptiveWidth = () => {
-    if (isCollapsed) return 60; // Collapsed width
+    if (isCollapsed) return 60;
     
-    let maxWidth = 320; // Default width
+    let maxWidth = 320;
     
-    // Check session model names for required width
     sessions.forEach(session => {
       if (session.model) {
-        // Estimate width needed: base width + text length * character width + padding for buttons
-        const estimatedWidth = 200 + session.model.length * 8 + 20; // 20px for buttons
-        maxWidth = Math.max(maxWidth, Math.min(estimatedWidth, 500)); // Cap at 500px
+        const estimatedWidth = 200 + session.model.length * 8 + 20;
+        maxWidth = Math.max(maxWidth, Math.min(estimatedWidth, 500));
       }
     });
     
     return maxWidth;
   };
 
-  // Update width when sessions change or collapse state changes
   React.useEffect(() => {
     const newWidth = calculateAdaptiveWidth();
     setSidebarWidth(newWidth);
   }, [sessions, isCollapsed]);
 
-  // Search effect
+  // Enhanced search effect
   useEffect(() => {
     const searchContent = async () => {
       if (!searchTerm.trim()) {
         setSearchResults({ sessions: [], prompts: [] });
+        if (activeTab === 'public') {
+          loadPublicPrompts();
+        }
         return;
       }
 
       setIsSearching(true);
       try {
-        const response = await sessionsAPI.searchContent(searchTerm);
-        console.log('Search response:', response);
-        console.log('Search results:', response.data);
-        setSearchResults(response.data || { sessions: [], prompts: [] });
+        if (activeTab === 'public') {
+          const response = await promptsAPI.getPublicPrompts({
+            page: 1,
+            per_page: 50,
+            search: searchTerm
+          });
+          setPublicPrompts(response.data.prompts || []);
+        } else {
+          const response = await sessionsAPI.searchContent(searchTerm);
+          setSearchResults(response.data || { sessions: [], prompts: [] });
+        }
       } catch (error) {
         console.error('Search failed:', error);
         setSearchResults({ sessions: [], prompts: [] });
+        if (activeTab === 'public') {
+          setPublicPromptsError('Search failed');
+          setPublicPrompts([]);
+        }
       } finally {
         setIsSearching(false);
       }
     };
 
-    // Debounce search to avoid too many API calls
     const timeoutId = setTimeout(searchContent, 300);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm]);
+  }, [searchTerm, activeTab]);
 
   // Use search results when searching, otherwise use filtered local results
   const filteredSessions = searchTerm.trim() ? 
@@ -169,25 +216,6 @@ const Sidebar = ({
       (prompt.content && prompt.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (prompt.category && prompt.category.toLowerCase().includes(searchTerm.toLowerCase()))
     ) : []);
-
-  // Debug logging
-  if (searchTerm.trim()) {
-    console.log('Search term:', searchTerm);
-    console.log('Search results prompts:', searchResults.prompts);
-    console.log('Filtered prompts:', filteredPrompts);
-  }
-
-  const handleCreatePrompt = () => {
-    if (newPrompt.title.trim() && newPrompt.content.trim()) {
-      const tags = newPrompt.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      onNewPrompt({
-        ...newPrompt,
-        tags
-      });
-      setNewPrompt({ title: '', content: '', category: 'General', tags: '' });
-      setIsPromptDialogOpen(false);
-    }
-  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -267,7 +295,8 @@ const Sidebar = ({
       title: prompt.title || '',
       category: prompt.category || 'General',
       content: prompt.content || '',
-      tags: Array.isArray(prompt.tags) ? prompt.tags.join(', ') : (prompt.tags || '')
+      tags: Array.isArray(prompt.tags) ? prompt.tags.join(', ') : (prompt.tags || ''),
+      is_public: Boolean(prompt.is_public)
     });
     setIsEditPromptDialogOpen(true);
   };
@@ -285,25 +314,11 @@ const Sidebar = ({
     handleClosePromptContextMenu();
   };
 
-  const handleSaveEditPrompt = () => {
-    if (!editingPrompt.id) return;
-    const tags = String(editingPrompt.tags || '')
-      .split(',')
-      .map(t => t.trim())
-      .filter(Boolean);
-    onEditPrompt && onEditPrompt(editingPrompt.id, {
-      title: editingPrompt.title,
-      category: editingPrompt.category,
-      content: editingPrompt.content,
-      tags
-    });
-    setIsEditPromptDialogOpen(false);
-  };
-
-  // Handler for documentation link
   const handleDocumentationClick = () => {
     window.open('http://askhole.ru:3000/', '_blank');
   };
+
+  
 
   return (
     <div 
@@ -352,6 +367,15 @@ const Sidebar = ({
               <Button 
                 variant="ghost" 
                 size="sm" 
+                onClick={() => setIsPromptDialogOpen(true)}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title="Create Prompt"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
                 onClick={onOpenSettings}
                 className="hover:bg-sidebar-accent flex-shrink-0"
                 title="Settings"
@@ -377,11 +401,20 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'prompts' ? 'default' : 'ghost'}
               size="sm"
-              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              className={`flex-1 rounded-none ${activeTab === 'prompts' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
               onClick={() => setActiveTab('prompts')}
             >
               <Database className="h-4 w-4 mr-1" />
               Prompts
+            </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              className={`flex-1 rounded-3xl rounded-l-sm ${activeTab === 'public' ? 'bg-background text-foreground shadow-sm' : 'text-sidebar-foreground hover:bg-sidebar-accent'}`}
+              onClick={() => setActiveTab('public')}
+            >
+              <Globe className="h-4 w-4 mr-1" />
+              Public
             </Button>
           </div>
         )}
@@ -409,12 +442,30 @@ const Sidebar = ({
             >
               <Database className="h-4 w-4" />
             </Button>
+            <Button
+              variant={activeTab === 'public' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('public')}
+              className="w-10 h-10 p-0"
+              title="Public Prompts"
+            >
+              <Globe className="h-4 w-4" />
+            </Button>
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={onNewSession}
               className="w-10 h-10 p-0 hover:bg-sidebar-accent"
               title="New Chat"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setIsPromptDialogOpen(true)}
+              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              title="Create Prompt"
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -496,7 +547,6 @@ const Sidebar = ({
                     onClick={() => {
                       if (editingSessionId === session.id) return;
                       if (longPressTriggeredRef.current) {
-                        // suppress click after long-press
                         longPressTriggeredRef.current = false;
                         return;
                       }
@@ -548,7 +598,7 @@ const Sidebar = ({
                         </Badge>
                         <span 
                           className="text-xs text-muted-foreground truncate min-w-0"
-                          title={session.model} // Show full model name on hover
+                          title={session.model}
                         >
                           {session.model}
                         </span>
@@ -596,77 +646,6 @@ const Sidebar = ({
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Prompt Library</h3>
-                  <Dialog open={isPromptDialogOpen} onOpenChange={setIsPromptDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                        title="New Prompt"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-md">
-                      <DialogHeader>
-                        <DialogTitle>Create New Prompt</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="title">Title</Label>
-                          <Input
-                            id="title"
-                            value={newPrompt.title}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, title: e.target.value }))}
-                            placeholder="Enter prompt title"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="category">Category</Label>
-                          <Input
-                            id="category"
-                            value={newPrompt.category}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, category: e.target.value }))}
-                            placeholder="e.g., Writing, Coding, Analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="tags">Tags (comma-separated)</Label>
-                          <Input
-                            id="tags"
-                            value={newPrompt.tags}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                            placeholder="e.g., creative, technical, analysis"
-                            className="focus-ring"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="content">Prompt Content</Label>
-                          <Textarea
-                            id="content"
-                            value={newPrompt.content}
-                            onChange={(e) => setNewPrompt(prev => ({ ...prev, content: e.target.value }))}
-                            placeholder="Enter your prompt template..."
-                            className="min-h-[100px] focus-ring"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button onClick={handleCreatePrompt} className="btn-primary flex-1">
-                            Create Prompt
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setIsPromptDialogOpen(false)}
-                            className="btn-secondary"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </div>
                 {filteredPrompts.map((prompt) => (
                   <div
@@ -685,6 +664,12 @@ const Sidebar = ({
                           <Badge variant="secondary" className="text-xs">
                             {prompt.category}
                           </Badge>
+                          {prompt.is_public && (
+                            <Badge variant="outline" className="text-xs">
+                              <Globe className="h-2 w-2 mr-1" />
+                              Public
+                            </Badge>
+                          )}
                           {prompt.usage_count && prompt.usage_count > 0 && (
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Star className="h-3 w-3" />
@@ -754,6 +739,127 @@ const Sidebar = ({
                 )}
               </div>
             )}
+
+            {activeTab === 'public' && (
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-sidebar-foreground">Public Prompts</h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setIsPublicPromptsOpen(true)}
+                    className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
+                    title="Browse Public Library"
+                  >
+                    <Globe className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                {publicPromptsLoading && (
+                  <div className="text-center py-6">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p className="text-xs text-muted-foreground">Loading public prompts...</p>
+                  </div>
+                )}
+                
+                {publicPromptsError && (
+                  <div className="text-center py-6">
+                    <p className="text-xs text-red-500">{publicPromptsError}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadPublicPrompts}
+                      className="mt-2 text-xs"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                
+                {!publicPromptsLoading && !publicPromptsError && publicPrompts.length === 0 && (
+                  <div className="text-center text-muted-foreground text-sm py-6">
+                    <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    {searchTerm ? 'No matching public prompts found' : 'No public prompts available'}
+                    {!searchTerm && (
+                      <div className="mt-3">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsPublicPromptsOpen(true)}
+                          className="text-xs"
+                        >
+                          Browse Public Library
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {!publicPromptsLoading && publicPrompts.length > 0 && (
+                  <>
+                    {publicPrompts.map((prompt) => (
+                      <div
+                        key={prompt.id}
+                        className="group p-2 rounded-lg border border-sidebar-border hover:bg-sidebar-accent cursor-pointer transition-colors slide-in"
+                        onClick={() => onUsePrompt(prompt)}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate text-sidebar-foreground">{prompt.title}</div>
+                            <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                              {prompt.content}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {prompt.category}
+                              </Badge>
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <User className="h-3 w-3" />
+                                <span className="truncate">{prompt.author || 'Unknown'}</span>
+                              </div>
+                              {prompt.likes_count > 0 && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Heart className="h-3 w-3" />
+                                  {prompt.likes_count}
+                                </div>
+                              )}
+                            </div>
+                            {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {prompt.tags.slice(0, 2).map((tag, index) => (
+                                  <Badge key={index} variant="outline" className="text-xs">
+                                    <Tag className="h-2 w-2 mr-1" />
+                                    {tag}
+                                  </Badge>
+                                ))}
+                                {prompt.tags.length > 2 && (
+                                  <Badge variant="outline" className="text-xs">
+                                    +{prompt.tags.length - 2}
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {publicPrompts.length >= 50 && (
+                      <div className="text-center py-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setIsPublicPromptsOpen(true)}
+                          className="text-xs"
+                        >
+                          View All Public Prompts
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
           </ScrollArea>
 
           {/* Fixed Bottom Panel for Expanded State */}
@@ -790,6 +896,7 @@ const Sidebar = ({
         </>
       )}
       
+      {/* Context Menus and Dialogs */}
       <ContextMenu
         isVisible={contextMenu.isVisible}
         position={contextMenu.position}
@@ -797,68 +904,39 @@ const Sidebar = ({
         onDelete={handleDelete}
         onClose={handleCloseContextMenu}
       />
-      {/* Edit Prompt Dialog */}
-      <Dialog open={isEditPromptDialogOpen} onOpenChange={setIsEditPromptDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Prompt</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="edit-title">Title</Label>
-              <Input
-                id="edit-title"
-                value={editingPrompt.title}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter prompt title"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-category">Category</Label>
-              <Input
-                id="edit-category"
-                value={editingPrompt.category}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, category: e.target.value }))}
-                placeholder="e.g., Writing, Coding, Analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-tags">Tags (comma-separated)</Label>
-              <Input
-                id="edit-tags"
-                value={editingPrompt.tags}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, tags: e.target.value }))}
-                placeholder="e.g., creative, technical, analysis"
-                className="focus-ring"
-              />
-            </div>
-            <div>
-              <Label htmlFor="edit-content">Prompt Content</Label>
-              <Textarea
-                id="edit-content"
-                value={editingPrompt.content}
-                onChange={(e) => setEditingPrompt(prev => ({ ...prev, content: e.target.value }))}
-                placeholder="Enter your prompt template..."
-                className="min-h-[100px] focus-ring"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button onClick={handleSaveEditPrompt} className="btn-primary flex-1">
-                Save Changes
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsEditPromptDialogOpen(false)}
-                className="btn-secondary"
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
+
+      <PromptDialog
+        isOpen={isPromptDialogOpen}
+        onClose={setIsPromptDialogOpen}
+        onCreate={(promptData) => {
+          onNewPrompt(promptData);
+          setIsPromptDialogOpen(false);
+        }}
+        editMode={false}
+      />
+
+      <PromptDialog
+        isOpen={isEditPromptDialogOpen}
+        onClose={setIsEditPromptDialogOpen}
+        onCreate={(updatedPrompt) => {
+          if (editingPrompt.id) {
+            onEditPrompt(editingPrompt.id, updatedPrompt);
+          }
+          setIsEditPromptDialogOpen(false);
+        }}
+        editMode={true}
+        initialPrompt={editingPrompt}
+      />
+      
+      <Dialog open={isPublicPromptsOpen} onOpenChange={setIsPublicPromptsOpen}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
+          <PublicPromptsLibrary 
+            onUsePrompt={onUsePrompt}
+            onClose={() => setIsPublicPromptsOpen(false)}
+          />
         </DialogContent>
       </Dialog>
+      
       <ContextMenu
         isVisible={promptContextMenu.isVisible}
         position={promptContextMenu.position}

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory
 from src.database import db
-from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload
+from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload, PromptLike
+from src.models.user import User
 from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
@@ -645,18 +646,32 @@ def create_prompt():
 
     data = request.get_json()
 
-    prompt = PromptTemplate(
-        user_id=current_user.id,
-        title=data.get('title', 'Untitled Prompt'),
-        content=data.get('content', ''),
-        category=data.get('category', 'General'),
-        tags=json.dumps(data.get('tags', []))
-    )
+    # Validate required fields
+    if not data.get('title', '').strip():
+        return jsonify({'error': 'Title is required'}), 400
+    if not data.get('content', '').strip():
+        return jsonify({'error': 'Content is required'}), 400
 
-    db.session.add(prompt)
-    db.session.commit()
+    try:
+        prompt = PromptTemplate(
+            user_id=current_user.id,
+            title=data['title'].strip(),
+            content=data['content'].strip(),
+            category=data.get('category', 'General').strip(),
+            tags=json.dumps(data.get('tags', [])),
+            is_public=bool(data.get('is_public', False))
+        )
 
-    return jsonify(prompt.to_dict()), 201
+        db.session.add(prompt)
+        db.session.commit()
+
+        logger.info(f"Created prompt {prompt.id} for user {current_user.id} - public: {prompt.is_public}")
+        return jsonify(prompt.to_dict()), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error creating prompt: {e}")
+        return jsonify({'error': 'Failed to create prompt'}), 500
 
 
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['PUT'])
@@ -676,19 +691,38 @@ def update_prompt(prompt_id):
 
     data = request.get_json()
 
-    if 'title' in data:
-        prompt.title = data['title']
-    if 'content' in data:
-        prompt.content = data['content']
-    if 'category' in data:
-        prompt.category = data['category']
-    if 'tags' in data:
-        prompt.tags = json.dumps(data['tags'])
+    # Validate if title or content are being updated
+    if 'title' in data and not data['title'].strip():
+        return jsonify({'error': 'Title cannot be empty'}), 400
+    if 'content' in data and not data['content'].strip():
+        return jsonify({'error': 'Content cannot be empty'}), 400
 
-    prompt.updated_at = datetime.utcnow()
-    db.session.commit()
+    try:
+        # Update fields
+        if 'title' in data:
+            prompt.title = data['title'].strip()
+        if 'content' in data:
+            prompt.content = data['content'].strip()
+        if 'category' in data:
+            prompt.category = data['category'].strip()
+        if 'tags' in data:
+            prompt.tags = json.dumps(data['tags'])
+        if 'is_public' in data:
+            old_public = prompt.is_public
+            prompt.is_public = bool(data['is_public'])
+            if old_public != prompt.is_public:
+                logger.info(f"Prompt {prompt_id} public status changed: {old_public} -> {prompt.is_public}")
 
-    return jsonify(prompt.to_dict())
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Updated prompt {prompt_id} for user {current_user.id}")
+        return jsonify(prompt.to_dict())
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to update prompt'}), 500
 
 
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['DELETE'])
@@ -706,10 +740,17 @@ def delete_prompt(prompt_id):
     if not prompt:
         return jsonify({'error': 'Prompt not found or access denied'}), 404
 
-    db.session.delete(prompt)
-    db.session.commit()
+    try:
+        db.session.delete(prompt)
+        db.session.commit()
 
-    return jsonify({'success': True})
+        logger.info(f"Deleted prompt {prompt_id} for user {current_user.id}")
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error deleting prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to delete prompt'}), 500
 
 
 @chat_bp.route('/prompts/<int:prompt_id>/use', methods=['POST'])
@@ -719,18 +760,191 @@ def use_prompt(prompt_id):
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
 
-    prompt = PromptTemplate.query.filter_by(
-        id=prompt_id,
-        user_id=current_user.id
+    # Allow usage of both user's own prompts and public prompts
+    prompt = PromptTemplate.query.filter(
+        PromptTemplate.id == prompt_id,
+        db.or_(
+            PromptTemplate.user_id == current_user.id,
+            PromptTemplate.is_public == True
+        )
     ).first()
 
     if not prompt:
         return jsonify({'error': 'Prompt not found or access denied'}), 404
 
-    prompt.usage_count += 1
-    db.session.commit()
+    try:
+        prompt.usage_count = (prompt.usage_count or 0) + 1
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
 
-    return jsonify(prompt.to_dict())
+        return jsonify(prompt.to_dict())
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating usage count for prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to update usage count'}), 500
+
+
+@chat_bp.route('/public-prompts', methods=['GET'])
+def get_public_prompts():
+    """Get public prompt templates with search, filtering, and pagination"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Get query parameters
+    search_query = request.args.get('search', '').strip()
+    category_filter = request.args.get('category', '').strip()
+    page = max(1, int(request.args.get('page', 1)))
+    per_page = min(100, max(1, int(request.args.get('per_page', 20))))  # Limit per_page to prevent abuse
+
+    try:
+        # Build base query for public prompts
+        query = PromptTemplate.query.filter_by(is_public=True)
+
+        # Apply search filter
+        if search_query:
+            search_pattern = f'%{search_query}%'
+            query = query.filter(
+                db.or_(
+                    PromptTemplate.title.ilike(search_pattern),
+                    PromptTemplate.content.ilike(search_pattern),
+                    PromptTemplate.tags.ilike(search_pattern),
+                    PromptTemplate.category.ilike(search_pattern)
+                )
+            )
+
+        # Apply category filter
+        if category_filter:
+            query = query.filter(PromptTemplate.category.ilike(f'%{category_filter}%'))
+
+        # Order by popularity and recency
+        query = query.order_by(
+            PromptTemplate.likes_count.desc().nullslast(),
+            PromptTemplate.usage_count.desc().nullslast(),
+            PromptTemplate.created_at.desc()
+        )
+
+        # Apply pagination
+        paginated_prompts = query.paginate(
+            page=page,
+            per_page=per_page,
+            error_out=False
+        )
+
+        # Get author information efficiently
+        user_ids = list(set(prompt.user_id for prompt in paginated_prompts.items))
+        users_dict = {
+            user.id: user.username
+            for user in User.query.filter(User.id.in_(user_ids)).all()
+        } if user_ids else {}
+
+        # Build response with author info
+        prompts_with_authors = []
+        for prompt in paginated_prompts.items:
+            prompt_dict = prompt.to_dict()
+            prompt_dict['author'] = users_dict.get(prompt.user_id, 'Unknown')
+            prompts_with_authors.append(prompt_dict)
+
+        return jsonify({
+            'prompts': prompts_with_authors,
+            'pagination': {
+                'page': paginated_prompts.page,
+                'per_page': paginated_prompts.per_page,
+                'total': paginated_prompts.total,
+                'pages': paginated_prompts.pages,
+                'has_next': paginated_prompts.has_next,
+                'has_prev': paginated_prompts.has_prev
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting public prompts: {e}")
+        return jsonify({'error': 'Failed to load public prompts'}), 500
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/like', methods=['POST'])
+def like_prompt(prompt_id):
+    """Like or unlike a public prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.get(prompt_id)
+    if not prompt:
+        return jsonify({'error': 'Prompt not found'}), 404
+
+    # Check if prompt is public
+    if not prompt.is_public:
+        return jsonify({'error': 'Cannot like private prompts'}), 403
+
+    try:
+        # Check if user already liked this prompt
+        existing_like = PromptLike.query.filter_by(
+            user_id=current_user.id,
+            prompt_id=prompt_id
+        ).first()
+
+        if existing_like:
+            # Unlike: remove the like
+            db.session.delete(existing_like)
+            prompt.likes_count = max(0, (prompt.likes_count or 0) - 1)
+            liked = False
+            action = 'unliked'
+        else:
+            # Like: add the like
+            new_like = PromptLike(
+                user_id=current_user.id,
+                prompt_id=prompt_id
+            )
+            db.session.add(new_like)
+            prompt.likes_count = (prompt.likes_count or 0) + 1
+            liked = True
+            action = 'liked'
+
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"User {current_user.id} {action} prompt {prompt_id}")
+
+        return jsonify({
+            'liked': liked,
+            'likes_count': prompt.likes_count,
+            'action': action
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error toggling like for prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to toggle like'}), 500
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/like-status', methods=['GET'])
+def get_prompt_like_status(prompt_id):
+    """Get like status for a prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    prompt = PromptTemplate.query.get(prompt_id)
+    if not prompt:
+        return jsonify({'error': 'Prompt not found'}), 404
+
+    try:
+        # Check if user has liked this prompt
+        existing_like = PromptLike.query.filter_by(
+            user_id=current_user.id,
+            prompt_id=prompt_id
+        ).first()
+
+        return jsonify({
+            'liked': existing_like is not None,
+            'likes_count': prompt.likes_count or 0
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting like status for prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to get like status'}), 500
 
 
 @chat_bp.route('/test-auth', methods=['GET'])

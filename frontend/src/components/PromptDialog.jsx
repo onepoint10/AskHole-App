@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -15,36 +16,75 @@ const defaultPrompt = {
   category: 'General',
   tags: '',
   content: '',
+  is_public: false,
 };
 
-const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
+const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate, editMode = false, initialPrompt = null }) => {
   const [prompt, setPrompt] = useState(defaultPrompt);
 
   useEffect(() => {
     if (isOpen) {
-      setPrompt(prev => ({ ...defaultPrompt, content: initialContent || '' }));
+      if (editMode && initialPrompt) {
+        // Edit mode - populate with existing prompt data
+        setPrompt({
+          title: initialPrompt.title || '',
+          category: initialPrompt.category || 'General',
+          tags: Array.isArray(initialPrompt.tags) 
+            ? initialPrompt.tags.join(', ') 
+            : (initialPrompt.tags || ''),
+          content: initialPrompt.content || '',
+          is_public: Boolean(initialPrompt.is_public), // Ensure boolean conversion
+        });
+      } else {
+        // Create mode - use default with optional initial content
+        setPrompt({ 
+          ...defaultPrompt, 
+          content: initialContent || '' 
+        });
+      }
     }
-  }, [isOpen, initialContent]);
+  }, [isOpen, initialContent, editMode, initialPrompt]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      setPrompt(defaultPrompt);
+    }
+  }, [isOpen]);
 
   const handleCreate = () => {
     if (!prompt.title.trim() || !prompt.content.trim()) return;
+    
     const tagsArray = prompt.tags
       .split(',')
       .map(tag => tag.trim())
       .filter(Boolean);
-    onCreate?.({
+      
+    const promptData = {
       title: prompt.title.trim(),
       content: prompt.content,
       category: prompt.category.trim() || 'General',
       tags: tagsArray,
-    });
+      is_public: Boolean(prompt.is_public), // Ensure boolean
+    };
+    
+    console.log('Creating/updating prompt with data:', promptData);
+    onCreate?.(promptData);
+    onClose?.(false);
+  };
+
+  const handleClose = () => {
+    setPrompt(defaultPrompt); // Reset form on close
+    onClose?.(false);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Create New Prompt</DialogTitle>
+          <DialogTitle>
+            {editMode ? 'Edit Prompt' : 'Create New Prompt'}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div>
@@ -87,13 +127,31 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
               className="min-h-[120px] focus-ring"
             />
           </div>
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="prompt-public"
+              checked={Boolean(prompt.is_public)}
+              onCheckedChange={(checked) => {
+                console.log('Public switch changed to:', checked);
+                setPrompt(prev => ({ ...prev, is_public: checked }));
+              }}
+            />
+            <Label htmlFor="prompt-public" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+              Make this prompt public
+            </Label>
+          </div>
+          {prompt.is_public && (
+            <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950 p-2 rounded-md">
+              Public prompts can be discovered and used by other users in the community.
+            </div>
+          )}
           <div className="flex gap-2">
             <Button onClick={handleCreate} className="btn-primary flex-1">
-              Create Prompt
+              {editMode ? 'Save Changes' : 'Create Prompt'}
             </Button>
             <Button
               variant="outline"
-              onClick={() => onClose?.(false)}
+              onClick={handleClose}
               className="btn-secondary"
             >
               Cancel
@@ -106,4 +164,3 @@ const PromptDialog = ({ isOpen, onClose, initialContent = '', onCreate }) => {
 };
 
 export default PromptDialog;
-
