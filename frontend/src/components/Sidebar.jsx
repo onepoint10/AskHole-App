@@ -115,13 +115,6 @@ const Sidebar = ({
     }
   };
 
-  // Load public prompts when public tab is selected
-  useEffect(() => {
-    if (activeTab === 'public') {
-      loadPublicPrompts();
-    }
-  }, [activeTab]);
-
   const loadPublicPrompts = async () => {
     try {
       setPublicPromptsLoading(true);
