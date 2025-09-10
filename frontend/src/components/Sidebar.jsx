@@ -3,7 +3,9 @@ import {
   Settings, 
   Database, 
   History, 
-  Plus, 
+  Plus,
+  BookPlus,
+  MessageCirclePlus, 
   Search,
   Trash2,
   Edit3,
@@ -16,7 +18,8 @@ import {
   LogOut,
   Globe,
   User,
-  Heart
+  Heart,
+  Github
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -311,6 +314,11 @@ const Sidebar = ({
     window.open('http://askhole.ru:3000/', '_blank');
   };
 
+  const handleGithubClick = () => {
+    window.open('https://github.com/onepoint10/AskHole-App', '_blank');
+  };
+
+
   
 
   return (
@@ -338,7 +346,7 @@ const Sidebar = ({
               )}
             </div>
             {!isCollapsed && (
-              <h2 className={`text-lg text-sidebar-foreground whitespace-nowrap ${isMobileOverlay ? 'pl-2' : ''}`}>
+              <h2 className={`text-lg text-sidebar-foreground whitespace-nowrap ${isMobileOverlay ? 'pl-3' : ''}`}>
                 <span className="font-semibold">Ask</span>
                 <span className="font-light">Hole</span>
               </h2>
@@ -354,7 +362,7 @@ const Sidebar = ({
                   className="hover:bg-sidebar-accent flex-shrink-0"
                   title="New Chat"
                 >
-                  <Plus className="h-4 w-4" />
+                  <MessageCirclePlus className="h-4 w-4" />
                 </Button>
               )}
               <Button 
@@ -364,7 +372,7 @@ const Sidebar = ({
                 className="hover:bg-sidebar-accent flex-shrink-0"
                 title="Create Prompt"
               >
-                <Plus className="h-4 w-4" />
+                <BookPlus className="h-4 w-4" />
               </Button>
               <Button 
                 variant="ghost" 
@@ -451,7 +459,7 @@ const Sidebar = ({
               className="w-10 h-10 p-0 hover:bg-sidebar-accent"
               title="New Chat"
             >
-              <Plus className="h-4 w-4" />
+              <MessageCirclePlus className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
@@ -460,7 +468,7 @@ const Sidebar = ({
               className="w-10 h-10 p-0 hover:bg-sidebar-accent"
               title="Create Prompt"
             >
-              <Plus className="h-4 w-4" />
+              <BookPlus className="h-4 w-4" />
             </Button>
             <Button 
               variant="ghost" 
@@ -874,6 +882,15 @@ const Sidebar = ({
                   </span>
                 )}
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleGithubClick}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title="Github"
+              >
+                <Github className="h-4 w-4" />
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

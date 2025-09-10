@@ -12,7 +12,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 import PromptDialog from './components/PromptDialog';
-import { Menu } from 'lucide-react';
+import { Menu, MessageCirclePlus } from 'lucide-react';
 
 function App() {
   // Authentication state
@@ -868,7 +868,7 @@ function App() {
             className="mobile-newchat-button"
             onClick={() => createNewSession()}
           >
-            +
+            <MessageCirclePlus className="h-5 w-5" />
           </button>
         )}
 
