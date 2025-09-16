@@ -440,7 +440,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                       
                       {/* File attachments and images for user messages */}
                       {message.files && message.files.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-primary-foreground/20">
+                        <div className="mt-2 pt-2 border-primary-foreground/20">
                           {/* Separate images and other files */}
                           {(() => {
                             const images = message.files.filter(file => {

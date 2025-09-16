@@ -38,6 +38,13 @@ const MessageInput = ({
     }
   }, [currentSession, settings?.defaultModel]);
 
+   // Initialize plugins and device detection
+  useEffect(() => {
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
+    setIsMobileDevice(isMobile);
+  }, []);
+
   // Handle initial content changes
   useEffect(() => {
     if (initialContent && initialContent !== message) {
@@ -172,28 +179,76 @@ const MessageInput = ({
   };
 
   const handleTextChange = (e) => {
-    setMessage(e.target.value);
-    
-    // Auto-resize textarea while keeping bottom row reserved
     const textarea = e.target;
+    setMessage(textarea.value);
+
+    // Calculate line height and max height for 8 lines
+    const lineHeight = 24; // matches your CSS line-height: 24px
+    const maxLines = 8;
+    const maxHeight = lineHeight * maxLines;
+    const minHeight = 54; // Your existing minHeight
+
+    // Reset height to calculate actual scroll height
     textarea.style.height = 'auto';
+
+    // Get the actual content height
+    const scrollHeight = textarea.scrollHeight;
+
+    // Set height with maximum limit
+    if (scrollHeight <= maxHeight) {
+      // Content fits within max lines - expand textarea
+      textarea.style.height = `${Math.max(scrollHeight, minHeight)}px`;
+      textarea.style.overflowY = 'hidden';
+    } else {
+      // Content exceeds max lines - fix height and enable scrolling
+      textarea.style.height = `${maxHeight}px`;
+      textarea.style.overflowY = 'auto';
+      
+      // Scroll to bottom to show latest text
+      textarea.scrollTop = textarea.scrollHeight;
+    }
+  };
+
+  const handlePaste = async (e) => {
+    const clipboardItems = e.clipboardData.items;
+    const imageFiles = [];
     
-    // Calculate the height needed for content
-    const contentHeight = textarea.scrollHeight;
-    const lineHeight = 20; // Approximate line height in pixels
-    const minRows = 2;
-    const bottomRowHeight = lineHeight; // Reserve space for one row at bottom
+    // Check for image files in clipboard
+    for (let i = 0; i < clipboardItems.length; i++) {
+      const item = clipboardItems[i];
+      
+      // Check if the item is an image
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          // Create a more descriptive filename with timestamp
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+          const extension = item.type.split('/')[1] || 'png';
+          const renamedFile = new File([file], `pasted-image-${timestamp}.${extension}`, {
+            type: item.type,
+            lastModified: Date.now()
+          });
+          imageFiles.push(renamedFile);
+        }
+      }
+    }
     
-    // Calculate minimum height (2 rows)
-    const minHeight = (minRows * lineHeight) + bottomRowHeight;
+    // If we found image files, add them to attached files
+    if (imageFiles.length > 0) {
+      e.preventDefault(); // Prevent default paste behavior for images
+      setAttachedFiles(prev => [...prev, ...imageFiles]);
+      
+      // Show feedback to user
+      const fileCount = imageFiles.length;
+      const message = fileCount === 1 ? 
+        `Image pasted and attached (${imageFiles[0].name})` : 
+        `${fileCount} images pasted and attached`;
+      
+      // You can add a toast notification here if you have toast functionality
+      console.log(message);
+    }
     
-    // Calculate maximum height (prevent excessive growth)
-    const maxRows = 8; // Adjust as needed
-    const maxHeight = (maxRows * lineHeight) + bottomRowHeight;
-    
-    // Set height ensuring minimum and maximum bounds
-    const newHeight = Math.max(minHeight, Math.min(contentHeight + bottomRowHeight, maxHeight));
-    textarea.style.height = newHeight + 'px';
+    // For text content, let the default paste behavior happen
   };
 
   const handleFileSelect = (e) => {
@@ -219,7 +274,7 @@ const MessageInput = ({
 
   return (
     <div className="border-border bg-background">
-      <div className="max-w-4xl mx-auto p-4 px-2">
+      <div className={`max-w-4xl mx-auto py-4`}>
         {attachedFiles.length > 0 && (
           <div className="mb-3 space-y-2">
             {attachedFiles.map((file, index) => (
@@ -266,26 +321,27 @@ const MessageInput = ({
               </div>
             )}
             
-            <div className="flex-1 rounded-3xl relative">{/* existing textarea content */}
+            <div className={`flex-1 rounded-3xl relative ${isMobileDevice ? '' : 'px-4'}`}> {/* existing textarea content */}
               <Textarea
                 ref={textareaRef}
                 value={message}
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
+                onPaste={handlePaste}
                 placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
-                className="chat-input resize-none pr-12 text-base leading-relaxed input-custom-scrollbar"
+                className="chat-input resize-none text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
                 style={{
-                  minHeight: '48px', // 2 rows + bottom reserved row (24px * 3)
-                  paddingBottom: '32px', // Extra padding for bottom row elements
+                  minHeight: '54px', // 2 rows + bottom reserved row (24px * 3)
+                  paddingBottom: '48px', // Extra padding for bottom row elements
                   lineHeight: '24px'
                 }}
               />
               
               {/* Model selector - positioned in reserved bottom area */}
               {shouldShowModelSelector && !disabled && (
-                <div className="absolute bottom-2 left-2 z-10">
+                <div className={`absolute bottom-2 z-10 ${isMobileDevice ? 'left-3 ' : 'left-6 '}`}>
                   <ModelSelector
                     availableModels={availableModels}
                     selectedModel={selectedModel}
@@ -300,11 +356,11 @@ const MessageInput = ({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="absolute bottom-2 right-9 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary z-10"
+                className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-8 ' : 'right-14 '}`}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isLoading}
               >
-                <Paperclip className="h-4 w-4" />
+                <Paperclip className="h-5 w-5" />
               </Button>
               
               <input
@@ -322,9 +378,9 @@ const MessageInput = ({
                 variant="ghost"
                 size="sm"
                 disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
-                className="absolute bottom-2 right-2 h-8 w-8 p-0 hover:bg-muted/80 hover:text-primary z-10"
+                className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-5 w-5" />
               </Button>
             </div>
           </div>
