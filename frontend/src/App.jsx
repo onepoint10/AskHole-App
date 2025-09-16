@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import AuthComponent from './components/AuthComponent';
+import AdminDashboard from './components/AdminDashboard';
 import ChatTabs from './components/ChatTabs';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
@@ -12,13 +13,16 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 import PromptDialog from './components/PromptDialog';
-import { Menu, MessageCirclePlus } from 'lucide-react';
+import { Menu, MessageCirclePlus, Shield } from 'lucide-react';
 
 function App() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  // Admin view state
+  const [showAdminDashboard, setShowAdminDashboard] = useState(false);
 
   // Core state management
   const [sessions, setSessions] = useState([]);
@@ -69,7 +73,7 @@ function App() {
     showTimestamps: false,
     autoSave: true,
     streamResponses: false,
-    maxTokens: 4096,
+    maxTokens: 20000,
   });
 
   const determineClientFromModel = (model) => {
@@ -107,6 +111,12 @@ function App() {
   const isConfigured = useMemo(() => 
     Boolean(settings.geminiApiKey || settings.openrouterApiKey), 
     [settings.geminiApiKey, settings.openrouterApiKey]
+  );
+
+  // Check if current user is admin (assuming user ID 2 is admin)
+  const isAdmin = useMemo(() => 
+    currentUser && currentUser.id === 2, 
+    [currentUser]
   );
 
   // Filter sessions for tabs (only show open tabs)
@@ -203,6 +213,7 @@ function App() {
       setActiveSessionId(null);
       setCurrentMessages([]);
       setPrompts([]);
+      setShowAdminDashboard(false);
       
       toast.success('Logged out successfully');
     } catch (error) {
@@ -212,6 +223,7 @@ function App() {
       document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
       setIsAuthenticated(false);
       setCurrentUser(null);
+      setShowAdminDashboard(false);
       toast.error('Logout failed, but you have been logged out locally');
     }
   }, []);
@@ -847,6 +859,33 @@ function App() {
     return <AuthComponent onAuthSuccess={handleAuthSuccess} />;
   }
 
+  // Show admin dashboard if admin user and admin mode is active
+  if (showAdminDashboard) {
+    return (
+      <div className="h-screen bg-background">
+        {/* Admin Dashboard Header */}
+        <div className="border-b bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-3">
+              <div className="flex items-center">
+                <Shield className="h-6 w-6 text-blue-600 mr-2" />
+                <h1 className="text-lg font-semibold text-gray-700">Admin Dashboard</h1>
+              </div>
+              <button
+                onClick={() => setShowAdminDashboard(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                Back to Chat
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <AdminDashboard />
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div className={`h-screen flex bg-background text-foreground ${isMobile ? 'mobile-root' : ''}`}>
@@ -888,6 +927,8 @@ function App() {
             onEditPrompt={updatePrompt}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onLogout={handleLogout}
+            isAdmin={isAdmin}
+            onOpenAdmin={() => setShowAdminDashboard(true)}
           />
         )}
         
@@ -912,6 +953,11 @@ function App() {
                 onLogout={handleLogout}
                 isMobileOverlay={true}
                 onRequestClose={() => setIsSidebarOpen(false)}
+                isAdmin={isAdmin}
+                onOpenAdmin={() => {
+                  setShowAdminDashboard(true);
+                  setIsSidebarOpen(false);
+                }}
               />
             </div>
           </div>

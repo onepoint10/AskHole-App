@@ -19,7 +19,8 @@ import {
   Globe,
   User,
   Heart,
-  Github
+  Github,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,7 +57,9 @@ const Sidebar = ({
   onOpenSettings,
   onLogout,
   isMobileOverlay = false,
-  onRequestClose
+  onRequestClose,
+  isAdmin,
+  onOpenAdmin
 }) => {
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
   const [promptContextMenu, setPromptContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, promptId: null });
@@ -354,17 +357,15 @@ const Sidebar = ({
           </div>
           {!isCollapsed && (
              <div className="flex items-center gap-1">
-              {isMobileOverlay && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={onNewSession}
-                  className="hover:bg-sidebar-accent flex-shrink-0"
-                  title="New Chat"
-                >
-                  <MessageCirclePlus className="h-4 w-4" />
-                </Button>
-              )}
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onNewSession}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title="New Chat"
+              >
+                <MessageCirclePlus className="h-4 w-4" />
+              </Button>                  
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -383,6 +384,17 @@ const Sidebar = ({
               >
                 <Settings className="h-4 w-4" />
               </Button>
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm" 
+                  onClick={onOpenAdmin}
+                  className="hover:bg-sidebar-accent flex-shrink-0"
+                  title="Admin Dashboard"
+                >
+                  <Shield className="h-4 w-4" />                  
+                </Button>
+               )}           
             </div>
           )}
         </div>

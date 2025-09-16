@@ -2,15 +2,15 @@
 const getApiBaseUrl = () => {
   // If we're in development and accessing via network IP, use the same IP for API
   const currentHost = window.location.hostname;
+  const currentProtocol = window.location.protocol;
+  const currentPort = window.location.port;
   
   // Check if we're accessing via a network IP (not localhost/127.0.0.1)
-  if (currentHost !== 'localhost' && currentHost !== '127.0.0.1') {
-    // Use the same host but port 5000 for API
+  if (currentPort === '5173' || currentPort === '3000' || currentPort === '8080') {
     return `http://${currentHost}:5000/api`;
   }
-  
-  // Default to localhost for local development
-  return 'http://127.0.0.1:5000/api';
+
+  return `${currentProtocol}//${currentHost}/api`;
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -509,4 +509,41 @@ export const usersAPI = {
       method: 'DELETE',
     });
   },
+};
+
+export const adminAPI = {
+  getOverviewStats: async () => apiCall('/admin/stats/overview'),
+  getUsageStats: async (days = 30) => apiCall(`/admin/stats/usage?days=${days}`),
+  getModelStats: async () => apiCall('/admin/stats/models'),
+  getUsers: async (page = 1, per_page = 10, search = '', active_only = false) => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: per_page.toString(),
+      search: search,
+      active_only: active_only.toString()
+    });
+    return apiCall(`/admin/users?${params.toString()}`);
+  },
+  updateUserStatus: async (userId, isActive) => apiCall(`/admin/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ is_active: isActive }),
+  }),
+  getSessions: async (page = 1, per_page = 10, userId = '', model = '') => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: per_page.toString()
+    });
+    if (userId) params.append('user_id', userId);
+    if (model) params.append('model', model);
+    return apiCall(`/admin/sessions?${params.toString()}`);
+  },
+  getFiles: async (page = 1, per_page = 10, userId = '') => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      per_page: per_page.toString()
+    });
+    if (userId) params.append('user_id', userId);
+    return apiCall(`/admin/files?${params.toString()}`);
+  },
+  getSystemInfo: async () => apiCall('/admin/system/info'),
 };

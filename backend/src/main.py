@@ -24,6 +24,7 @@ from src.models.user import User, UserSession
 from src.routes.user import user_bp
 from src.routes.chat import chat_bp
 from src.routes.auth import auth_bp
+from src.routes.admin import admin_bp
 from datetime import timedelta
 
 def create_app():
@@ -46,8 +47,8 @@ def create_app():
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
     
     # Flask timeout configurations
-    app.config['REQUEST_TIMEOUT'] = 120  # 120 seconds for request timeout
-    app.config['UPLOAD_TIMEOUT'] = 120   # 120 seconds for upload timeout
+    app.config['REQUEST_TIMEOUT'] = 150  # 120 seconds for request timeout
+    app.config['UPLOAD_TIMEOUT'] = 150   # 120 seconds for upload timeout
     
     # Ensure upload directory exists
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -69,6 +70,8 @@ def create_app():
     
     # Enable CORS for all routes with more specific configuration
     CORS(app,
+         origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.138:5173",
+                  "https://app.askhole.ru", "https://www.app.askhole.ru"],
          resources={r"/api/*": {"origins": "*", "supports_credentials": False}},
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
@@ -80,6 +83,7 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(chat_bp, url_prefix='/api')
+    app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
     # Create database tables
     with app.app_context():
@@ -162,8 +166,8 @@ app = create_app()
 if __name__ == '__main__':
     app = create_app()
     
-    logger.info("Starting Flask app with 120-second timeout for file operations...")
-    logger.info("File upload timeout: 120 seconds; Max file size: 100MB")
+    logger.info("Starting Flask app with 150-second timeout for file operations...")
+    logger.info("File upload timeout: 150 seconds; Max file size: 100MB")
     
     app.run(
         host='0.0.0.0',

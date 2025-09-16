@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify, session
+from functools import wraps
 from src.database import db
 from src.models.user import User, UserSession
 from datetime import datetime, timedelta
@@ -105,6 +106,38 @@ def get_current_user():
 
     print(f"Found user: {user_session.user.username}")
     return user_session.user
+
+
+def is_admin_user(user):
+    """
+    Check if user has admin privileges
+    For now, we'll consider the first user (ID 1) as admin
+    You can enhance this with a proper role system later
+    """
+    isAdmin = user.id == 2
+    print(f"user is admin: {isAdmin}")
+    return isAdmin
+
+
+
+def require_admin():
+    """
+    Decorator for admin-only routes
+    Usage: @require_admin()
+    """
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            current_user = get_current_user()
+            if not current_user:
+                return jsonify({'error': 'Authentication required'}), 401
+            if not is_admin_user(current_user):
+                return jsonify({'error': 'Admin access required'}), 403
+            return f(*args, **kwargs)
+
+        return decorated_function
+
+    return decorator
 
 
 @auth_bp.route('/register', methods=['POST'])
