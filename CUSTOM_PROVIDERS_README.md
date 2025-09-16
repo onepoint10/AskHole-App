@@ -42,21 +42,6 @@ The custom provider system works with any API that follows the OpenAI-compatible
 - **Nvidia Cloud**: Nvidia's AI services
 - **Any OpenAI-compatible API**: Including self-hosted models
 
-## Technical Details
-
-### Frontend Changes
-
-- **AddProviderDialog.jsx**: Dialog for adding custom providers
-- **AddModelDialog.jsx**: Dialog for adding custom models
-- **SettingsDialog.jsx**: Updated to include custom providers and models sections
-- **App.jsx**: Updated to handle custom providers in configuration
-- **ModelSelector.jsx**: Updated to display custom models
-
-### Backend Changes
-
-- **custom_client.py**: New client class for handling custom providers
-- **chat.py**: Updated to handle custom clients and models
-
 ### Data Storage
 
 Custom providers and models are stored in the browser's localStorage as part of the settings object.
