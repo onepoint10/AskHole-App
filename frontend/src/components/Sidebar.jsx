@@ -330,7 +330,7 @@ const Sidebar = ({
       style={{ width: `${sidebarWidth}px` }}
     >
       {/* Header */}
-      <div className="p-3 border-b border-sidebar-border">
+      <div className={`p-3 border-sidebar-border `}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div 
@@ -401,7 +401,7 @@ const Sidebar = ({
         
         {/* Tab Navigation */}
         {!isCollapsed && (
-          <div className="flex bg-sidebar-accent rounded-3xl p-1">
+          <div className="flex p-1 bg-sidebar-accent rounded-3xl">
             <Button
               variant={activeTab === 'history' ? 'default' : 'ghost'}
               size="sm"
@@ -440,8 +440,11 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'history' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setActiveTab('history')}
-              className="w-10 h-10 p-0"
+              onClick={() => {
+                setActiveTab('history');
+                setIsCollapsed(!isCollapsed);
+              }}
+              className="w-8 h-8 p-0"
               title="History"
             >
               <History className="h-4 w-4" />
@@ -449,8 +452,11 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'prompts' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setActiveTab('prompts')}
-              className="w-10 h-10 p-0"
+              onClick={() => {
+                setActiveTab('prompts');
+                setIsCollapsed(!isCollapsed);
+              }}
+              className="w-8 h-8 p-0"
               title="Prompts"
             >
               <Database className="h-4 w-4" />
@@ -458,8 +464,11 @@ const Sidebar = ({
             <Button
               variant={activeTab === 'public' ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => setActiveTab('public')}
-              className="w-10 h-10 p-0"
+              onClick={() => {
+                setActiveTab('public');
+                setIsCollapsed(!isCollapsed);                
+              }}
+              className="w-8 h-8 p-0"
               title="Public Prompts"
             >
               <Globe className="h-4 w-4" />
@@ -468,7 +477,7 @@ const Sidebar = ({
               variant="ghost" 
               size="sm" 
               onClick={onNewSession}
-              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              className="w-8 h-8 p-0 hover:bg-sidebar-accent"
               title="New Chat"
             >
               <MessageCirclePlus className="h-4 w-4" />
@@ -477,7 +486,7 @@ const Sidebar = ({
               variant="ghost" 
               size="sm" 
               onClick={() => setIsPromptDialogOpen(true)}
-              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              className="w-8 h-10 80 hover:bg-sidebar-accent"
               title="Create Prompt"
             >
               <BookPlus className="h-4 w-4" />
@@ -486,7 +495,7 @@ const Sidebar = ({
               variant="ghost" 
               size="sm" 
               onClick={onOpenSettings}
-              className="w-10 h-10 p-0 hover:bg-sidebar-accent"
+              className="w-8 h-8 p-0 hover:bg-sidebar-accent"
               title="Settings"
             >
               <Settings className="h-4 w-4" />
@@ -494,7 +503,7 @@ const Sidebar = ({
           </div>
           
           {/* Fixed Bottom Panel for Collapsed State */}
-          <div className="border-sidebar-border p-2 bg-background">
+          <div className="border-sidebar-border p-2">
             <div className="flex flex-col items-center space-y-2">
               <Button
                 variant="ghost"
@@ -509,7 +518,7 @@ const Sidebar = ({
                 variant="ghost"
                 size="sm"
                 onClick={onLogout}
-                className="w-10 h-10 p-0 hover:bg-destructive/10 hover:text-destructive"
+                className="w-10 h-10 p-0 mb-3 hover:bg-destructive/10 hover:text-destructive"
                 title="Log out"
               >
                 <LogOut className="h-4 w-4" />
@@ -520,7 +529,7 @@ const Sidebar = ({
       ) : (
         <>
           {/* Search */}
-          <div className="px-3 py-3 border-sidebar-border">
+          <div className="p-3 border-sidebar-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -876,9 +885,9 @@ const Sidebar = ({
           </ScrollArea>
 
           {/* Fixed Bottom Panel for Expanded State */}
-          <div className="border-sidebar-border p-3 bg-background">
+          <div className="border-sidebar-border p-3 bg-sidebar-accent rounded-t-3xl">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="sm"

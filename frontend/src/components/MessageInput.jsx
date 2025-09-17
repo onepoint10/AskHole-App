@@ -276,13 +276,13 @@ const MessageInput = ({
     <div className="border-border bg-background">
       <div className={`max-w-4xl mx-auto py-4`}>
         {attachedFiles.length > 0 && (
-          <div className="mb-3 space-y-2">
+          <div className={`mb-3 space-y-2 ${isMobileDevice ? '' : 'mx-4'}`}>
             {attachedFiles.map((file, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 bg-muted/50 rounded-3xl p-3 border border-border/50"
+                className={`flex items-center gap-3 bg-muted/50 rounded-3xl py-3 border border-border/50 `}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-1 min-w-0 ml-2">
                   <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                   <span className="text-sm font-medium truncate">{file.name}</span>
                   <span className="text-xs text-muted-foreground flex-shrink-0">
@@ -292,7 +292,7 @@ const MessageInput = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive"
+                  className={`h-6 w-6 p-0 hover:bg-destructive/10 hover:text-destructive ${isMobileDevice ? '' : 'mr-2'}`}
                   onClick={() => removeFile(index)}
                 >
                   <X className="h-3 w-3" />
@@ -313,7 +313,7 @@ const MessageInput = ({
           >
             {/* Drag overlay */}
             {isDragOver && (
-              <div className="absolute inset-0 bg-primary/5 border-2 border-primary/30 border-dashed rounded-4xl z-20 flex items-center justify-center">
+              <div className={`absolute inset-0 bg-primary/5 border-2 border-primary/30 border-dashed rounded-4xl z-20 flex items-center justify-center ${isMobileDevice ? '' : 'mx-4'}`}>
                 <div className="text-center p-4">
                   <Paperclip className="h-8 w-8 mx-auto mb-2 text-primary" />
                   <p className="text-sm font-medium text-primary">Drop files here to attach</p>
