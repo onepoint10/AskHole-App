@@ -14,6 +14,7 @@ import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './service
 import './App.css';
 import PromptDialog from './components/PromptDialog';
 import { Menu, MessageCirclePlus, Shield } from 'lucide-react';
+import { useSwipeGesture } from './hooks/useSwipeGesture';
 
 function App() {
   // Authentication state
@@ -45,6 +46,9 @@ function App() {
   // Mobile detection and sidebar state
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Integrate swipe gesture hook
+  const swipeHandlers = useSwipeGesture(isMobile, isSidebarOpen, setIsSidebarOpen);
 
   useEffect(() => {
     const detectMobile = () => {
@@ -888,7 +892,10 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className={`h-screen flex bg-background text-foreground ${isMobile ? 'mobile-root' : ''}`}>
+      <div
+        className={`h-screen flex bg-background text-foreground ${isMobile ? 'mobile-root' : ''}`}
+        {...swipeHandlers} // Apply swipe handlers here
+      >
         {/* Mobile toggle button */}
         {isMobile && (
           <button
