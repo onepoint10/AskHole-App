@@ -226,38 +226,43 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
-    """Login user with improved network compatibility"""
+    """Login user with improved network compatibility - supports email or username"""
     print("=== LOGIN ENDPOINT CALLED ===")
     print(f"Request method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
     print(f"Request cookies: {dict(request.cookies)}")
-    
+
     try:
         data = request.get_json()
         print(f"Request data: {data}")
-        
-        username = data.get('username', '').strip()
+
+        # Accept both 'username' and 'login' as the identifier field
+        login_identifier = data.get('username', '').strip() or data.get('login', '').strip()
         password = data.get('password', '')
 
         # Validation
-        if not username or not password:
-            print("Missing username or password")
-            return jsonify({'error': 'Username and password are required'}), 400
+        if not login_identifier or not password:
+            print("Missing login identifier or password")
+            return jsonify({'error': 'Username/email and password are required'}), 400
 
-        print(f"Attempting login for username: {username}")
+        print(f"Attempting login for identifier: {login_identifier}")
 
-        # Find user
-        user = User.query.filter_by(username=username).first()
+        # Find user by username OR email
+        user = User.query.filter(
+            (User.username == login_identifier) |
+            (User.email == login_identifier.lower())
+        ).first()
+
         if not user:
-            print(f"User not found: {username}")
-            return jsonify({'error': 'Invalid username or password'}), 401
+            print(f"User not found for identifier: {login_identifier}")
+            return jsonify({'error': 'Invalid username/email or password'}), 401
 
         # Check password
         if not user.check_password(password):
-            print(f"Invalid password for user: {username}")
-            return jsonify({'error': 'Invalid username or password'}), 401
+            print(f"Invalid password for user: {user.username}")
+            return jsonify({'error': 'Invalid username/email or password'}), 401
 
-        print(f"Password check passed for user: {username}")
+        print(f"Password check passed for user: {user.username}")
 
         # Create new session
         session_id = str(uuid.uuid4())
@@ -284,11 +289,11 @@ def login():
             },
             'session_id': session_id
         })
-        
+
         # Set session ID in response headers for frontend to capture
         response.headers['X-Session-ID'] = session_id
-        
-        print(f"Login successful for user: {username}")
+
+        print(f"Login successful for user: {user.username}")
         return response
 
     except Exception as e:
