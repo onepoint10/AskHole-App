@@ -721,15 +721,27 @@ function App() {
         p.id === prompt.id ? { ...p, usage_count: p.usage_count + 1 } : p
       ));
 
-      // Set the prompt content in the message input instead of sending it
-      setMessageInputContent(prompt.content);
-      
-      toast.success(`Applied "${prompt.title}" template to message input.`);
+      if (isMobile) {
+        // On mobile, create a new session and set the prompt content
+        const newSession = await createNewSession();
+        if (newSession) {
+          await selectSession(newSession.id); // Ensure the new session is active
+          setMessageInputContent(prompt.content);
+          toast.success(`Started new chat with "${prompt.title}" template.`);
+          setIsSidebarOpen(false); // Close sidebar after using prompt
+        } else {
+          toast.error("Failed to start new chat with prompt.");
+        }
+      } else {
+        // On desktop, just set the prompt content in the message input
+        setMessageInputContent(prompt.content);
+        toast.success(`Applied "${prompt.title}" template to message input.`);
+      }
     } catch (error) {
       console.error('Failed to use prompt:', error);
       toast.error("Failed to use prompt template.");
     }
-  }, []);
+  }, [isMobile, createNewSession, selectSession, setIsSidebarOpen]);
 
   const deletePrompt = useCallback(async (promptId) => {
     try {
