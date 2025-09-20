@@ -3,6 +3,7 @@ backend/src/routes/__pycache__
 backend/src/models/__pycache__
 backend/src/uploads
 backend/src/static
+backend/src/database
 frontend/node_modules
 frontend/dist
 frontend/static
