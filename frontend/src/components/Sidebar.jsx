@@ -20,7 +20,8 @@ import {
   User,
   Heart,
   Github,
-  Shield
+  Shield,
+  X // Import X icon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -538,7 +539,18 @@ const Sidebar = ({
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 rounded-3xl bg-sidebar-accent border-sidebar-border focus:border-sidebar-primary"
               />
-              {isSearching && (
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:bg-transparent"
+                  onClick={() => setSearchTerm('')}
+                  title="Clear search"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+              {isSearching && !searchTerm && (
                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
                 </div>
