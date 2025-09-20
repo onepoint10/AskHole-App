@@ -9,3 +9,4 @@ frontend/dist
 frontend/static
 
 frontend/package-lock.json
+backend/src/database/app.db
