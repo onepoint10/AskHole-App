@@ -1,4 +1,4 @@
-from src.database import db
+from src.database import db, encrypt_message, decrypt_message
 from datetime import datetime
 import json
 
@@ -69,6 +69,14 @@ class ChatMessage(db.Model):
     files = db.Column(db.Text)  # JSON string of file references
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @property
+    def decrypted_content(self):
+        return decrypt_message(self.content)
+
+    @decrypted_content.setter
+    def decrypted_content(self, value):
+        self.content = encrypt_message(value)
+
     def to_dict(self):
         # Get file information if files exist
         file_info = []
@@ -107,7 +115,7 @@ class ChatMessage(db.Model):
             'id': self.id,
             'session_id': self.session_id,
             'role': self.role,
-            'content': self.content,
+            'content': self.decrypted_content, # Return decrypted content
             'files': file_info,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
