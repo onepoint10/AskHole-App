@@ -607,8 +607,14 @@ def generate_image_route(session_id):
             upload_dir = os.path.join(current_app.root_path, 'uploads')
             os.makedirs(upload_dir, exist_ok=True)
             
-            # Generate a unique filename for the image
-            unique_filename = f"generated_image_{uuid.uuid4()}.png"
+            # Sanitize prompt for filename
+            sanitized_prompt = secure_filename(prompt.strip()[:50]) # Take first 50 chars and sanitize
+            if not sanitized_prompt:
+                sanitized_prompt = "generated_image"
+
+            # Generate a unique filename for the image using sanitized prompt and timestamp
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_filename = f"{sanitized_prompt}_{timestamp_str}_{uuid.uuid4().hex[:6]}.png"
             file_path = os.path.join(upload_dir, unique_filename)
             img.save(file_path)
 
@@ -616,7 +622,7 @@ def generate_image_route(session_id):
             file_upload = FileUpload(
                 user_id=current_user.id,
                 filename=unique_filename,
-                original_filename=f"generated_image_{i+1}.png",
+                original_filename=f"{sanitized_prompt}_{i+1}.png", # More meaningful original filename
                 file_path=file_path,
                 file_size=os.path.getsize(file_path),
                 mime_type='image/png'
