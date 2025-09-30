@@ -21,6 +21,9 @@ from PIL import Image
 import mimetypes
 from datetime import datetime
 import threading
+import time
+import random
+from google.api_core.exceptions import ResourceExhausted, InternalServerError, ServiceUnavailable
 
 
 class GeminiClient:
@@ -115,6 +118,34 @@ class GeminiClient:
             print(f"Error getting chat history for session {session_id}: {e}")
             return []
 
+    def retry_on_google_api_error(max_retries=5, initial_delay=10, backoff_factor=2):
+        """
+        Decorator to retry Google API calls on specific errors with exponential backoff.
+        """
+        def decorator(func):
+            def wrapper(*args, **kwargs):
+                for i in range(max_retries):
+                    try:
+                        return func(*args, **kwargs)
+                    except (ResourceExhausted, InternalServerError, ServiceUnavailable) as e:
+                        status_code = getattr(e, 'code', None)
+                        if status_code in [429, 500, 503]:
+                            delay = initial_delay * (backoff_factor ** i) + random.uniform(0, 1)
+                            print(f"Google API error {status_code} encountered. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
+                            time.sleep(delay)
+                        else:
+                            raise  # Re-raise other exceptions
+                    except Exception as e:
+                        # Catch other general exceptions that might not have a 'code' attribute
+                        # and re-raise them if they are not related to the specified status codes.
+                        # This is a fallback for unexpected error structures.
+                        print(f"An unexpected error occurred: {type(e).__name__}: {e}. Not retrying.")
+                        raise
+                raise Exception(f"Google API call failed after {max_retries} retries.")
+            return wrapper
+        return decorator
+
+    @retry_on_google_api_error()
     def generate_text(self, prompt: str, model: str, files=None, temperature: float = 1.0):
         """Generate text response (one-off, not part of chat session)"""
         content_parts = [prompt]
@@ -138,6 +169,7 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Text generation error: {str(e)}")
 
+    @retry_on_google_api_error()
     def chat_message(self, session_id: str, message: str, model: str = None, files=None, temperature: float = 1.0, history_messages=None):
         """Send message in chat mode - session keeps its original model.
 
@@ -177,6 +209,7 @@ class GeminiClient:
             print(f"Error in chat_message for session {session_id}: {str(e)}")
             raise Exception(f"Chat message error: {str(e)}")
 
+    @retry_on_google_api_error()
     def generate_image(self, prompt: str):
         """Generate image from text prompt"""
         try:
@@ -203,6 +236,7 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Image generation error: {str(e)}")
 
+    @retry_on_google_api_error()
     def edit_image(self, image_path: str, instruction: str):
         """Edit image based on instruction"""
         try:
@@ -232,6 +266,7 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Image editing error: {str(e)}")
 
+    @retry_on_google_api_error()
     async def generate_audio(self, prompt: str):
         """Generate audio from text prompt"""
         try:
@@ -264,6 +299,7 @@ class GeminiClient:
         except Exception as e:
             raise Exception(f"Audio generation error: {str(e)}")
 
+    @retry_on_google_api_error()
     async def process_audio_input(self, audio_path: str):
         """Process audio input and return audio response"""
         try:
