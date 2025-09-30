@@ -2,7 +2,7 @@
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Bot, Copy, Check, Trash2, Database } from 'lucide-react';
+import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react'; // Add Download icon
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
@@ -41,6 +41,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       return file;
     }
     return file.original_filename || file.filename || file.name || 'Unknown file';
+  }, []);
+
+  // Helper function to determine if a file is an image
+  const isImageFile = useCallback((file) => {
+    const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
+           (file.mime_type && file.mime_type.startsWith('image/'));
   }, []);
 
   // Initialize plugins and device detection
@@ -443,17 +450,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                         <div className="mt-2 pt-2 border-primary-foreground/20">
                           {/* Separate images and other files */}
                           {(() => {
-                            const images = message.files.filter(file => {
-                              const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
-                              return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
-                                     (file.mime_type && file.mime_type.startsWith('image/'));
-                            });
+                            const images = message.files.filter(file => isImageFile(file));
                             
-                            const otherFiles = message.files.filter(file => {
-                              const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
-                              return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
-                                     !(file.mime_type && file.mime_type.startsWith('image/'));
-                            });
+                            const otherFiles = message.files.filter(file => !isImageFile(file));
 
                             return (
                               <>
@@ -461,29 +460,35 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                 {images.length > 0 && (
                                   <div className="space-y-2">
                                     <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                      {images.map((image, index) => (
-                                        <div key={`image-${index}`} className="relative group">
-                                          <img
-                                            src={getFileUrl(image)}
-                                            alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
-                                            className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
-                                              isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
-                                            }`}
-                                            onClick={(e) => {
-                                              // Open image in new tab on click
-                                              const imgSrc = e.target.src;
-                                              window.open(imgSrc, '_blank');
-                                            }}
-                                            onError={(e) => {
-                                              // Hide broken images
-                                              e.target.style.display = 'none';
-                                            }}
-                                          />
-                                          <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
-                                            {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
+                                      {images.map((image, index) => {
+                                        const imageUrl = getFileUrl(image);
+                                        console.log("Image object:", image);
+                                        console.log("Image URL:", imageUrl);
+                                        return (
+                                          <div key={`image-${index}`} className="relative group">
+                                            <img
+                                              src={imageUrl}
+                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
+                                              className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
+                                                isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
+                                              }`}
+                                              onClick={(e) => {
+                                                // Open image in new tab on click
+                                                const imgSrc = e.target.src;
+                                                window.open(imgSrc, '_blank');
+                                              }}
+                                              onError={(e) => {
+                                                // Hide broken images
+                                                e.target.style.display = 'none';
+                                                console.error("Failed to load image:", imageUrl, e);
+                                              }}
+                                            />
+                                            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
+                                              {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
@@ -560,17 +565,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                         {message.files && message.files.length > 0 && (
                           <div className="mt-2 pt-2">
                             {(() => {
-                              const images = message.files.filter(file => {
-                                const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
-                                return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
-                                       (file.mime_type && file.mime_type.startsWith('image/'));
-                              });
+                              const images = message.files.filter(file => isImageFile(file));
                               
-                              const otherFiles = message.files.filter(file => {
-                                const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
-                                return !/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) && 
-                                       !(file.mime_type && file.mime_type.startsWith('image/'));
-                              });
+                              const otherFiles = message.files.filter(file => !isImageFile(file));
 
                               return (
                                 <>
@@ -579,37 +576,57 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                     <div className="space-y-2">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
                                         <span>🖼️</span>
-                                        <span>Referenced images:</span>
+                                        <span>Generated images:</span>
                                       </div>
                                       <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                        {images.map((image, index) => (
-                                          <div key={`image-${index}`} className="relative group">
-                                            <img
-                                              src={getFileUrl(image)}
-                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
-                                              className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
-                                                isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
-                                              }`}
-                                              onClick={(e) => {
-                                                const imgSrc = e.target.src;
-                                                window.open(imgSrc, '_blank');
-                                              }}
-                                              onError={(e) => {
-                                                e.target.style.display = 'none';
-                                              }}
-                                            />
-                                            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
-                                              {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
+                                        {images.map((image, index) => {
+                                          const imageUrl = getFileUrl(image);
+                                          console.log("Assistant Image object:", image);
+                                          console.log("Assistant Image URL:", imageUrl);
+                                          return (
+                                            <div key={`image-${index}`} className="relative group">
+                                              <img
+                                                src={imageUrl}
+                                                alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Generated Image ${index + 1}`)}
+                                                className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
+                                                  isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
+                                                }`}
+                                                onClick={(e) => {
+                                                  const imgSrc = e.target.src;
+                                                  window.open(imgSrc, '_blank');
+                                                }}
+                                                onError={(e) => {
+                                                  e.target.style.display = 'none';
+                                                  console.error("Failed to load assistant image:", imageUrl, e);
+                                                }}
+                                              />
+                                              <Button
+                                                variant="secondary"
+                                                size="sm"
+                                                className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 z-20"
+                                                onClick={() => {
+                                                  const link = document.createElement('a');
+                                                  link.href = imageUrl;
+                                                  link.download = image.original_filename || `generated-image-${new Date().toISOString().replace(/[:.]/g, '-')}.png`; // Use original filename for download
+                                                  document.body.appendChild(link);
+                                                  link.click();
+                                                  document.body.removeChild(link);
+                                                  toast.success("Image downloaded!");
+                                                }}
+                                                title="Download image"
+                                              >
+                                                <Download className="h-3.5 w-3.5" />
+                                              </Button>
                                             </div>
-                                          </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
 
                                   {/* Display other files */}
                                   {otherFiles.length > 0 && (
-                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-primary-foreground/10' : ''}`}>
+                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
                                       <div className="flex flex-wrap gap-1">
                                         {otherFiles.map((file, index) => (
                                           <span 

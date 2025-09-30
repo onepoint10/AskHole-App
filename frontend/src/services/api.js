@@ -303,6 +303,14 @@ export const sessionsAPI = {
     });
   },
 
+  generateImage: async (sessionId, imageData) => {
+    console.log('API Request: POST /sessions/' + sessionId + '/generate-image');
+    return apiCall(`/sessions/${sessionId}/generate-image`, {
+      method: 'POST',
+      body: JSON.stringify(imageData),
+    });
+  },
+
   clearSession: async (sessionId) => {
     console.log('API Request: POST /sessions/' + sessionId + '/clear');
     return apiCall(`/sessions/${sessionId}/clear`, {

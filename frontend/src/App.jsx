@@ -637,6 +637,75 @@ function App() {
     }
   }, [activeSessionId, setIsAuthenticated]);
 
+  const generateImage = useCallback(async (prompt) => {
+    if (!prompt || !prompt.trim()) {
+      toast.error("Please enter a prompt for image generation.");
+      return { success: false };
+    }
+
+    if (!activeSessionId) {
+      toast.error("No active session. Please create a new chat first.");
+      return { success: false };
+    }
+
+    const sessionExists = sessions.find(s => s.id === activeSessionId);
+    if (!sessionExists) {
+      toast.error("Active session not found. Please create a new chat.");
+      return { success: false };
+    }
+
+    const tempUserMessageId = `temp_image_prompt_${Date.now()}`;
+    const userMessage = {
+      id: tempUserMessageId,
+      role: 'user',
+      content: `Generate image: "${prompt.trim()}"`, // Indicate image generation
+      timestamp: new Date().toISOString(),
+      isTemporary: true,
+      isImageGeneration: true,
+    };
+
+    setCurrentMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await sessionsAPI.generateImage(activeSessionId, { prompt: prompt.trim() });
+
+      setCurrentMessages(prev => {
+        const withoutTemp = prev.filter(msg => msg.id !== tempUserMessageId);
+        return [
+          ...withoutTemp,
+          response.data.user_message,
+          response.data.assistant_message,
+        ];
+      });
+
+      setSessions(prev => prev.map(s => 
+        s.id === activeSessionId ? response.data.session : s
+      ));
+
+      toast.success("Image generated successfully!");
+      return { success: true };
+
+    } catch (error) {
+      console.error('Failed to generate image:', error);
+      setCurrentMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
+
+      let errorMessage = "Failed to generate image";
+      if (error.message.includes('Authentication required')) {
+        errorMessage = "Session expired. Please log in again.";
+        setIsAuthenticated(false);
+      } else if (error.message.includes('not configured')) {
+        errorMessage = "Please configure your API keys in settings before generating images.";
+      } else {
+        errorMessage = `Failed to generate image: ${error.message}`;
+      }
+      toast.error(errorMessage);
+      return { success: false, originalMessage: prompt };
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeSessionId, setIsAuthenticated]);
+
   // Add periodic file status checking
   const checkFileStatuses = useCallback(async (fileIds) => {
     if (!fileIds || fileIds.length === 0) return;
@@ -1003,6 +1072,7 @@ function App() {
           
           <MessageInput
             onSendMessage={sendMessage}
+            onImageGeneration={generateImage} // Pass the new image generation function
             isLoading={isLoading}
             disabled={!isConfigured}
             availableModels={availableModels}
