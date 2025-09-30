@@ -562,6 +562,100 @@ def send_message(session_id):
             return jsonify({'error': str(e)}), 500
 
 
+@chat_bp.route('/sessions/<session_id>/generate-image', methods=['POST'])
+def generate_image_route(session_id):
+    """Generate an image based on a text prompt and add to chat session."""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
+    data = request.get_json()
+    prompt = data.get('prompt', '')
+
+    if not prompt or not prompt.strip():
+        return jsonify({'error': 'Image generation prompt cannot be empty'}), 400
+
+    if not gemini_client:
+        return jsonify({'error': 'Gemini client not configured for image generation.'}), 500
+
+    # Save user's image generation prompt
+    user_message = ChatMessage(
+        session_id=session_id,
+        role='user',
+        content=f"Generate image: \"" + prompt.strip() + "\"",
+        is_image_generation=True
+    )
+    db.session.add(user_message)
+    db.session.flush() # Flush to get user_message.id for potential rollback
+
+    try:
+        # Generate image using Gemini client
+        images, description = gemini_client.generate_image(prompt=prompt.strip())
+
+        # Save generated images as FileUploads and link to assistant message
+        image_file_ids = []
+        for i, img in enumerate(images):
+            # Save image to disk
+            upload_dir = os.path.join(current_app.root_path, 'uploads')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Sanitize prompt for filename
+            sanitized_prompt = secure_filename(prompt.strip()[:50]) # Take first 50 chars and sanitize
+            if not sanitized_prompt:
+                sanitized_prompt = "generated_image"
+
+            # Generate a unique filename for the image using sanitized prompt and timestamp
+            timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+            unique_filename = f"{sanitized_prompt}_{timestamp_str}_{uuid.uuid4().hex[:6]}.png"
+            file_path = os.path.join(upload_dir, unique_filename)
+            img.save(file_path)
+
+            # Create FileUpload record
+            file_upload = FileUpload(
+                user_id=current_user.id,
+                filename=unique_filename,
+                original_filename=f"{sanitized_prompt}_{i+1}.png", # More meaningful original filename
+                file_path=file_path,
+                file_size=os.path.getsize(file_path),
+                mime_type='image/png'
+            )
+            db.session.add(file_upload)
+            db.session.flush() # Flush to get file_upload.id
+            image_file_ids.append(file_upload.id)
+
+        # Create assistant message with description and linked images
+        assistant_message_content = description if description else "Here are the images I generated based on your prompt."
+        assistant_message = ChatMessage(
+            session_id=session_id,
+            role='assistant',
+            content=assistant_message_content.strip(),
+            files=json.dumps(image_file_ids) if image_file_ids else None
+        )
+        db.session.add(assistant_message)
+
+        session.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'user_message': user_message.to_dict(),
+            'assistant_message': assistant_message.to_dict(),
+            'session': session.to_dict()
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.exception(f"Error in generate_image_route: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
 @chat_bp.route('/sessions/<session_id>/messages/<message_id>', methods=['DELETE'])
 def delete_message(session_id, message_id):
     """Delete a specific message from a chat session"""
@@ -1191,7 +1285,8 @@ def download_file(file_id):
     return send_from_directory(
         os.path.dirname(file_upload.file_path),
         os.path.basename(file_upload.file_path),
-        as_attachment=False,
+        as_attachment=False, # Change to False to allow inline display
+        download_name=file_upload.original_filename, # Use original filename for download
         mimetype=file_upload.mime_type or 'application/octet-stream'
     )
 

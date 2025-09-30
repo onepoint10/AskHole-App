@@ -67,6 +67,7 @@ class ChatMessage(db.Model):
     role = db.Column(db.String(20), nullable=False)  # 'user' or 'assistant'
     content = db.Column(db.Text, nullable=False)
     files = db.Column(db.Text)  # JSON string of file references
+    is_image_generation = db.Column(db.Boolean, default=False) # New field to indicate image generation messages
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -109,6 +110,7 @@ class ChatMessage(db.Model):
             'role': self.role,
             'content': self.content,
             'files': file_info,
+            'is_image_generation': self.is_image_generation, # Include in to_dict
             'timestamp': self.timestamp.isoformat() if self.timestamp else None
         }
 

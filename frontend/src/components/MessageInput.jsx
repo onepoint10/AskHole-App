@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X } from 'lucide-react';
+import { Send, Paperclip, X, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import ModelSelector from './ModelSelector';
@@ -15,13 +15,15 @@ const MessageInput = ({
   isMobileOverlay = false,
   settings,
   initialContent,
-  onContentSet
+  onContentSet,
+  onImageGeneration, // New prop for image generation
 }) => {
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isImageGenerationMode, setIsImageGenerationMode] = useState(false); // New state for image generation mode
   const dragCounterRef = useRef(0);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -124,7 +126,7 @@ const MessageInput = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (message.trim() || attachedFiles.length > 0) {
+    if (message.trim() || attachedFiles.length > 0 || isImageGenerationMode) { // Allow submission in image generation mode even with empty message
       // If we have an empty session, update its model before sending
       if (currentSession && currentSession.message_count === 0 && selectedModel !== currentSession.model) {
         console.log('Updating empty session model from', currentSession.model, 'to', selectedModel);
@@ -144,12 +146,18 @@ const MessageInput = ({
       }
       
       // Send message to current/updated session
-      const result = await onSendMessage(message.trim(), attachedFiles);
+      let result;
+      if (isImageGenerationMode) {
+        result = await onImageGeneration(message.trim()); // Call new prop for image generation
+      } else {
+        result = await onSendMessage(message.trim(), attachedFiles);
+      }
       
       // Only clear input if message was sent successfully
       if (result && result.success) {
         setMessage('');
         setAttachedFiles([]);
+        setIsImageGenerationMode(false); // Exit image generation mode on success
         // Reset textarea height after clearing
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
@@ -328,7 +336,7 @@ const MessageInput = ({
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 onPaste={handlePaste}
-                placeholder={disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole..."}
+                placeholder={isImageGenerationMode ? "Describe the image you want to generate..." : (disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole...")}
                 className="chat-input resize-none text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
@@ -340,7 +348,7 @@ const MessageInput = ({
               />
               
               {/* Model selector - positioned in reserved bottom area */}
-              {shouldShowModelSelector && !disabled && (
+              {shouldShowModelSelector && !disabled && !isImageGenerationMode && ( // Hide model selector in image generation mode
                 <div className={`absolute bottom-2 z-10 ${isMobileDevice ? 'left-3 ' : 'left-6 '}`}>
                   <ModelSelector
                     availableModels={availableModels}
@@ -351,6 +359,19 @@ const MessageInput = ({
                 </div>
               )}
               
+              {/* Image Generation Button - positioned next to file attachment */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-16 ' : 'right-22 '} ${isImageGenerationMode ? 'text-primary' : ''}`}
+                onClick={() => setIsImageGenerationMode(prev => !prev)}
+                disabled={disabled || isLoading}
+                title="Toggle Image Generation Mode"
+              >
+                <ImageIcon className="h-5 w-5" />
+              </Button>
+
               {/* File attachment button - positioned in reserved bottom area */}
               <Button
                 type="button"
@@ -358,7 +379,8 @@ const MessageInput = ({
                 size="sm"
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-8 ' : 'right-14 '}`}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || isLoading}
+                disabled={disabled || isLoading || isImageGenerationMode} // Disable when in image generation mode
+                title="Attach Files"
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
@@ -369,7 +391,8 @@ const MessageInput = ({
                 multiple
                 className="hidden"
                 onChange={handleFileSelect}
-                accept=".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.jsx,.html,.css,.xml"
+                accept={isImageGenerationMode ? "image/*" : ".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.jsx,.html,.css,.xml"} // Restrict to images in image generation mode
+                disabled={isImageGenerationMode} // Disable file input when in image generation mode
               />
               
               {/* Send button - positioned in reserved bottom area */}
@@ -377,7 +400,7 @@ const MessageInput = ({
                 type="submit"
                 variant="ghost"
                 size="sm"
-                disabled={(!message.trim() && attachedFiles.length === 0) || disabled || isLoading}
+                disabled={(!message.trim() && attachedFiles.length === 0 && !isImageGenerationMode) || (isImageGenerationMode && !message.trim()) || disabled || isLoading}
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
               >
                 <Send className="h-5 w-5" />
