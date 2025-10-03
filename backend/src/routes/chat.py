@@ -1365,7 +1365,7 @@ def search_content():
     
     for prompt in prompts:
         # Debug: Print prompt details
-        print(f"DEBUG: Checking prompt '{prompt.title}' - content length: {len(prompt.content) if prompt.content else 0}")
+        # print(f"DEBUG: Checking prompt '{prompt.title}' - content length: {len(prompt.content) if prompt.content else 0}")
         
         # Check if query matches prompt title, content, or category
         title_match = query_lower in prompt.title.lower()
