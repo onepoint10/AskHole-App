@@ -194,7 +194,7 @@ const MessageInput = ({
     const lineHeight = 24; // matches your CSS line-height: 24px
     const maxLines = 8;
     const maxHeight = lineHeight * maxLines;
-    const minHeight = 54; // Your existing minHeight
+    const minHeight = 60; // Your existing minHeight
 
     // Reset height to calculate actual scroll height
     textarea.style.height = 'auto';
@@ -341,8 +341,8 @@ const MessageInput = ({
                 disabled={disabled || isLoading}
                 rows={2}
                 style={{
-                  minHeight: '54px', // 2 rows + bottom reserved row (24px * 3)
-                  paddingBottom: '48px', // Extra padding for bottom row elements
+                  minHeight: '60px', // 2 rows + bottom reserved row (24px * 3)
+                  paddingBottom: '52px', // Extra padding for bottom row elements
                   lineHeight: '24px'
                 }}
               />
