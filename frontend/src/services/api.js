@@ -405,6 +405,9 @@ export const promptsAPI = {
     if (params.category?.trim()) {
       validatedParams.category = params.category.trim();
     }
+    if (params.tag?.trim()) { // Add this block to include tag parameter
+      validatedParams.tag = params.tag.trim();
+    }
     
     const queryParams = new URLSearchParams();
     Object.entries(validatedParams).forEach(([key, value]) => {

@@ -67,6 +67,7 @@ const Sidebar = ({
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [activeTab, setActiveTab] = useState('history');
   const [searchTerm, setSearchTerm] = useState('');
+  const [tagFilter, setTagFilter] = useState(''); // New state for tag filter
   const [searchResults, setSearchResults] = useState({ sessions: [], prompts: [] });
   const [isSearching, setIsSearching] = useState(false);
   const [newPrompt, setNewPrompt] = useState({ title: '', content: '', category: 'General', tags: '' });
@@ -122,14 +123,15 @@ const Sidebar = ({
     }
   };
 
-  const loadPublicPrompts = async () => {
+  const loadPublicPrompts = async (search = '', tag = '') => {
     try {
       setPublicPromptsLoading(true);
       setPublicPromptsError(null);
       const response = await promptsAPI.getPublicPrompts({
         page: 1,
         per_page: 50,
-        search: searchTerm.trim()
+        search: search.trim(),
+        tag: tag.trim()
       });
       setPublicPrompts(response.data.prompts || []);
     } catch (error) {
@@ -165,10 +167,10 @@ const Sidebar = ({
   // Enhanced search effect
   useEffect(() => {
     const searchContent = async () => {
-      if (!searchTerm.trim()) {
+      if (!searchTerm.trim() && !tagFilter) {
         setSearchResults({ sessions: [], prompts: [] });
         if (activeTab === 'public') {
-          loadPublicPrompts();
+          loadPublicPrompts(); // Load all public prompts if no search or tag filter
         }
         return;
       }
@@ -176,12 +178,7 @@ const Sidebar = ({
       setIsSearching(true);
       try {
         if (activeTab === 'public') {
-          const response = await promptsAPI.getPublicPrompts({
-            page: 1,
-            per_page: 50,
-            search: searchTerm
-          });
-          setPublicPrompts(response.data.prompts || []);
+          setPublicPromptsLoading(false);
         } else {
           const response = await sessionsAPI.searchContent(searchTerm);
           setSearchResults(response.data || { sessions: [], prompts: [] });
@@ -200,7 +197,17 @@ const Sidebar = ({
 
     const timeoutId = setTimeout(searchContent, 300);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, activeTab]);
+  }, [searchTerm, activeTab]); // Removed tagFilter from here
+
+  // Effect for loading public prompts when activeTab is 'public' or tagFilter changes
+  useEffect(() => {
+    if (activeTab === 'public') {
+      const timeoutId = setTimeout(() => {
+        loadPublicPrompts(searchTerm, tagFilter);
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [activeTab, searchTerm, tagFilter]);
 
   // Use search results when searching, otherwise use filtered local results
   const filteredSessions = searchTerm.trim() ? 
@@ -209,13 +216,14 @@ const Sidebar = ({
       session.title.toLowerCase().includes(searchTerm.toLowerCase())
     ) : []);
 
-  const filteredPrompts = searchTerm.trim() ? 
-    searchResults.prompts : 
-    (Array.isArray(prompts) ? prompts.filter(prompt =>
+  const filteredPrompts = (Array.isArray(prompts) ? prompts.filter(prompt =>
+    (searchTerm.trim() === '' || 
       prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prompt.content && prompt.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (prompt.category && prompt.category.toLowerCase().includes(searchTerm.toLowerCase()))
-    ) : []);
+    ) &&
+    (tagFilter === '' || (prompt.tags && prompt.tags.includes(tagFilter)))
+  ) : []);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -322,8 +330,11 @@ const Sidebar = ({
     window.open('https://github.com/onepoint10/AskHole-App', '_blank');
   };
 
-
-  
+  const handleTagFilter = (tag) => {
+    setTagFilter(tag);
+    setSearchTerm(''); // Clear search term when tag changes
+    setActiveTab(prev => prev === 'public' ? 'public' : 'prompts'); // Stay on current prompt tab
+  };
 
   return (
     <div 
@@ -680,6 +691,18 @@ const Sidebar = ({
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">Prompt Library</h3>
+                  {tagFilter && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTagFilter('')}
+                      className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
+                      title="Clear Tag Filter"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      {tagFilter}
+                    </Button>
+                  )}
                 </div>
                 {filteredPrompts.map((prompt) => (
                   <div
@@ -728,7 +751,15 @@ const Sidebar = ({
                         {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {prompt.tags.slice(0, 3).map((tag, index) => (
-                              <Badge key={index} variant="outline" className="text-xs">
+                              <Badge 
+                                key={index} 
+                                variant={tagFilter === tag ? 'default' : 'outline'} 
+                                className="text-xs cursor-pointer hover:bg-accent" 
+                                onClick={(e) => { 
+                                  e.stopPropagation();
+                                  handleTagFilter(tag);
+                                }}
+                              >
                                 <Tag className="h-2 w-2 mr-1" />
                                 {tag}
                               </Badge>
@@ -768,7 +799,7 @@ const Sidebar = ({
                 {filteredPrompts.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <Database className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm ? 'No matching prompts found' : 'No prompts found'}
+                    {searchTerm || tagFilter ? 'No matching prompts found' : 'No prompts found'}
                   </div>
                 )}
               </div>
@@ -787,6 +818,18 @@ const Sidebar = ({
                   >
                     <Globe className="h-4 w-4" />
                   </Button>
+                  {tagFilter && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setTagFilter('')}
+                      className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
+                      title="Clear Tag Filter"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      {tagFilter}
+                    </Button>
+                  )}
                 </div>
                 
                 {publicPromptsLoading && (
@@ -802,7 +845,7 @@ const Sidebar = ({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={loadPublicPrompts}
+                      onClick={() => loadPublicPrompts(searchTerm, tagFilter)}
                       className="mt-2 text-xs"
                     >
                       Retry
@@ -813,7 +856,7 @@ const Sidebar = ({
                 {!publicPromptsLoading && !publicPromptsError && publicPrompts.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm ? 'No matching public prompts found' : 'No public prompts available'}
+                    {searchTerm || tagFilter ? 'No matching public prompts found' : 'No public prompts available'}
                     {!searchTerm && (
                       <div className="mt-3">
                         <Button 
@@ -861,7 +904,15 @@ const Sidebar = ({
                             {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {prompt.tags.slice(0, 2).map((tag, index) => (
-                                  <Badge key={index} variant="outline" className="text-xs">
+                                  <Badge 
+                                    key={index} 
+                                    variant={tagFilter === tag ? 'default' : 'outline'} 
+                                    className="text-xs cursor-pointer hover:bg-accent" 
+                                    onClick={(e) => { 
+                                      e.stopPropagation();
+                                      handleTagFilter(tag);
+                                    }}
+                                  >
                                     <Tag className="h-2 w-2 mr-1" />
                                     {tag}
                                   </Badge>
@@ -976,6 +1027,7 @@ const Sidebar = ({
           <PublicPromptsLibrary 
             onUsePrompt={onUsePrompt}
             onClose={() => setIsPublicPromptsOpen(false)}
+            initialTagFilter={tagFilter} // Pass the current tagFilter from Sidebar
           />
         </DialogContent>
       </Dialog>

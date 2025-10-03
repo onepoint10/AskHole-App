@@ -889,6 +889,7 @@ def get_public_prompts():
     # Get query parameters
     search_query = request.args.get('search', '').strip()
     category_filter = request.args.get('category', '').strip()
+    tag_filter = request.args.get('tag', '').strip() # Retrieve tag filter
     page = max(1, int(request.args.get('page', 1)))
     per_page = min(100, max(1, int(request.args.get('per_page', 20))))  # Limit per_page to prevent abuse
 
@@ -911,6 +912,19 @@ def get_public_prompts():
         # Apply category filter
         if category_filter:
             query = query.filter(PromptTemplate.category.ilike(f'%{category_filter}%'))
+
+        # Apply tag filter
+        if tag_filter:
+            # Use JSON array containment pattern for exact tag match
+            # Handle both quoted and unquoted array elements
+            tag_pattern = f'%"{tag_filter}"%'  # For double-quoted strings
+            alt_pattern = f"%'{tag_filter}'%"  # For single-quoted strings
+            query = query.filter(
+                db.or_(
+                    PromptTemplate.tags.ilike(tag_pattern),
+                    PromptTemplate.tags.ilike(alt_pattern)
+                )
+            )
 
         # Order by popularity and recency
         query = query.order_by(
