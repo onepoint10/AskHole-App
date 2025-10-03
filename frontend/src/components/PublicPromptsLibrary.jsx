@@ -8,22 +8,25 @@ import { Heart, Search, User, Calendar, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { promptsAPI } from '@/services/api';
 
-const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
+const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) => {
   const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [tagFilter, setTagFilter] = useState(initialTagFilter); // Initialize with prop
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({});
   const [likedPrompts, setLikedPrompts] = useState(new Set());
 
-  const loadPublicPrompts = async (page = 1, search = '', category = '') => {
+  const loadPublicPrompts = async (page = 1, search = '', category = '', tag = '') => {
+    console.log('loadPublicPrompts called with:', { page, search, category, tag });
     try {
       setLoading(true);
       const response = await promptsAPI.getPublicPrompts({
         page,
         search,
         category,
+        tag, // Include tag in API call
         per_page: 12
       });
       
@@ -59,18 +62,36 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
   };
 
   useEffect(() => {
-    loadPublicPrompts(currentPage, searchQuery, categoryFilter);
-  }, [currentPage]);
+    loadPublicPrompts(currentPage, searchQuery, categoryFilter, tagFilter);
+  }, [currentPage, searchQuery, categoryFilter, tagFilter]);
+
+  // Effect to update tagFilter if initialTagFilter prop changes
+  useEffect(() => {
+    if (initialTagFilter !== tagFilter) {
+      console.log('initialTagFilter changed:', initialTagFilter, 'Updating tagFilter from', tagFilter);
+      setTagFilter(initialTagFilter);
+      setCurrentPage(1);
+    }
+  }, [initialTagFilter, tagFilter]); // Added tagFilter to dependencies to prevent infinite loop
 
   const handleSearch = () => {
     setCurrentPage(1);
-    loadPublicPrompts(1, searchQuery, categoryFilter);
+    loadPublicPrompts(1, searchQuery, categoryFilter, tagFilter);
   };
 
   const handleCategoryFilter = (category) => {
     setCategoryFilter(category);
+    setTagFilter(''); // Clear tag filter when category changes
     setCurrentPage(1);
-    loadPublicPrompts(1, searchQuery, category);
+    loadPublicPrompts(1, searchQuery, category, '');
+  };
+
+  const handleTagFilter = (tag) => {
+    console.log('handleTagFilter called with:', tag);
+    setTagFilter(tag);
+    setCategoryFilter(''); // Clear category filter when tag changes
+    setCurrentPage(1);
+    // The main useEffect will handle calling loadPublicPrompts
   };
 
   const handleLike = async (promptId) => {
@@ -113,6 +134,11 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
   const getUniqueCategories = () => {
     const categories = [...new Set(prompts.map(p => p.category))];
     return categories.filter(Boolean);
+  };
+
+  const getUniqueTags = () => {
+    const tags = [...new Set(prompts.flatMap(p => p.tags))];
+    return tags.filter(Boolean);
   };
 
   if (loading && prompts.length === 0) {
@@ -160,9 +186,9 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
         {/* Category Filters */}
         <div className="flex flex-wrap gap-2">
           <Button
-            variant={categoryFilter === '' ? 'default' : 'outline'}
+            variant={categoryFilter === '' && tagFilter === '' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => handleCategoryFilter('')}
+            onClick={() => { handleCategoryFilter(''); setTagFilter(''); }}
             disabled={loading}
           >
             All Categories
@@ -178,6 +204,16 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
               {category}
             </Button>
           ))}
+          {tagFilter && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => handleTagFilter('')}
+              disabled={loading}
+            >
+              Clear Tag: {tagFilter}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -189,7 +225,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
             <p className="text-muted-foreground">No public prompts found.</p>
             {searchQuery && (
               <p className="text-sm text-muted-foreground mt-2">
-                Try adjusting your search terms or category filter.
+                Try adjusting your search terms or category/filter.
               </p>
             )}
           </div>
@@ -236,7 +272,15 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose }) => {
                     {prompt.tags && prompt.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {prompt.tags.slice(0, 3).map((tag, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
+                          <Badge 
+                            key={index} 
+                            variant={tagFilter === tag ? 'default' : 'outline'} 
+                            className="text-xs cursor-pointer hover:bg-accent" 
+                            onClick={(e) => { 
+                              e.stopPropagation(); // Stop event propagation
+                              handleTagFilter(tag);
+                            }}
+                          >
                             {tag}
                           </Badge>
                         ))}

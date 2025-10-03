@@ -9,7 +9,8 @@ const PromptCard = ({
   onUsePrompt, 
   showAuthor = true, 
   showLikes = true, 
-  currentUser 
+  currentUser,
+  onTagClick
 }) => {
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(prompt.likes_count || 0);
@@ -139,7 +140,15 @@ const PromptCard = ({
           {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
             <>
               {prompt.tags.slice(0, 3).map((tag, index) => (
-                <Badge key={index} variant="outline" className="text-xs">
+                <Badge 
+                  key={index} 
+                  variant="outline" 
+                  className="text-xs cursor-pointer hover:bg-accent" 
+                  onClick={(e) => { 
+                    e.stopPropagation(); // Prevent triggering the prompt use action
+                    onTagClick?.(tag);
+                  }}
+                >
                   <Tag className="h-2 w-2 mr-1" />
                   {tag}
                 </Badge>
