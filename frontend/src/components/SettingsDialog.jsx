@@ -328,6 +328,7 @@ const SettingsDialog = ({
                   <SelectContent>
                     <SelectItem value="en">{t('english')}</SelectItem>
                     <SelectItem value="fr">{t('french')}</SelectItem>
+                    <SelectItem value="ru">{t('russian')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
