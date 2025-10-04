@@ -32,7 +32,7 @@ const setCookie = (name, value, days = 30) => {
 };
 
 // Helper function for making API calls with proper error handling
-const apiCall = async (url, options = {}) => {
+const apiCall = async (url, options = {}, language = 'en') => {
   // FIXED: Get session ID from multiple sources with better priority
   const sessionIdFromStorage = localStorage.getItem('session_id');
   const sessionIdFromCookie = getCookie('session');
@@ -43,12 +43,13 @@ const apiCall = async (url, options = {}) => {
   console.log(`API Call ${url}: session_id = ${sessionId}`);
   
   const defaultOptions = {
-    credentials: 'omit',  // Changed from 'include' to 'omit' to work with CORS
+    credentials: 'include',  // Changed to 'include' to ensure cookies are sent
     mode: 'cors',
     timeout: 120000, // Increased to 120 seconds to match backend timeout
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Accept-Language': language, // Use the passed language parameter
       // FIXED: Always send session ID in Authorization header for network requests
       ...(sessionId && { 
         'Authorization': `Bearer ${sessionId}`
@@ -126,12 +127,12 @@ const apiCall = async (url, options = {}) => {
 
 // Authentication API
 export const authAPI = {
-  register: async (userData) => {
+  register: async (userData, language) => {
     console.log('API Request: POST /auth/register');
     const response = await apiCall('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
-    });
+    }, language);
     
     // Handle session from registration response
     if (response.data.session_id) {
@@ -142,12 +143,12 @@ export const authAPI = {
     return response;
   },
 
-  login: async (credentials) => {
+  login: async (credentials, language) => {
     console.log('API Request: POST /auth/login');
     const response = await apiCall('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
-    });
+    }, language);
     
     // FIXED: Always prefer session_id from response data for network compatibility
     if (response.data.session_id) {
@@ -167,12 +168,12 @@ export const authAPI = {
     return response;
   },
 
-  logout: async () => {
+  logout: async (language) => {
     console.log('API Request: POST /auth/logout');
     try {
       const response = await apiCall('/auth/logout', {
         method: 'POST',
-      });
+      }, language);
       
       // Clear session data after successful logout
       localStorage.removeItem('session_id');
@@ -187,15 +188,15 @@ export const authAPI = {
     }
   },
 
-  getCurrentUser: async () => {
+  getCurrentUser: async (language) => {
     console.log('API Request: GET /auth/me');
-    return apiCall('/auth/me');
+    return apiCall('/auth/me', {}, language);
   },
 
-  checkAuth: async () => {
+  checkAuth: async (language) => {
     console.log('API Request: GET /auth/check');
     try {
-      return await apiCall('/auth/check');
+      return await apiCall('/auth/check', {}, language);
     } catch (error) {
       // If auth check fails, clear potentially invalid session data
       if (error.message.includes('Authentication required')) {
@@ -209,80 +210,80 @@ export const authAPI = {
 
 // Configuration API
 export const configAPI = {
-  setConfig: async (config) => {
+  setConfig: async (config, language) => {
     console.log('API Request: POST /config');
     return apiCall('/config', {
       method: 'POST',
       body: JSON.stringify(config),
-    });
+    }, language);
   },
 
-  getModels: async () => {
+  getModels: async (language) => {
     console.log('API Request: GET /models');
-    return apiCall('/models');
+    return apiCall('/models', {}, language);
   },
 };
 
 // Sessions API
 export const sessionsAPI = {
-  getSessions: async () => {
+  getSessions: async (language) => {
     console.log('API Request: GET /sessions');
-    return apiCall('/sessions');
+    return apiCall('/sessions', {}, language);
   },
   
-  getSessionHistory: async () => {
+  getSessionHistory: async (language) => {
     console.log('API Request: GET /sessions/history');
-    return apiCall('/sessions/history');
+    return apiCall('/sessions/history', {}, language);
   },
 
-  createSession: async (sessionData) => {
+  createSession: async (sessionData, language) => {
     console.log('API Request: POST /sessions');
     return apiCall('/sessions', {
       method: 'POST',
       body: JSON.stringify(sessionData),
-    });
+    }, language);
   },
 
-  getSession: async (sessionId) => {
+  getSession: async (sessionId, language) => {
     console.log('API Request: GET /sessions/' + sessionId);
-    return apiCall(`/sessions/${sessionId}`);
+    return apiCall(`/sessions/${sessionId}`, {}, language);
   },
 
-  updateSession: async (sessionId, updates) => {
+  updateSession: async (sessionId, updates, language) => {
     console.log('API Request: PUT /sessions/' + sessionId);
     return apiCall(`/sessions/${sessionId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
-    });
+    }, language);
   },
 
-  deleteSession: async (sessionId) => {
+  deleteSession: async (sessionId, language) => {
     console.log('API Request: DELETE /sessions/' + sessionId);
     return apiCall(`/sessions/${sessionId}`, {
       method: 'DELETE',
-    });
+    }, language);
   },
 
-  closeSession: async (sessionId) => {
+  closeSession: async (sessionId, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/close');
     return apiCall(`/sessions/${sessionId}/close`, {
       method: 'POST',
-    });
+    }, language);
   },
 
-  reopenSession: async (sessionId) => {
+  reopenSession: async (sessionId, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/reopen');
     return apiCall(`/sessions/${sessionId}/reopen`, {
       method: 'POST',
-    });
+    }, language);
   },
 
-  searchContent: async (query) => {
+  searchContent: async (query, language) => {
     console.log('API Request: GET /search?q=' + query);
-    return apiCall(`/search?q=${encodeURIComponent(query)}`);
+    return apiCall(`/search?q=${encodeURIComponent(query)}`, {}, language);
   },
 
-  sendMessage: async (sessionId, messageData) => {
+  sendMessage: async (sessionId, messageData, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/messages');
     
     // Validate message data before sending
@@ -293,40 +294,40 @@ export const sessionsAPI = {
     return apiCall(`/sessions/${sessionId}/messages`, {
       method: 'POST',
       body: JSON.stringify(messageData),
-    });
+    }, language);
   },
 
-  deleteMessage: async (sessionId, messageId) => {
+  deleteMessage: async (sessionId, messageId, language) => {
     console.log('API Request: DELETE /sessions/' + sessionId + '/messages/' + messageId);
     return apiCall(`/sessions/${sessionId}/messages/${messageId}`, {
       method: 'DELETE',
-    });
+    }, language);
   },
 
-  generateImage: async (sessionId, imageData) => {
+  generateImage: async (sessionId, imageData, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/generate-image');
     return apiCall(`/sessions/${sessionId}/generate-image`, {
       method: 'POST',
       body: JSON.stringify(imageData),
-    });
+    }, language);
   },
 
-  clearSession: async (sessionId) => {
+  clearSession: async (sessionId, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/clear');
     return apiCall(`/sessions/${sessionId}/clear`, {
       method: 'POST',
-    });
+    }, language);
   },
 };
 
 // Prompts API
 export const promptsAPI = {
-  getPrompts: async () => {
+  getPrompts: async (language) => {
     console.log('API Request: GET /prompts');
-    return apiCall('/prompts');
+    return apiCall('/prompts', {}, language);
   },
 
-  createPrompt: async (promptData) => {
+  createPrompt: async (promptData, language) => {
     console.log('API Request: POST /prompts', { title: promptData.title, is_public: promptData.is_public });
     
     // Validate required fields on frontend
@@ -349,10 +350,10 @@ export const promptsAPI = {
     return apiCall('/prompts', {
       method: 'POST',
       body: JSON.stringify(cleanData),
-    });
+    }, language);
   },
 
-  updatePrompt: async (promptId, updates) => {
+  updatePrompt: async (promptId, updates, language) => {
     console.log('API Request: PUT /prompts/' + promptId, { is_public: updates.is_public });
     
     // Validate if updating title or content
@@ -373,24 +374,24 @@ export const promptsAPI = {
     return apiCall(`/prompts/${promptId}`, {
       method: 'PUT',
       body: JSON.stringify(cleanUpdates),
-    });
+    }, language);
   },
 
-  deletePrompt: async (promptId) => {
+  deletePrompt: async (promptId, language) => {
     console.log('API Request: DELETE /prompts/' + promptId);
     return apiCall(`/prompts/${promptId}`, {
       method: 'DELETE',
-    });
+    }, language);
   },
 
-  usePrompt: async (promptId) => {
+  usePrompt: async (promptId, language) => {
     console.log('API Request: POST /prompts/' + promptId + '/use');
     return apiCall(`/prompts/${promptId}/use`, {
       method: 'POST',
-    });
+    }, language);
   },
 
-  getPublicPrompts: async (params = {}) => {
+  getPublicPrompts: async (params = {}, language) => {
     console.log('API Request: GET /public-prompts', params);
     
     // Validate parameters
@@ -419,10 +420,10 @@ export const promptsAPI = {
     const queryString = queryParams.toString();
     const url = queryString ? `/public-prompts?${queryString}` : '/public-prompts';
     
-    return apiCall(url);
+    return apiCall(url, {}, language);
   },
 
-  likePrompt: async (promptId) => {
+  likePrompt: async (promptId, language) => {
     console.log('API Request: POST /prompts/' + promptId + '/like');
     
     if (!promptId || isNaN(promptId)) {
@@ -431,28 +432,28 @@ export const promptsAPI = {
     
     return apiCall(`/prompts/${promptId}/like`, {
       method: 'POST',
-    });
+    }, language);
   },
 
-  getPromptLikeStatus: async (promptId) => {
+  getPromptLikeStatus: async (promptId, language) => {
     console.log('API Request: GET /prompts/' + promptId + '/like-status');
     
     if (!promptId || isNaN(promptId)) {
       throw new Error('Invalid prompt ID');
     }
     
-    return apiCall(`/prompts/${promptId}/like-status`);
+    return apiCall(`/prompts/${promptId}/like-status`, {}, language);
   },
 };
 
 // Files API
 export const filesAPI = {
-  getFiles: async () => {
+  getFiles: async (language) => {
     console.log('API Request: GET /files');
-    return apiCall('/files');
+    return apiCall('/files', {}, language);
   },
 
-  uploadFile: async (file) => {
+  uploadFile: async (file, language) => {
     console.log('API Request: POST /files/upload');
     
     // Validate file before upload
@@ -478,83 +479,83 @@ export const filesAPI = {
           'Authorization': `Bearer ${sessionId}`
         }),
       },
-    });
+    }, language);
   },
 
-  deleteFile: async (fileId) => {
+  deleteFile: async (fileId, language) => {
     console.log('API Request: DELETE /files/' + fileId);
     return apiCall(`/files/${fileId}`, {
       method: 'DELETE',
-    });
+    }, language);
   },
 
-  getFileStatus: async (fileId) => {
+  getFileStatus: async (fileId, language) => {
     console.log('API Request: GET /files/' + fileId + '/status');
-    return apiCall(`/files/${fileId}/status`);
+    return apiCall(`/files/${fileId}/status`, {}, language);
   },
 };
 
 // Users API
 export const usersAPI = {
-  getUsers: async () => {
+  getUsers: async (language) => {
     console.log('API Request: GET /users');
-    return apiCall('/users');
+    return apiCall('/users', {}, language);
   },
 
-  getUser: async (userId) => {
+  getUser: async (userId, language) => {
     console.log('API Request: GET /users/' + userId);
-    return apiCall(`/users/${userId}`);
+    return apiCall(`/users/${userId}`, {}, language);
   },
 
-  updateUser: async (userId, updates) => {
+  updateUser: async (userId, updates, language) => {
     console.log('API Request: PUT /users/' + userId);
     return apiCall(`/users/${userId}`, {
       method: 'PUT',
       body: JSON.stringify(updates),
-    });
+    }, language);
   },
 
-  deleteUser: async (userId) => {
+  deleteUser: async (userId, language) => {
     console.log('API Request: DELETE /users/' + userId);
     return apiCall(`/users/${userId}`, {
       method: 'DELETE',
-    });
+    }, language);
   },
 };
 
 export const adminAPI = {
-  getOverviewStats: async () => apiCall('/admin/stats/overview'),
-  getUsageStats: async (days = 30) => apiCall(`/admin/stats/usage?days=${days}`),
-  getModelStats: async () => apiCall('/admin/stats/models'),
-  getUsers: async (page = 1, per_page = 10, search = '', active_only = false) => {
+  getOverviewStats: async (language) => apiCall('/admin/stats/overview', {}, language),
+  getUsageStats: async (days = 30, language) => apiCall(`/admin/stats/usage?days=${days}`, {}, language),
+  getModelStats: async (language) => apiCall('/admin/stats/models', {}, language),
+  getUsers: async (page = 1, per_page = 10, search = '', active_only = false, language) => {
     const params = new URLSearchParams({
       page: page.toString(),
       per_page: per_page.toString(),
       search: search,
       active_only: active_only.toString()
     });
-    return apiCall(`/admin/users?${params.toString()}`);
+    return apiCall(`/admin/users?${params.toString()}`, {}, language);
   },
-  updateUserStatus: async (userId, isActive) => apiCall(`/admin/users/${userId}`, {
+  updateUserStatus: async (userId, isActive, language) => apiCall(`/admin/users/${userId}`, {
     method: 'PUT',
     body: JSON.stringify({ is_active: isActive }),
-  }),
-  getSessions: async (page = 1, per_page = 10, userId = '', model = '') => {
+  }, language),
+  getSessions: async (page = 1, per_page = 10, userId = '', model = '', language) => {
     const params = new URLSearchParams({
       page: page.toString(),
       per_page: per_page.toString()
     });
     if (userId) params.append('user_id', userId);
     if (model) params.append('model', model);
-    return apiCall(`/admin/sessions?${params.toString()}`);
+    return apiCall(`/admin/sessions?${params.toString()}`, {}, language);
   },
-  getFiles: async (page = 1, per_page = 10, userId = '') => {
+  getFiles: async (page = 1, per_page = 10, userId = '', language) => {
     const params = new URLSearchParams({
       page: page.toString(),
       per_page: per_page.toString()
     });
     if (userId) params.append('user_id', userId);
-    return apiCall(`/admin/files?${params.toString()}`);
+    return apiCall(`/admin/files?${params.toString()}`, {}, language);
   },
-  getSystemInfo: async () => apiCall('/admin/system/info'),
+  getSystemInfo: async (language) => apiCall('/admin/system/info', {}, language),
 };

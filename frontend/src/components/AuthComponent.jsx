@@ -6,8 +6,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Loader2, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const AuthComponent = ({ onAuthSuccess }) => {
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
@@ -41,13 +43,13 @@ const AuthComponent = ({ onAuthSuccess }) => {
 
   const validatePassword = (password) => {
     if (password.length < 6) {
-      return 'Password must be at least 6 characters long';
+      return t('password_too_short');
     }
     if (!/[A-Za-z]/.test(password)) {
-      return 'Password must contain at least one letter';
+      return t('password_must_contain_letter');
     }
     if (!/[0-9]/.test(password)) {
-      return 'Password must contain at least one number';
+      return t('password_must_contain_number');
     }
     return null;
   };
@@ -57,7 +59,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
     setErrors({});
     
     if (!loginForm.username.trim() || !loginForm.password) {
-      setErrors({ general: 'Please fill in all fields' });
+      setErrors({ general: t('please_fill_all_fields') });
       return;
     }
 
@@ -77,22 +79,22 @@ const AuthComponent = ({ onAuthSuccess }) => {
       // The API client should already handle session storage
       // Just verify we have user data
       if (response.data.user) {
-        toast.success('Login successful!');
+        toast.success(t('login_successful'));
         onAuthSuccess(response.data.user);
       } else {
-        throw new Error('Invalid response from server');
+        throw new Error(t('invalid_response_from_server'));
       }
     } catch (error) {
       console.error('Login error:', error);
       
       // More specific error handling
-      let errorMessage = 'Login failed';
+      let errorMessage = t('login_failed');
       if (error.message.includes('Invalid username')) {
-        errorMessage = 'Invalid username or password';
+        errorMessage = t('invalid_username_or_password');
       } else if (error.message.includes('Authentication')) {
-        errorMessage = 'Authentication failed. Please try again.';
+        errorMessage = t('authentication_failed_try_again');
       } else if (error.message.includes('Network')) {
-        errorMessage = 'Network error. Please check your connection.';
+        errorMessage = t('network_error_check_connection');
       } else {
         errorMessage = error.message || errorMessage;
       }
@@ -111,17 +113,17 @@ const AuthComponent = ({ onAuthSuccess }) => {
     
     // Validation
     if (!registerForm.username.trim()) {
-      newErrors.username = 'Username is required';
+      newErrors.username = t('username_is_required');
     } else if (registerForm.username.trim().length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
+      newErrors.username = t('username_min_length', { length: 3 });
     } else if (registerForm.username.trim().length > 80) {
-      newErrors.username = 'Username must be less than 80 characters';
+      newErrors.username = t('username_max_length', { length: 80 });
     }
     
     if (!registerForm.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = t('email_is_required');
     } else if (!validateEmail(registerForm.email)) {
-      newErrors.email = 'Please enter a valid email address';
+      newErrors.email = t('please_enter_valid_email');
     }
     
     const passwordError = validatePassword(registerForm.password);
@@ -130,7 +132,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
     }
     
     if (registerForm.password !== registerForm.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = t('passwords_do_not_match');
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -153,24 +155,24 @@ const AuthComponent = ({ onAuthSuccess }) => {
       console.log('Registration response:', response.data);
 
       if (response.data.user) {
-        toast.success('Registration successful! Welcome!');
+        toast.success(t('registration_successful_welcome'));
         onAuthSuccess(response.data.user);
       } else {
-        throw new Error('Invalid response from server');
+        throw new Error(t('invalid_response_from_server'));
       }
     } catch (error) {
       console.error('Registration error:', error);
       
       // More specific error handling
-      let errorMessage = 'Registration failed';
+      let errorMessage = t('registration_failed');
       if (error.message.includes('Username already exists')) {
-        setErrors({ username: 'Username already exists' });
+        setErrors({ username: t('username_already_exists') });
         return;
       } else if (error.message.includes('Email already registered')) {
-        setErrors({ email: 'Email already registered' });
+        setErrors({ email: t('email_already_registered') });
         return;
       } else if (error.message.includes('Network')) {
-        errorMessage = 'Network error. Please check your connection.';
+        errorMessage = t('network_error_check_connection');
       } else {
         errorMessage = error.message || errorMessage;
       }
@@ -204,17 +206,17 @@ const AuthComponent = ({ onAuthSuccess }) => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Welcome to AskHole</CardTitle>
+          <CardTitle className="text-2xl font-bold">{t('welcome_to_askhole')}</CardTitle>
           <CardDescription>
-            Sign in to your account or create a new one
+            {t('signin_or_create_account')}
           </CardDescription>
         </CardHeader>
         
         <CardContent>
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login">{t('login')}</TabsTrigger>
+              <TabsTrigger value="register">{t('register')}</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login" className="space-y-4 mt-6">
@@ -224,7 +226,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Username or email"
+                      placeholder={t('username_or_email')}
                       value={loginForm.username}
                       onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                       className="pl-10"
@@ -239,7 +241,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Password"
+                      placeholder={t('password')}
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       className="pl-10 pr-10"
@@ -268,10 +270,10 @@ const AuthComponent = ({ onAuthSuccess }) => {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
+                      {t('signing_in')}
                     </>
                   ) : (
-                    'Sign In'
+                    t('sign_in')
                   )}
                 </Button>
               </form>
@@ -284,7 +286,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Username"
+                      placeholder={t('username')}
                       value={registerForm.username}
                       onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
                       className="pl-10"
@@ -302,7 +304,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="email"
-                      placeholder="Email"
+                      placeholder={t('email')}
                       value={registerForm.email}
                       onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       className="pl-10"
@@ -320,7 +322,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Password"
+                      placeholder={t('password')}
                       value={registerForm.password}
                       onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                       className="pl-10 pr-10"
@@ -347,7 +349,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       type={showPassword ? "text" : "password"}
-                      placeholder="Confirm Password"
+                      placeholder={t('confirm_password')}
                       value={registerForm.confirmPassword}
                       onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                       className="pl-10"
@@ -370,10 +372,10 @@ const AuthComponent = ({ onAuthSuccess }) => {
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating account...
+                      {t('creating_account')}
                     </>
                   ) : (
-                    'Create Account'
+                    t('create_account')
                   )}
                 </Button>
               </form>
@@ -382,14 +384,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
           
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              {activeTab === 'login' ? "Don't have an account? " : "Already have an account? "}
+              {activeTab === 'login' ? t('dont_have_account') : t('already_have_account')}
               <button
                 type="button"
                 onClick={() => handleTabChange(activeTab === 'login' ? 'register' : 'login')}
                 className="text-primary hover:underline font-medium transition-colors"
                 disabled={isLoading}
               >
-                {activeTab === 'login' ? 'Sign up' : 'Sign in'}
+                {activeTab === 'login' ? t('sign_up') : t('sign_in')}
               </button>
             </p>
           </div>

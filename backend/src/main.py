@@ -69,12 +69,13 @@ def create_app():
     werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
     
     # Enable CORS for all routes with more specific configuration
+    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.138:5173",
+                       "https://app.askhole.ru", "https://www.app.askhole.ru"]
     CORS(app,
-         origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.138:5173",
-                  "https://app.askhole.ru", "https://www.app.askhole.ru"],
-         resources={r"/api/*": {"origins": "*", "supports_credentials": False}},
+         origins=allowed_origins,
+         resources={r"/api/*": {"origins": allowed_origins, "supports_credentials": True}},
          methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID"],
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cookie", "Set-Cookie", "X-Session-ID", "Accept-Language"],
          expose_headers=["Set-Cookie", "X-Session-ID"],
          intercept_exceptions=False
          )
