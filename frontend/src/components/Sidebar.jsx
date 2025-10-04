@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Settings, 
   Database, 
@@ -62,6 +63,7 @@ const Sidebar = ({
   isAdmin,
   onOpenAdmin
 }) => {
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
   const [promptContextMenu, setPromptContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, promptId: null });
   const [editingSessionId, setEditingSessionId] = useState(null);
@@ -136,7 +138,7 @@ const Sidebar = ({
       setPublicPrompts(response.data.prompts || []);
     } catch (error) {
       console.error('Failed to load public prompts for sidebar:', error);
-      setPublicPromptsError('Failed to load public prompts');
+      setPublicPromptsError(t('failed_to_load_public_prompts'));
       setPublicPrompts([]);
     } finally {
       setPublicPromptsLoading(false);
@@ -187,7 +189,7 @@ const Sidebar = ({
         console.error('Search failed:', error);
         setSearchResults({ sessions: [], prompts: [] });
         if (activeTab === 'public') {
-          setPublicPromptsError('Search failed');
+          setPublicPromptsError(t('search_failed'));
           setPublicPrompts([]);
         }
       } finally {
@@ -197,7 +199,7 @@ const Sidebar = ({
 
     const timeoutId = setTimeout(searchContent, 300);
     return () => clearTimeout(timeoutId);
-  }, [searchTerm, activeTab]); // Removed tagFilter from here
+  }, [searchTerm, activeTab, t]); // Added t to dependency array
 
   // Effect for loading public prompts when activeTab is 'public' or tagFilter changes
   useEffect(() => {
@@ -231,9 +233,9 @@ const Sidebar = ({
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    if (diffDays === 1) return 'Today';
-    if (diffDays === 2) return 'Yesterday';
-    if (diffDays <= 7) return `${diffDays - 1} days ago`;
+    if (diffDays === 1) return t('today');
+    if (diffDays === 2) return t('yesterday');
+    if (diffDays <= 7) return t('days_ago', { count: diffDays - 1 });
     return date.toLocaleDateString();
   };
 
@@ -350,7 +352,7 @@ const Sidebar = ({
               onClick={toggleCollapse}
               onMouseEnter={() => setIsHoveringLogo(true)}
               onMouseLeave={() => setIsHoveringLogo(false)}
-              title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={isCollapsed ? t('expand_sidebar') : t('collapse_sidebar')}
             >
               {isHoveringLogo ? (
                 isCollapsed ? 
@@ -374,7 +376,7 @@ const Sidebar = ({
                 size="sm" 
                 onClick={onNewSession}
                 className="hover:bg-sidebar-accent flex-shrink-0"
-                title="New Chat"
+                title={t('new_chat')}
               >
                 <MessageCirclePlus className="h-4 w-4" />
               </Button>                  
@@ -383,7 +385,7 @@ const Sidebar = ({
                 size="sm" 
                 onClick={() => setIsPromptDialogOpen(true)}
                 className="hover:bg-sidebar-accent flex-shrink-0"
-                title="Create Prompt"
+                title={t('create_prompt')}
               >
                 <BookPlus className="h-4 w-4" />
               </Button>
@@ -392,7 +394,7 @@ const Sidebar = ({
                 size="sm" 
                 onClick={onOpenSettings}
                 className="hover:bg-sidebar-accent flex-shrink-0"
-                title="Settings"
+                title={t('settings')}
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -402,7 +404,7 @@ const Sidebar = ({
                   size="sm" 
                   onClick={onOpenAdmin}
                   className="hover:bg-sidebar-accent flex-shrink-0"
-                  title="Admin Dashboard"
+                  title={t('admin_dashboard')}
                 >
                   <Shield className="h-4 w-4" />                  
                 </Button>
@@ -421,7 +423,7 @@ const Sidebar = ({
               onClick={() => setActiveTab('history')}
             >
               <History className="h-4 w-4 mr-1" />
-              History
+              {t('history')}
             </Button>
             <Button
               variant={activeTab === 'prompts' ? 'default' : 'ghost'}
@@ -430,7 +432,7 @@ const Sidebar = ({
               onClick={() => setActiveTab('prompts')}
             >
               <Database className="h-4 w-4 mr-1" />
-              Prompts
+              {t('prompts')}
             </Button>
             <Button
               variant={activeTab === 'public' ? 'default' : 'ghost'}
@@ -439,7 +441,7 @@ const Sidebar = ({
               onClick={() => setActiveTab('public')}
             >
               <Globe className="h-4 w-4 mr-1" />
-              Public
+              {t('public')}
             </Button>
           </div>
         )}
@@ -457,7 +459,7 @@ const Sidebar = ({
                 setIsCollapsed(!isCollapsed);
               }}
               className="w-8 h-8 p-0"
-              title="History"
+              title={t('history')}
             >
               <History className="h-4 w-4" />
             </Button>
@@ -469,7 +471,7 @@ const Sidebar = ({
                 setIsCollapsed(!isCollapsed);
               }}
               className="w-8 h-8 p-0"
-              title="Prompts"
+              title={t('prompts')}
             >
               <Database className="h-4 w-4" />
             </Button>
@@ -481,7 +483,7 @@ const Sidebar = ({
                 setIsCollapsed(!isCollapsed);                
               }}
               className="w-8 h-8 p-0"
-              title="Public Prompts"
+              title={t('public_prompts')}
             >
               <Globe className="h-4 w-4" />
             </Button>
@@ -490,7 +492,7 @@ const Sidebar = ({
               size="sm" 
               onClick={onNewSession}
               className="w-8 h-8 p-0 hover:bg-sidebar-accent"
-              title="New Chat"
+              title={t('new_chat')}
             >
               <MessageCirclePlus className="h-4 w-4" />
             </Button>
@@ -499,7 +501,7 @@ const Sidebar = ({
               size="sm" 
               onClick={() => setIsPromptDialogOpen(true)}
               className="w-8 h-10 80 hover:bg-sidebar-accent"
-              title="Create Prompt"
+              title={t('create_prompt')}
             >
               <BookPlus className="h-4 w-4" />
             </Button>
@@ -508,7 +510,7 @@ const Sidebar = ({
               size="sm" 
               onClick={onOpenSettings}
               className="w-8 h-8 p-0 hover:bg-sidebar-accent"
-              title="Settings"
+              title={t('settings')}
             >
               <Settings className="h-4 w-4" />
             </Button>
@@ -522,7 +524,7 @@ const Sidebar = ({
                 size="sm"
                 onClick={handleDocumentationClick}
                 className="w-10 h-10 p-0 hover:bg-sidebar-accent"
-                title="Documentation"
+                title={t('documentation')}
               >
                 <HelpCircle className="h-4 w-4" />
               </Button>
@@ -531,7 +533,7 @@ const Sidebar = ({
                 size="sm"
                 onClick={onLogout}
                 className="w-10 h-10 p-0 mb-3 hover:bg-destructive/10 hover:text-destructive"
-                title="Log out"
+                title={t('logout')}
               >
                 <LogOut className="h-4 w-4" />
               </Button>
@@ -545,7 +547,7 @@ const Sidebar = ({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={`Search ${activeTab}...`}
+                placeholder={t('search_tab', { tab: activeTab })}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9 rounded-3xl bg-sidebar-accent border-sidebar-border focus:border-sidebar-primary"
@@ -556,7 +558,7 @@ const Sidebar = ({
                   size="sm"
                   className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 text-muted-foreground hover:bg-transparent"
                   onClick={() => setSearchTerm('')}
-                  title="Clear search"
+                  title={t('clear_search')}
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -574,13 +576,13 @@ const Sidebar = ({
             {activeTab === 'history' && (
               <div className="px-2 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-sidebar-foreground">Recent Chats</h3>
+                  <h3 className="text-sm font-medium text-sidebar-foreground">{t('recent_chats')}</h3>
                   <Button 
                     variant="ghost" 
                     size="sm" 
                     onClick={onNewSession}
                     className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                    title="New Chat"
+                    title={t('new_chat')}
                   >
                     <Plus className="h-4 w-4" />
                   </Button>
@@ -617,12 +619,12 @@ const Sidebar = ({
                         <div className="font-medium text-sm truncate text-sidebar-foreground">{session.title}</div>
                       )}
                       <div className="text-xs text-muted-foreground mt-1">
-                        {formatDate(session.updated_at)} • {session.message_count} messages
+                        {formatDate(session.updated_at)} • {session.message_count} {t('messages')}
                       </div>
                       {searchTerm.trim() && session.match_type && (
                         <div className="text-xs text-primary mt-1">
                           <Badge variant="secondary" className="text-xs">
-                            {session.match_type === 'title' ? 'Title match' : 'Message match'}
+                            {session.match_type === 'title' ? t('title_match') : t('message_match')}
                           </Badge>
                           {session.match_type === 'message' && session.message_role && (
                             <span className="ml-2 text-muted-foreground">
@@ -633,7 +635,7 @@ const Sidebar = ({
                       )}
                       {searchTerm.trim() && session.match_content && session.match_type === 'message' && (
                         <div className="text-xs text-muted-foreground mt-1 p-2 bg-sidebar-accent/50 rounded border-l-2 border-primary">
-                          <div className="font-medium mb-1">Matched content:</div>
+                          <div className="font-medium mb-1">{t('matched_content')}:</div>
                           <div className="line-clamp-3">{session.match_content}</div>
                         </div>
                       )}
@@ -658,7 +660,7 @@ const Sidebar = ({
                           e.stopPropagation();
                           onDeleteSession(session.id);
                         }}
-                        title="Delete Chat"
+                        title={t('delete_chat')}
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
@@ -668,7 +670,7 @@ const Sidebar = ({
                 {filteredSessions.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm ? 'No matching chats found' : 'No chat sessions found'}
+                    {searchTerm ? t('no_matching_chats_found') : t('no_chat_sessions_found')}
                     {!searchTerm && sessions.length === 0 && (
                       <div className="mt-3">
                         <Button
@@ -678,7 +680,7 @@ const Sidebar = ({
                           className="text-xs"
                         >
                           <Plus className="h-3 w-3 mr-1" />
-                          Start First Chat
+                          {t('start_first_chat')}
                         </Button>
                       </div>
                     )}
@@ -690,14 +692,14 @@ const Sidebar = ({
             {activeTab === 'prompts' && (
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-sidebar-foreground">Prompt Library</h3>
+                  <h3 className="text-sm font-medium text-sidebar-foreground">{t('prompt_library')}</h3>
                   {tagFilter && (
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setTagFilter('')}
                       className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                      title="Clear Tag Filter"
+                      title={t('clear_tag_filter')}
                     >
                       <X className="h-4 w-4 mr-1" />
                       {tagFilter}
@@ -724,7 +726,7 @@ const Sidebar = ({
                           {prompt.is_public && (
                             <Badge variant="outline" className="text-xs">
                               <Globe className="h-2 w-2 mr-1" />
-                              Public
+                              {t('public')}
                             </Badge>
                           )}
                           {prompt.usage_count && prompt.usage_count > 0 && (
@@ -737,14 +739,14 @@ const Sidebar = ({
                         {searchTerm.trim() && prompt.match_type && (
                           <div className="text-xs text-primary mt-1">
                             <Badge variant="outline" className="text-xs">
-                              {prompt.match_type === 'title' ? 'Title match' : 
-                               prompt.match_type === 'content' ? 'Content match' : 'Category match'}
+                              {prompt.match_type === 'title' ? t('title_match') : 
+                               prompt.match_type === 'content' ? t('content_match') : t('category_match')}
                             </Badge>
                           </div>
                         )}
                         {searchTerm.trim() && prompt.match_content && prompt.match_type !== 'title' && (
                           <div className="text-xs text-muted-foreground mt-1 p-2 bg-sidebar-accent/50 rounded border-l-2 border-primary">
-                            <div className="font-medium mb-1">Matched content:</div>
+                            <div className="font-medium mb-1">{t('matched_content')}:</div>
                             <div className="line-clamp-3">{prompt.match_content}</div>
                           </div>
                         )}
@@ -776,7 +778,7 @@ const Sidebar = ({
                             e.stopPropagation();
                             beginEditPrompt(prompt);
                           }}
-                          title="Edit Prompt"
+                          title={t('edit_prompt')}
                         >
                           <Edit3 className="h-3 w-3" />
                         </Button>
@@ -788,7 +790,7 @@ const Sidebar = ({
                             e.stopPropagation();
                             onDeletePrompt(prompt.id);
                           }}
-                          title="Delete Prompt"
+                          title={t('delete_prompt')}
                         >
                           <Trash2 className="h-3 w-3" />
                         </Button>
@@ -799,7 +801,7 @@ const Sidebar = ({
                 {filteredPrompts.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <Database className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm || tagFilter ? 'No matching prompts found' : 'No prompts found'}
+                    {searchTerm || tagFilter ? t('no_matching_prompts_found') : t('no_prompts_found')}
                   </div>
                 )}
               </div>
@@ -808,13 +810,13 @@ const Sidebar = ({
             {activeTab === 'public' && (
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-sidebar-foreground">Public Prompts</h3>
+                  <h3 className="text-sm font-medium text-sidebar-foreground">{t('public_prompts')}</h3>
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => setIsPublicPromptsOpen(true)}
                     className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                    title="Browse Public Library"
+                    title={t('browse_public_library')}
                   >
                     <Globe className="h-4 w-4" />
                   </Button>
@@ -824,7 +826,7 @@ const Sidebar = ({
                       size="sm"
                       onClick={() => setTagFilter('')}
                       className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
-                      title="Clear Tag Filter"
+                      title={t('clear_tag_filter')}
                     >
                       <X className="h-4 w-4 mr-1" />
                       {tagFilter}
@@ -835,7 +837,7 @@ const Sidebar = ({
                 {publicPromptsLoading && (
                   <div className="text-center py-6">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-xs text-muted-foreground">Loading public prompts...</p>
+                    <p className="text-xs text-muted-foreground">{t('loading_public_prompts')}</p>
                   </div>
                 )}
                 
@@ -848,7 +850,7 @@ const Sidebar = ({
                       onClick={() => loadPublicPrompts(searchTerm, tagFilter)}
                       className="mt-2 text-xs"
                     >
-                      Retry
+                      {t('retry')}
                     </Button>
                   </div>
                 )}
@@ -856,7 +858,7 @@ const Sidebar = ({
                 {!publicPromptsLoading && !publicPromptsError && publicPrompts.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    {searchTerm || tagFilter ? 'No matching public prompts found' : 'No public prompts available'}
+                    {searchTerm || tagFilter ? t('no_matching_public_prompts_found') : t('no_public_prompts_available')}
                     {!searchTerm && (
                       <div className="mt-3">
                         <Button 
@@ -865,7 +867,7 @@ const Sidebar = ({
                           onClick={() => setIsPublicPromptsOpen(true)}
                           className="text-xs"
                         >
-                          Browse Public Library
+                          {t('browse_public_library')}
                         </Button>
                       </div>
                     )}
@@ -892,7 +894,7 @@ const Sidebar = ({
                               </Badge>
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                 <User className="h-3 w-3" />
-                                <span className="truncate">{prompt.author || 'Unknown'}</span>
+                                <span className="truncate">{prompt.author || t('unknown')}</span>
                               </div>
                               {prompt.likes_count > 0 && (
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -937,7 +939,7 @@ const Sidebar = ({
                           onClick={() => setIsPublicPromptsOpen(true)}
                           className="text-xs"
                         >
-                          View All Public Prompts
+                          {t('view_all_public_prompts')}
                         </Button>
                       </div>
                     )}
@@ -956,7 +958,7 @@ const Sidebar = ({
                   size="sm"
                   onClick={handleDocumentationClick}
                   className="hover:bg-sidebar-accent flex-shrink-0"
-                  title="Documentation"
+                  title={t('documentation')}
                 >
                   <HelpCircle className="h-4 w-4" />
                 </Button>
@@ -971,7 +973,7 @@ const Sidebar = ({
                 size="sm"
                 onClick={handleGithubClick}
                 className="hover:bg-sidebar-accent flex-shrink-0"
-                title="Github"
+                title={t('github')}
               >
                 <Github className="h-4 w-4" />
               </Button>
@@ -980,10 +982,10 @@ const Sidebar = ({
                 size="sm"
                 onClick={onLogout}
                 className="hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
-                title="Log out"
+                title={t('logout')}
               >
                 <LogOut className="h-4 w-4" />
-                <span className="ml-1 text-xs">Log out</span>
+                <span className="ml-1 text-xs">{t('logout')}</span>
               </Button>
             </div>
           </div>
@@ -1038,8 +1040,8 @@ const Sidebar = ({
         onRename={handlePromptEditFromContext}
         onDelete={handlePromptDeleteFromContext}
         onClose={handleClosePromptContextMenu}
-        deleteLabel="Delete Prompt"
-        renameLabel="Edit"
+        deleteLabel={t('delete_prompt')}
+        renameLabel={t('edit')}
       />
     </div>
   );

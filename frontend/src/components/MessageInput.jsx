@@ -3,10 +3,11 @@ import { Send, Paperclip, X, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import ModelSelector from './ModelSelector';
+import { useTranslation } from 'react-i18next';
 
-const MessageInput = ({ 
-  onSendMessage, 
-  isLoading, 
+const MessageInput = ({
+  onSendMessage,
+  isLoading,
   disabled,
   availableModels,
   currentSession,
@@ -18,6 +19,7 @@ const MessageInput = ({
   onContentSet,
   onImageGeneration, // New prop for image generation
 }) => {
+  const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
@@ -129,16 +131,16 @@ const MessageInput = ({
     if (message.trim() || attachedFiles.length > 0 || isImageGenerationMode) { // Allow submission in image generation mode even with empty message
       // If we have an empty session, update its model before sending
       if (currentSession && currentSession.message_count === 0 && selectedModel !== currentSession.model) {
-        console.log('Updating empty session model from', currentSession.model, 'to', selectedModel);
+        console.log(t('updating_empty_session_model', { currentModel: currentSession.model, newModel: selectedModel }));
         await onModelChange(currentSession.id, String(selectedModel));
       }
       
       // If no session exists at all, create one
       if (!currentSession) {
-        console.log('Creating new session with selected model:', selectedModel, 'type:', typeof selectedModel);
+        console.log(t('creating_new_session_with_model', { model: selectedModel, type: typeof selectedModel }));
         const targetSession = await onCreateNewSession(selectedModel);
         if (!targetSession) {
-          console.error('Failed to create new session');
+          console.error(t('failed_to_create_new_session'));
           return;
         }
         // Wait a bit to ensure session is properly created and state updated
@@ -170,7 +172,7 @@ const MessageInput = ({
   };
 
   const handleModelChange = async (newModel) => {
-    console.log('Model changed to:', newModel, 'type:', typeof newModel);
+    console.log(t('model_changed_to_with_type', { model: newModel, type: typeof newModel }));
     setSelectedModel(String(newModel)); // Ensure it's always a string
     
     // If session exists and has messages, update the session model
@@ -249,8 +251,8 @@ const MessageInput = ({
       // Show feedback to user
       const fileCount = imageFiles.length;
       const message = fileCount === 1 ? 
-        `Image pasted and attached (${imageFiles[0].name})` : 
-        `${fileCount} images pasted and attached`;
+        t('image_pasted_and_attached', { fileName: imageFiles[0].name }) : 
+        t('images_pasted_and_attached', { count: fileCount });
       
       // You can add a toast notification here if you have toast functionality
       console.log(message);
@@ -272,7 +274,7 @@ const MessageInput = ({
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = [t('bytes'), t('kb'), t('mb'), t('gb')];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
@@ -324,7 +326,7 @@ const MessageInput = ({
               <div className={`absolute inset-0 bg-primary/5 border-2 border-primary/30 border-dashed rounded-4xl z-20 flex items-center justify-center ${isMobileDevice ? '' : 'mx-4'}`}>
                 <div className="text-center p-4">
                   <Paperclip className="h-8 w-8 mx-auto mb-2 text-primary" />
-                  <p className="text-sm font-medium text-primary">Drop files here to attach</p>
+                  <p className="text-sm font-medium text-primary">{t('drop_files_here_to_attach')}</p>
                 </div>
               </div>
             )}
@@ -336,7 +338,7 @@ const MessageInput = ({
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 onPaste={handlePaste}
-                placeholder={isImageGenerationMode ? "Describe the image you want to generate..." : (disabled ? "Please configure your API keys in settings to start chatting..." : "Text to Ask Hole...")}
+                placeholder={isImageGenerationMode ? t('describe_image_to_generate') : (disabled ? t('configure_api_keys_to_chat') : t('text_to_ask_hole'))}
                 className="chat-input resize-none text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
@@ -367,7 +369,7 @@ const MessageInput = ({
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-16 ' : 'right-22 '} ${isImageGenerationMode ? 'text-primary' : ''}`}
                 onClick={() => setIsImageGenerationMode(prev => !prev)}
                 disabled={disabled || isLoading}
-                title="Toggle Image Generation Mode"
+                title={t('toggle_image_generation_mode')}
               >
                 <ImageIcon className="h-5 w-5" />
               </Button>
@@ -380,7 +382,7 @@ const MessageInput = ({
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-8 ' : 'right-14 '}`}
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || isLoading || isImageGenerationMode} // Disable when in image generation mode
-                title="Attach Files"
+                title={t('attach_files')}
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
@@ -412,7 +414,7 @@ const MessageInput = ({
         {disabled && (
           <div className="mt-3 text-center">
             <p className="text-sm text-muted-foreground">
-              Configure your API keys in settings to start using AskHole
+              {t('configure_api_keys_to_start_using_askhole')}
             </p>
           </div>
         )}

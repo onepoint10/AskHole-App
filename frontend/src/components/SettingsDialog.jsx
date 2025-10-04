@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Settings, 
   Key, 
@@ -37,13 +38,14 @@ import {
   TabsTrigger,
 } from '@/components/ui/tabs';
 
-const SettingsDialog = ({ 
-  isOpen, 
-  onClose, 
-  settings, 
+const SettingsDialog = ({
+  isOpen,
+  onClose,
+  settings,
   onUpdateSettings,
-  availableModels 
+  availableModels
 }) => {
+  const { t, i18n } = useTranslation();
   const [localSettings, setLocalSettings] = useState(settings);
   const [isAddProviderOpen, setIsAddProviderOpen] = useState(false);
   const [isAddModelOpen, setIsAddModelOpen] = useState(false);
@@ -99,63 +101,69 @@ const SettingsDialog = ({
     updateSetting('customModelBindings', existingBindings);
   };
 
+  const handleLanguageChange = (lng) => {
+    console.log('Language change requested:', lng);
+    i18n.changeLanguage(lng);
+    updateSetting('language', lng);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5" />
-            Settings
+            {t('settings')}
           </DialogTitle>
         </DialogHeader>
 
         <Tabs defaultValue="api" className="w-full">
           <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="api">API Keys</TabsTrigger>
-            <TabsTrigger value="models">Models</TabsTrigger>
-            <TabsTrigger value="appearance">Appearance</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="api">{t('api_keys')}</TabsTrigger>
+            <TabsTrigger value="models">{t('models')}</TabsTrigger>
+            <TabsTrigger value="appearance">{t('appearance')}</TabsTrigger>
+            <TabsTrigger value="advanced">{t('advanced')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="api" className="space-y-4">
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Key className="h-4 w-4" />
-                <h3 className="text-lg font-medium">API Configuration</h3>
+                <h3 className="text-lg font-medium">{t('api_configuration')}</h3>
               </div>
-              
+
               <div className="space-y-2">
-                <Label htmlFor="gemini-key">Gemini API Key</Label>
+                <Label htmlFor="gemini-key">{t('gemini_api_key')}</Label>
                 <Input
                   id="gemini-key"
                   type="password"
                   value={localSettings.geminiApiKey || ''}
                   onChange={(e) => updateSetting('geminiApiKey', e.target.value)}
-                  placeholder="Enter your Gemini API key"
+                  placeholder={t('enter_gemini_api_key')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Get your API key from Google AI Studio
+                  {t('get_api_key_gemini')}
                 </p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="openrouter-key">OpenRouter API Key</Label>
+                <Label htmlFor="openrouter-key">{t('openrouter_api_key')}</Label>
                 <Input
                   id="openrouter-key"
                   type="password"
                   value={localSettings.openrouterApiKey || ''}
                   onChange={(e) => updateSetting('openrouterApiKey', e.target.value)}
-                  placeholder="Enter your OpenRouter API key"
+                  placeholder={t('enter_openrouter_api_key')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Get your API key from OpenRouter.ai
+                  {t('get_api_key_openrouter')}
                 </p>
               </div>
 
               {/* Custom Providers Section */}
               <div className="space-y-4 pt-6 border-t">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-md font-medium">Custom Providers</h4>
+                  <h4 className="text-md font-medium">{t('custom_providers')}</h4>
                   <Button
                     type="button"
                     size="sm"
@@ -163,7 +171,7 @@ const SettingsDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
-                    Add Provider
+                    {t('add_provider')}
                   </Button>
                 </div>
 
@@ -189,7 +197,7 @@ const SettingsDialog = ({
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No custom providers added yet. Click "Add Provider" to add your own API provider.
+                    {t('no_custom_providers')}
                   </p>
                 )}
               </div>
@@ -200,17 +208,20 @@ const SettingsDialog = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Sliders className="h-4 w-4" />
-                <h3 className="text-lg font-medium">Model Configuration</h3>
+                <h3 className="text-lg font-medium">{t('model_configuration')}</h3>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="default-model">Default Model</Label>
+                <Label htmlFor="default-model">{t('default_model')}</Label>
                 <Select
                   value={localSettings.defaultModel || ''}
-                  onValueChange={(value) => updateSetting('defaultModel', value)}
+                  onValueChange={(value) => {
+                    console.log('Default model change requested:', value);
+                    updateSetting('defaultModel', value);
+                  }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select default model" />
+                    <SelectValue placeholder={t('select_default_model')} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableModels.gemini?.map((model) => (
@@ -234,7 +245,7 @@ const SettingsDialog = ({
 
               <div className="space-y-2">
                 <Label htmlFor="temperature">
-                  Temperature: {localSettings.temperature || 1.0}
+                  {t('temperature')}: {localSettings.temperature || 1.0}
                 </Label>
                 <Slider
                   id="temperature"
@@ -246,14 +257,14 @@ const SettingsDialog = ({
                   className="w-full"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Controls randomness in responses. Lower values are more focused, higher values are more creative.
+                  {t('temperature_description')}
                 </p>
               </div>
 
               {/* Custom Models Section */}
               <div className="space-y-4 pt-6 border-t">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-md font-medium">Custom Models</h4>
+                  <h4 className="text-md font-medium">{t('custom_models')}</h4>
                   <Button
                     type="button"
                     size="sm"
@@ -261,7 +272,7 @@ const SettingsDialog = ({
                     className="flex items-center gap-2"
                   >
                     <Plus className="h-4 w-4" />
-                    Add Model
+                    {t('add_model')}
                   </Button>
                 </div>
 
@@ -273,7 +284,7 @@ const SettingsDialog = ({
                           <div className="font-medium">{model}</div>
                           {localSettings.customModelBindings?.[model] && (
                             <div className="text-xs text-muted-foreground">
-                              Bound to: {localSettings.customModelBindings[model]}
+                              {t('bound_to')}: {localSettings.customModelBindings[model]}
                             </div>
                           )}
                         </div>
@@ -291,7 +302,7 @@ const SettingsDialog = ({
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    No custom models added yet. Click "Add Model" to add your own model.
+                    {t('no_custom_models')}
                   </p>
                 )}
               </div>
@@ -302,35 +313,54 @@ const SettingsDialog = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Palette className="h-4 w-4" />
-                <h3 className="text-lg font-medium">Appearance</h3>
+                <h3 className="text-lg font-medium">{t('appearance')}</h3>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="theme">Theme</Label>
+                <Label htmlFor="language">{t('language')}</Label>
+                <Select
+                  value={localSettings.language || i18n.language}
+                  onValueChange={handleLanguageChange}
+                >
+                  <SelectTrigger id="language">
+                    <SelectValue placeholder={t('select_language')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">{t('english')}</SelectItem>
+                    <SelectItem value="fr">{t('french')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="theme">{t('theme')}</Label>
                 <Select
                   value={localSettings.theme || 'system'}
-                  onValueChange={(value) => updateSetting('theme', value)}
+                  onValueChange={(value) => {
+                    console.log('Theme change requested:', value);
+                    updateSetting('theme', value);
+                  }}
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select theme" />
+                  <SelectTrigger id="theme">
+                    <SelectValue placeholder={t('select_theme')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="light">
                       <div className="flex items-center gap-2">
                         <Sun className="h-4 w-4" />
-                        Light
+                        {t('light')}
                       </div>
                     </SelectItem>
                     <SelectItem value="dark">
                       <div className="flex items-center gap-2">
                         <Moon className="h-4 w-4" />
-                        Dark
+                        {t('dark')}
                       </div>
                     </SelectItem>
                     <SelectItem value="system">
                       <div className="flex items-center gap-2">
                         <Monitor className="h-4 w-4" />
-                        System
+                        {t('system')}
                       </div>
                     </SelectItem>
                   </SelectContent>
@@ -339,9 +369,9 @@ const SettingsDialog = ({
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="compact-mode">Compact Mode</Label>
+                  <Label htmlFor="compact-mode">{t('compact_mode')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Reduce spacing and padding for more content
+                    {t('compact_mode_description')}
                   </p>
                 </div>
                 <Switch
@@ -353,9 +383,9 @@ const SettingsDialog = ({
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="show-timestamps">Show Timestamps</Label>
+                  <Label htmlFor="show-timestamps">{t('show_timestamps')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Display message timestamps in chat
+                    {t('show_timestamps_description')}
                   </p>
                 </div>
                 <Switch
@@ -371,14 +401,14 @@ const SettingsDialog = ({
             <div className="space-y-4">
               <div className="flex items-center gap-2 mb-4">
                 <Settings className="h-4 w-4" />
-                <h3 className="text-lg font-medium">Advanced Settings</h3>
+                <h3 className="text-lg font-medium">{t('advanced_settings')}</h3>
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="auto-save">Auto-save Chats</Label>
+                  <Label htmlFor="auto-save">{t('auto_save_chats')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Automatically save chat sessions
+                    {t('auto_save_chats_description')}
                   </p>
                 </div>
                 <Switch
@@ -390,9 +420,9 @@ const SettingsDialog = ({
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="stream-responses">Stream Responses</Label>
+                  <Label htmlFor="stream-responses">{t('stream_responses')}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Show responses as they are generated
+                    {t('stream_responses_description')}
                   </p>
                 </div>
                 <Switch
@@ -403,7 +433,7 @@ const SettingsDialog = ({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="max-tokens">Max Tokens per Response</Label>
+                <Label htmlFor="max-tokens">{t('max_tokens_per_response')}</Label>
                 <Input
                   id="max-tokens"
                   type="number"
@@ -412,7 +442,7 @@ const SettingsDialog = ({
                   placeholder="4096"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maximum number of tokens in AI responses
+                  {t('max_tokens_description')}
                 </p>
               </div>
             </div>
@@ -421,10 +451,10 @@ const SettingsDialog = ({
 
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            {t('cancel')}
           </Button>
           <Button onClick={handleSave}>
-            Save Settings
+            {t('save_settings')}
           </Button>
         </div>
       </DialogContent>

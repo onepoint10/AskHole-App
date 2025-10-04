@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 
 const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
+  const { t } = useTranslation();
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -40,8 +42,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     if (typeof file === 'string') {
       return file;
     }
-    return file.original_filename || file.filename || file.name || 'Unknown file';
-  }, []);
+    return file.original_filename || file.filename || file.name || t('unknown_file');
+  }, [t]);
 
   // Helper function to determine if a file is an image
   const isImageFile = useCallback((file) => {
@@ -67,12 +69,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         }
       } catch (error) {
         // Silently fail - markdown will render without plugins
-        console.warn('Failed to load markdown plugins:', error);
+        console.warn(t('failed_to_load_markdown_plugins'), error);
       }
     };
 
     loadPlugins();
-  }, []);
+  }, [t]);
 
   // Dark mode detection
   useEffect(() => {
@@ -109,13 +111,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   // Improved clipboard functionality with better debugging
   const copyToClipboard = useCallback(async (text, messageId, isCode = false) => {
     if (!text) {
-      console.log('Copy failed: No text provided');
+      console.log(t('copy_failed_no_text'));
       return;
     }
 
-    console.log('Attempting to copy text:', text.substring(0, 50) + '...');
-    console.log('Is secure context:', window.isSecureContext);
-    console.log('Navigator clipboard available:', !!navigator.clipboard);
+    console.log(t('attempting_to_copy_text', { text: text.substring(0, 50) + '...' }));
+    console.log(t('is_secure_context'), window.isSecureContext);
+    console.log(t('navigator_clipboard_available'), !!navigator.clipboard);
 
     try {
       let success = false;
@@ -123,18 +125,18 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       // Method 1: Modern clipboard API
       if (navigator.clipboard && navigator.clipboard.writeText) {
         try {
-          console.log('Trying modern clipboard API...');
+          console.log(t('trying_modern_clipboard_api'));
           await navigator.clipboard.writeText(text);
-          console.log('Modern clipboard API succeeded');
+          console.log(t('modern_clipboard_api_succeeded'));
           success = true;
         } catch (clipboardError) {
-          console.log('Modern clipboard API failed:', clipboardError.name, clipboardError.message);
+          console.log(t('modern_clipboard_api_failed'), clipboardError.name, clipboardError.message);
         }
       }
 
       // Method 2: execCommand fallback
       if (!success) {
-        console.log('Trying execCommand fallback...');
+        console.log(t('trying_execcommand_fallback'));
         const textArea = document.createElement('textarea');
         textArea.value = text;
         
@@ -161,9 +163,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         
         try {
           success = document.execCommand('copy');
-          console.log('execCommand result:', success);
+          console.log(t('execcommand_result'), success);
         } catch (execError) {
-          console.log('execCommand failed:', execError);
+          console.log(t('execcommand_failed'), execError);
         }
         
         document.body.removeChild(textArea);
@@ -171,7 +173,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
       // Method 3: Alternative approach for stubborn cases
       if (!success) {
-        console.log('Trying alternative selection method...');
+        console.log(t('trying_alternative_selection_method'));
         const range = document.createRange();
         const selection = window.getSelection();
         
@@ -191,9 +193,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         
         try {
           success = document.execCommand('copy');
-          console.log('Alternative method result:', success);
+          console.log(t('alternative_method_result'), success);
         } catch (altError) {
-          console.log('Alternative method failed:', altError);
+          console.log(t('alternative_method_failed'), altError);
         }
         
         selection.removeAllRanges();
@@ -201,7 +203,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       }
 
       if (success) {
-        console.log('Copy succeeded!');
+        console.log(t('copy_succeeded'));
         // Set appropriate copied state
         if (isCode) {
           setCopiedCodeId(messageId);
@@ -211,16 +213,16 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           setTimeout(() => setCopiedId(null), 2000);
         }
         
-        toast.success('Copied to clipboard!');
+        toast.success(t('copied_to_clipboard'));
       } else {
-        console.log('All copy methods failed');
-        toast.error('Failed to copy to clipboard. Please try copying manually.');
+        console.log(t('all_copy_methods_failed'));
+        toast.error(t('failed_to_copy_clipboard_manual'));
       }
     } catch (error) {
-      console.error('Copy failed with error:', error);
-      toast.error('Failed to copy to clipboard');
+      console.error(t('copy_failed_with_error'), error);
+      toast.error(t('failed_to_copy_clipboard'));
     }
-  }, []);
+  }, [t]);
 
   // Mobile table preprocessing
   const preprocessMarkdownForMobile = useCallback((markdown) => {
@@ -315,7 +317,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
               e.preventDefault();
               copyToClipboard(codeString, codeId, true);
             }}
-            title="Copy code"
+            title={t('copy_code')}
           >
             {copiedCodeId === codeId ? (
               <Check className="h-3 w-3 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
@@ -346,7 +348,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         </div>
       </div>
     );
-  }, [copyToClipboard, copiedCodeId, isDark, isMobileDevice]);
+  }, [copyToClipboard, copiedCodeId, isDark, isMobileDevice, t]);
 
   // Markdown components configuration
   const markdownComponents = {
@@ -462,13 +464,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                     <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
                                       {images.map((image, index) => {
                                         const imageUrl = getFileUrl(image);
-                                        console.log("Image object:", image);
-                                        console.log("Image URL:", imageUrl);
+                                        console.log(t('image_object'), image);
+                                        console.log(t('image_url'), imageUrl);
                                         return (
                                           <div key={`image-${index}`} className="relative group">
                                             <img
                                               src={imageUrl}
-                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Image ${index + 1}`)}
+                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('image_alt', { index: index + 1 }))}
                                               className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
                                                 isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
                                               }`}
@@ -480,7 +482,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                               onError={(e) => {
                                                 // Hide broken images
                                                 e.target.style.display = 'none';
-                                                console.error("Failed to load image:", imageUrl, e);
+                                                console.error(t('failed_to_load_image'), imageUrl, e);
                                               }}
                                             />
                                             <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
@@ -522,12 +524,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                   <ContextMenuContent>
                     <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
                       <Copy className="h-4 w-4 mr-2" />
-                      Copy
+                      {t('copy')}
                     </ContextMenuItem>
                     {onAddToPrompt && (
                       <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
                         <Database className="h-4 w-4 mr-2" />
-                        Add to database
+                        {t('add_to_database')}
                       </ContextMenuItem>
                     )}
                     {onDeleteMessage && (
@@ -536,7 +538,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                         className="text-destructive focus:text-destructive"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
+                        {t('delete')}
                       </ContextMenuItem>
                     )}
                   </ContextMenuContent>
@@ -576,18 +578,18 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                     <div className="space-y-2">
                                       <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
                                         <span>🖼️</span>
-                                        <span>Generated images:</span>
+                                        <span>{t('generated_images')}:</span>
                                       </div>
                                       <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
                                         {images.map((image, index) => {
                                           const imageUrl = getFileUrl(image);
-                                          console.log("Assistant Image object:", image);
-                                          console.log("Assistant Image URL:", imageUrl);
+                                          console.log(t('assistant_image_object'), image);
+                                          console.log(t('assistant_image_url'), imageUrl);
                                           return (
                                             <div key={`image-${index}`} className="relative group">
                                               <img
                                                 src={imageUrl}
-                                                alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || `Generated Image ${index + 1}`)}
+                                                alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('generated_image_alt', { index: index + 1 }))}
                                                 className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
                                                   isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
                                                 }`}
@@ -597,7 +599,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                                 }}
                                                 onError={(e) => {
                                                   e.target.style.display = 'none';
-                                                  console.error("Failed to load assistant image:", imageUrl, e);
+                                                  console.error(t('failed_to_load_assistant_image'), imageUrl, e);
                                                 }}
                                               />
                                               <Button
@@ -611,9 +613,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                                                   document.body.appendChild(link);
                                                   link.click();
                                                   document.body.removeChild(link);
-                                                  toast.success("Image downloaded!");
+                                                  toast.success(t('image_downloaded'));
                                                 }}
-                                                title="Download image"
+                                                title={t('download_image')}
                                               >
                                                 <Download className="h-3.5 w-3.5" />
                                               </Button>
@@ -658,7 +660,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                             e.preventDefault();
                             copyToClipboard(message.content, message.id);
                           }}
-                          title="Copy message"
+                          title={t('copy_message')}
                         >
                           {copiedId === message.id ? (
                             <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
@@ -671,12 +673,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                     <ContextMenuContent>
                       <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
                         <Copy className="h-4 w-4 mr-2" />
-                        Copy
+                        {t('copy')}
                       </ContextMenuItem>
                       {onAddToPrompt && (
                         <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
                           <Database className="h-4 w-4 mr-2" />
-                          Add to database
+                          {t('add_to_database')}
                         </ContextMenuItem>
                       )}
                       {onDeleteMessage && (
@@ -685,7 +687,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
                           className="text-destructive focus:text-destructive"
                         >
                           <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
+                          {t('delete')}
                         </ContextMenuItem>
                       )}
                     </ContextMenuContent>
@@ -714,7 +716,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         )}
         {!isLoading && messages.length === 0 && (
           <div className="flex justify-center items-center py-50">
-            <p className="text-muted-foreground">No messages yet. Start a conversation!</p>
+            <p className="text-muted-foreground">{t('no_messages_yet_start_conversation')}</p>
           </div>
         )}
         {/* Scroll anchor */}
