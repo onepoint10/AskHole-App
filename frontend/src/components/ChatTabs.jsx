@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import ContextMenu from './ContextMenu';
 import InlineEdit from './InlineEdit';
+import { useTranslation } from 'react-i18next';
 
 const ChatTabs = ({ 
   sessions = [], 
@@ -13,6 +14,7 @@ const ChatTabs = ({
   onCloseTab,  // Renamed from onCloseSession to be more specific
   onRenameSession 
 }) => {
+  const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
   const [editingSessionId, setEditingSessionId] = useState(null);
 
@@ -73,7 +75,7 @@ const ChatTabs = ({
                     <div className="flex items-center gap-2 px-3 py-2 min-w-0 flex-1">
                       <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                       <InlineEdit
-                        value={session.title || 'New Chat'}
+                        value={session.title || t('new_chat')}
                         onSave={(newTitle) => handleSaveRename(session.id, newTitle)}
                         onCancel={handleCancelRename}
                         className="flex-1 min-w-0"
@@ -87,7 +89,7 @@ const ChatTabs = ({
                     >
                       <MessageSquare className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                       <span className="truncate text-sm font-medium">
-                        {session.title || 'New Chat'}
+                        {session.title || t('new_chat')}
                       </span>
                     </button>
                   )}
@@ -100,7 +102,7 @@ const ChatTabs = ({
                         e.stopPropagation();
                         onCloseTab(session.id);  // Close tab only, don't delete session
                       }}
-                      title="Close tab"
+                      title={t('close_tab')}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -111,7 +113,7 @@ const ChatTabs = ({
               // FIXED: Show placeholder when no tabs are open
               <div className="flex items-center gap-2 px-3 py-2 text-muted-foreground text-sm">
                 <MessageSquare className="h-4 w-4" />
-                <span>No active chats</span>
+                <span>{t('no_active_chats')}</span>
               </div>
             )}
           </div>
@@ -121,7 +123,7 @@ const ChatTabs = ({
           size="sm"
           onClick={onNewSession}
           className="flex-shrink-0 mx-2"
-          title="New chat"
+          title={t('new_chat')}
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -131,9 +133,9 @@ const ChatTabs = ({
         isVisible={contextMenu.isVisible}
         position={contextMenu.position}
         onRename={handleRename}
-        onDelete={handleCloseTab}  
+        onDelete={handleCloseTab}
         onClose={handleCloseContextMenu}
-        deleteLabel="Close Tab"  
+        deleteLabel={t('close_tab')}
       />
     </>
   );

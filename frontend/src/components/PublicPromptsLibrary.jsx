@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,6 +10,7 @@ import { toast } from 'sonner';
 import { promptsAPI } from '@/services/api';
 
 const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) => {
+  const { t } = useTranslation();
   const [prompts, setPrompts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -55,7 +57,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
       
     } catch (error) {
       console.error('Failed to load public prompts:', error);
-      toast.error('Failed to load public prompts');
+      toast.error(t('publicPrompts.failedToLoad'));
     } finally {
       setLoading(false);
     }
@@ -118,7 +120,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
       
     } catch (error) {
       console.error('Failed to like prompt:', error);
-      toast.error('Failed to like prompt');
+      toast.error(t('publicPrompts.failedToLike'));
     }
   };
 
@@ -146,7 +148,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading public prompts...</p>
+          <p className="text-muted-foreground">{t('publicPrompts.loading')}</p>
         </div>
       </div>
     );
@@ -157,11 +159,11 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
       {/* Header - Fixed */}
       <div className="flex items-center justify-between mb-6 flex-shrink-0">
         <div>
-          <h2 className="text-2xl font-bold">Public Prompts Library</h2>
-          <p className="text-muted-foreground">Discover and use prompts shared by the community</p>
+          <h2 className="text-2xl font-bold">{t('publicPrompts.title')}</h2>
+          <p className="text-muted-foreground">{t('publicPrompts.description')}</p>
         </div>
         <Button variant="outline" onClick={onClose}>
-          Close
+          {t('publicPrompts.close')}
         </Button>
       </div>
 
@@ -171,7 +173,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
-              placeholder="Search prompts by title, content, or tags..."
+              placeholder={t('publicPrompts.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
@@ -179,7 +181,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
             />
           </div>
           <Button onClick={handleSearch} disabled={loading}>
-            Search
+            {t('publicPrompts.searchButton')}
           </Button>
         </div>
 
@@ -191,7 +193,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
             onClick={() => { handleCategoryFilter(''); setTagFilter(''); }}
             disabled={loading}
           >
-            All Categories
+            {t('publicPrompts.allCategories')}
           </Button>
           {getUniqueCategories().map(category => (
             <Button
@@ -211,7 +213,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
               onClick={() => handleTagFilter('')}
               disabled={loading}
             >
-              Clear Tag: {tagFilter}
+              {t('publicPrompts.clearTag', { tag: tagFilter })}
             </Button>
           )}
         </div>
@@ -222,10 +224,10 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
         {/* Prompts Grid */}
         {prompts.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No public prompts found.</p>
+            <p className="text-muted-foreground">{t('publicPrompts.noPromptsFound')}</p>
             {searchQuery && (
               <p className="text-sm text-muted-foreground mt-2">
-                Try adjusting your search terms or category/filter.
+                {t('publicPrompts.adjustSearch')}
               </p>
             )}
           </div>
@@ -286,7 +288,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
                         ))}
                         {prompt.tags.length > 3 && (
                           <Badge variant="outline" className="text-xs">
-                            +{prompt.tags.length - 3} more
+                            {t('publicPrompts.moreTags', { count: prompt.tags.length - 3 })}
                           </Badge>
                         )}
                       </div>
@@ -306,7 +308,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
                       className="flex-1"
                       disabled={loading}
                     >
-                      Use Prompt
+                      {t('publicPrompts.usePrompt')}
                     </Button>
                   </div>
                 </CardContent>
@@ -324,10 +326,10 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={!pagination.has_prev || loading}
             >
-              Previous
+              {t('publicPrompts.previous')}
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {pagination.page || currentPage} of {pagination.pages}
+              {t('publicPrompts.pageInfo', { currentPage: pagination.page || currentPage, totalPages: pagination.pages })}
             </span>
             <Button
               variant="outline"
@@ -335,7 +337,7 @@ const PublicPromptsLibrary = ({ onUsePrompt, onClose, initialTagFilter = '' }) =
               onClick={() => setCurrentPage(prev => Math.min(pagination.pages, prev + 1))}
               disabled={!pagination.has_next || loading}
             >
-              Next
+              {t('publicPrompts.next')}
             </Button>
           </div>
         )}
