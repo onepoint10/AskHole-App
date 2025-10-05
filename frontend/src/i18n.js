@@ -26,7 +26,7 @@ i18n
     resources,
     fallbackLng: 'en', // fallback language if user language is not available
 
-    keySeparator: false, // we do not use keys in form messages.welcome
+    keySeparator: '.', // we use keys in form messages.welcome
 
     interpolation: {
       escapeValue: false // react already safes from xss
