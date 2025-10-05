@@ -75,8 +75,8 @@ def _guess_mime_type(safe_filename: str, original_filename: str) -> str:
 def determine_client_from_model(model: str):
     """Determine client type based on model name"""
     gemini_models = [
-        'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-06-17',
-        'gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro', 'gemini-pro-vision'
+        'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-09-25',
+        'gemini-2.5-flash-preview-09-2025', 'gemini-2.5-flash-lite', 'gemini-embedding-001', 'gemini-2.0-flash'
     ]
 
     if any(model.startswith(gm.split('-')[0] + '-') or model == gm for gm in gemini_models):

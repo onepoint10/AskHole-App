@@ -41,7 +41,9 @@ class GeminiClient:
         return [
             "gemini-2.5-flash",
             "gemini-2.5-pro",
-            "gemini-2.5-flash-lite-preview-06-17"
+            "gemini-2.5-flash-preview-09-2025",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-lite-preview-09-2025"
         ]
 
     def create_chat_session(self, session_id: str, model: str):
