@@ -292,5 +292,24 @@
   "create_account": "Créer un compte",
   "dont_have_account": "Vous n'avez pas de compte ? ",
   "already_have_account": "Vous avez déjà un compte ? ",
-  "sign_up": "S'inscrire"
+  "sign_up": "S'inscrire",
+  "publicPrompts": {
+    "failedToLoad": "Échec du chargement des invites publiques",
+    "failedToLike": "Échec de l'appréciation de l'invite",
+    "loading": "Chargement des invites publiques...",
+    "title": "Bibliothèque d'invites publiques",
+    "description": "Découvrez et utilisez les invites partagées par la communauté",
+    "close": "Fermer",
+    "searchPlaceholder": "Rechercher des invites par titre, contenu ou balises...",
+    "searchButton": "Rechercher",
+    "allCategories": "Toutes les catégories",
+    "clearTag": "Effacer la balise : {{tag}}",
+    "noPromptsFound": "Aucune invite publique trouvée.",
+    "adjustSearch": "Essayez d'ajuster vos termes de recherche ou votre catégorie/filtre.",
+    "moreTags": "+{{count}} de plus",
+    "usePrompt": "Utiliser l'invite",
+    "previous": "Précédent",
+    "pageInfo": "Page {{currentPage}} sur {{totalPages}}",
+    "next": "Suivant"
+  }
 }

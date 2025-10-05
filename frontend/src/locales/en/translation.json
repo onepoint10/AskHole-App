@@ -292,5 +292,24 @@
   "create_account": "Create Account",
   "dont_have_account": "Don't have an account? ",
   "already_have_account": "Already have an account? ",
-  "sign_up": "Sign up"
+  "sign_up": "Sign up",
+  "publicPrompts": {
+    "failedToLoad": "Failed to load public prompts",
+    "failedToLike": "Failed to like prompt",
+    "loading": "Loading public prompts...",
+    "title": "Public Prompts Library",
+    "description": "Discover and use prompts shared by the community",
+    "close": "Close",
+    "searchPlaceholder": "Search prompts by title, content, or tags...",
+    "searchButton": "Search",
+    "allCategories": "All Categories",
+    "clearTag": "Clear Tag: {{tag}}",
+    "noPromptsFound": "No public prompts found.",
+    "adjustSearch": "Try adjusting your search terms or category/filter.",
+    "moreTags": "+{{count}} more",
+    "usePrompt": "Use Prompt",
+    "previous": "Previous",
+    "pageInfo": "Page {{currentPage}} of {{totalPages}}",
+    "next": "Next"
+  }
 }
