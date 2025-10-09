@@ -196,7 +196,7 @@ const Message = ({
                                             >
                                                 <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                                                     <ChevronsUpDown className="h-4 w-4" />
-                                                    {t('exa_search_results')}
+                                                    {t('exa.search_results')}
                                                 </h4>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent className="space-y-2">

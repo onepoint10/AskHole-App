@@ -13,20 +13,20 @@ const ExaSettings = ({ settings, onUpdateSettings }) => {
 
     const handleSave = () => {
         onUpdateSettings({ ...settings, exaApiKey: exaApiKey });
-        toast.success('Your EXA API key has been successfully saved.');
+        toast.success(t('exa.api_key_saved'));
     };
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-medium">EXA Search Settings</h3>
+            <h3 className="text-lg font-medium">{t('exa.settings')}</h3>
             <div className="grid gap-2">
-                <Label htmlFor="exa-api-key">EXA API Key</Label>
+                <Label htmlFor="exa-api-key">{t('exa.api_key')}</Label>
                 <Input
                     id="exa-api-key"
                     type="password"
                     value={exaApiKey}
                     onChange={(e) => setExaApiKey(e.target.value)}
-                    placeholder="Enter your EXA API Key"
+                    placeholder={t('exa.enter_api_key')}
                 />
             </div>
             <Button onClick={handleSave}>Save EXA API Key</Button>

@@ -344,7 +344,7 @@ const MessageInput = ({
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 onPaste={handlePaste}
-                placeholder={isImageGenerationMode ? t('describe_image_to_generate') : (isExaSearchMode ? t('enter_search_query_for_exa') : (disabled ? t('configure_api_keys_to_chat') : t('text_to_ask_hole')))}
+                placeholder={isImageGenerationMode ? t('describe_image_to_generate') : (isExaSearchMode ? t('exa.enter_search_query') : (disabled ? t('configure_api_keys_to_chat') : t('text_to_ask_hole')))}
                 className="chat-input resize-none text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
@@ -394,7 +394,7 @@ const MessageInput = ({
                   setIsImageGenerationMode(false); // Disable image generation mode when enabling EXA search
                 }}
                 disabled={disabled || isLoading}
-                title={t('toggle_exa_search_mode')}
+                title={t('exa.toggle_search_mode')}
               >
                 <Search className="h-5 w-5" />
               </Button>

@@ -293,6 +293,17 @@
   "dont_have_account": "Don't have an account? ",
   "already_have_account": "Already have an account? ",
   "sign_up": "Sign up",
+  "exa": {
+    "settings": "EXA Search Settings",
+    "api_key": "EXA API Key",
+    "enter_api_key": "Enter your EXA API key",
+    "api_key_saved": "Your EXA API key has been successfully saved.",
+    "search_results": "EXA Search Results",
+    "enter_search_query": "Enter search query for EXA...",
+    "toggle_search_mode": "Toggle EXA Search Mode",
+    "client_not_configured": "EXA client not configured. Please check your API key in settings.",
+    "search_failed": "EXA search failed: {{error}}"
+  },
   "publicPrompts": {
     "failedToLoad": "Failed to load public prompts",
     "failedToLike": "Failed to like prompt",
