@@ -302,7 +302,8 @@
     "enter_search_query": "Entrez votre requête de recherche EXA...",
     "toggle_search_mode": "Activer/désactiver le mode de recherche EXA",
     "client_not_configured": "Client EXA non configuré. Veuillez vérifier votre clé API dans les paramètres.",
-    "search_failed": "La recherche EXA a échoué : {{error}}"
+    "search_failed": "La recherche EXA a échoué : {{error}}",
+    "copy_results": "Copier les résultats de recherche"
   },
   "publicPrompts": {
     "failedToLoad": "Échec du chargement des invites publiques",

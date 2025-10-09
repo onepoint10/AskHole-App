@@ -302,7 +302,8 @@
     "enter_search_query": "Enter search query for EXA...",
     "toggle_search_mode": "Toggle EXA Search Mode",
     "client_not_configured": "EXA client not configured. Please check your API key in settings.",
-    "search_failed": "EXA search failed: {{error}}"
+    "search_failed": "EXA search failed: {{error}}",
+    "copy_results": "Copy search results"
   },
   "publicPrompts": {
     "failedToLoad": "Failed to load public prompts",

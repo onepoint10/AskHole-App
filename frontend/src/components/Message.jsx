@@ -28,6 +28,7 @@ const Message = ({
     const { t } = useTranslation();
     const isExaMessage = message.role === 'assistant' && message.content.includes("**Exa Search Results:**");
     const [isExaCollapsed, setIsExaCollapsed] = useState(true);
+    const [copiedExaId, setCopiedExaId] = useState(false);
 
     let exaResultsContent = null;
     let summaryContent = message.content;
@@ -200,14 +201,34 @@ const Message = ({
                                                 </h4>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent className="space-y-2">
-                                                <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''
-                                                    }`}>
-                                                    <ReactMarkdown
-                                                        remarkPlugins={remarkPlugins}
-                                                        components={markdownComponents}
+                                                <div className="relative">
+                                                    <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
+                                                        <ReactMarkdown
+                                                            remarkPlugins={remarkPlugins}
+                                                            components={markdownComponents}
+                                                        >
+                                                            {preprocessMarkdownForMobile(exaResultsContent)}
+                                                        </ReactMarkdown>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="absolute top-0 right-0 h-7 w-7 p-0 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            e.preventDefault();
+                                                            copyToClipboard(exaResultsContent, `exa-${message.id}`);
+                                                            setCopiedExaId(true);
+                                                            setTimeout(() => setCopiedExaId(false), 2000);
+                                                        }}
+                                                        title={t('copy_exa_results')}
                                                     >
-                                                        {preprocessMarkdownForMobile(exaResultsContent)}
-                                                    </ReactMarkdown>
+                                                        {copiedExaId ? (
+                                                            <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
+                                                        ) : (
+                                                            <Copy className="h-3.5 w-3.5 transition-transform hover:scale-110" />
+                                                        )}
+                                                    </Button>
                                                 </div>
                                             </CollapsibleContent>
                                         </Collapsible>
@@ -315,11 +336,11 @@ const Message = ({
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
+                                        className={`absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105`}
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             e.preventDefault();
-                                            copyToClipboard(message.content, message.id);
+                                            copyToClipboard(summaryContent || message.content, message.id);
                                         }}
                                         title={t('copy_message')}
                                     >
@@ -332,7 +353,7 @@ const Message = ({
                                 </div>
                             </ContextMenuTrigger>
                             <ContextMenuContent>
-                                <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
+                                <ContextMenuItem onSelect={() => copyToClipboard(summaryContent || message.content, message.id)}>
                                     <Copy className="h-4 w-4 mr-2" />
                                     {t('copy')}
                                 </ContextMenuItem>
