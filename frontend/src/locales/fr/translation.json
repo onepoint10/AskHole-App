@@ -293,6 +293,18 @@
   "dont_have_account": "Vous n'avez pas de compte ? ",
   "already_have_account": "Vous avez déjà un compte ? ",
   "sign_up": "S'inscrire",
+  "exa": {
+    "settings": "Paramètres de recherche EXA",
+    "api_key": "Clé API EXA",
+    "enter_api_key": "Entrez votre clé API EXA",
+    "api_key_saved": "Votre clé API EXA a été enregistrée avec succès.",
+    "search_results": "Résultats de recherche EXA",
+    "enter_search_query": "Entrez votre requête de recherche EXA...",
+    "toggle_search_mode": "Activer/désactiver le mode de recherche EXA",
+    "client_not_configured": "Client EXA non configuré. Veuillez vérifier votre clé API dans les paramètres.",
+    "search_failed": "La recherche EXA a échoué : {{error}}",
+    "copy_results": "Copier les résultats de recherche"
+  },
   "publicPrompts": {
     "failedToLoad": "Échec du chargement des invites publiques",
     "failedToLike": "Échec de l'appréciation de l'invite",

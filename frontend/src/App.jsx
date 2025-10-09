@@ -34,8 +34,8 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [currentMessages, setCurrentMessages] = useState([]);
   const [prompts, setPrompts] = useState([]);
-  const [availableModels, setAvailableModels] = useState({ 
-    gemini: [], 
+  const [availableModels, setAvailableModels] = useState({
+    gemini: [],
     openrouter: [],
     custom: []
   });
@@ -45,7 +45,7 @@ function App() {
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
   const [messageInputContent, setMessageInputContent] = useState('');
-  
+
   // Mobile detection and sidebar state
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -70,6 +70,7 @@ function App() {
   const [settings, setSettings] = useLocalStorage('askhole-settings', {
     geminiApiKey: '',
     openrouterApiKey: '',
+    exaApiKey: '', // Add EXA API key to settings
     customProviders: [],
     customModels: [],
     customModelBindings: {},
@@ -89,16 +90,16 @@ function App() {
     if (!model || typeof model !== 'string') {
       return 'gemini'; // default fallback
     }
-    
+
     const geminiModels = [
       'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite-preview-06-17'
     ];
-    
+
     // Check if model starts with 'gemini' or matches exactly
     if (model.startsWith('gemini') || geminiModels.includes(model)) {
       return 'gemini';
     }
-    
+
     // Custom bindings override
     if (settings.customModels && settings.customModels.includes(model)) {
       const bound = settings.customModelBindings?.[model];
@@ -106,30 +107,31 @@ function App() {
         // Map custom provider keys back to logical clients for backend routing
         if (bound === 'gemini') return 'gemini';
         if (bound === 'openrouter') return 'openrouter';
+        if (bound === 'exa') return 'exa'; // Add EXA client determination
         // Any other key means a user-defined provider
         return 'custom';
       }
       return 'custom';
     }
-    
+
     return 'openrouter';
   };
 
   // Computed values
-  const isConfigured = useMemo(() => 
-    Boolean(settings.geminiApiKey || settings.openrouterApiKey), 
-    [settings.geminiApiKey, settings.openrouterApiKey]
+  const isConfigured = useMemo(() =>
+    Boolean(settings.geminiApiKey || settings.openrouterApiKey || settings.exaApiKey),
+    [settings.geminiApiKey, settings.openrouterApiKey, settings.exaApiKey]
   );
 
   // Check if current user is admin (assuming user ID 2 is admin)
-  const isAdmin = useMemo(() => 
-    currentUser && currentUser.id === 2, 
+  const isAdmin = useMemo(() =>
+    currentUser && currentUser.id === 2,
     [currentUser]
   );
 
   // Filter sessions for tabs (only show open tabs)
-  const openTabSessions = useMemo(() => 
-    sessions.filter(session => openTabIds.includes(session.id)), 
+  const openTabSessions = useMemo(() =>
+    sessions.filter(session => openTabIds.includes(session.id)),
     [sessions, openTabIds]
   );
 
@@ -149,7 +151,7 @@ function App() {
   useEffect(() => {
     const applyThemeAndLanguage = () => {
       const root = document.documentElement;
-      
+
       // Apply theme
       if (settings.theme === 'dark') {
         root.classList.add('dark');
@@ -165,10 +167,10 @@ function App() {
             root.classList.remove('dark');
           }
         };
-        
+
         updateTheme();
         mediaQuery.addEventListener('change', updateTheme);
-        
+
         // Apply language
         i18n.changeLanguage(settings.language || 'en');
 
@@ -186,7 +188,7 @@ function App() {
   const checkAuthStatus = async () => {
     try {
       const response = await authAPI.checkAuth(i18n.language);
-      
+
       if (response.data.authenticated) {
         setIsAuthenticated(true);
         setCurrentUser(response.data.user);
@@ -214,11 +216,11 @@ function App() {
   const handleLogout = useCallback(async () => {
     try {
       await authAPI.logout(i18n.language);
-      
+
       // Clear all session data
       localStorage.removeItem('session_id');
       document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
-      
+
       // Reset all state
       setIsAuthenticated(false);
       setCurrentUser(null);
@@ -228,7 +230,7 @@ function App() {
       setCurrentMessages([]);
       setPrompts([]);
       setShowAdminDashboard(false);
-      
+
       toast.success(t('logout_successful'));
     } catch (error) {
       console.error('Logout failed:', error);
@@ -246,11 +248,12 @@ function App() {
   const initializeApp = async () => {
     try {
       // Configure API if we have keys
-      if (settings.geminiApiKey || settings.openrouterApiKey || (settings.customProviders && settings.customProviders.length > 0)) {
+      if (settings.geminiApiKey || settings.openrouterApiKey || settings.exaApiKey || (settings.customProviders && settings.customProviders.length > 0)) {
         try {
           await configAPI.setConfig({
             gemini_api_key: settings.geminiApiKey,
             openrouter_api_key: settings.openrouterApiKey,
+            exa_api_key: settings.exaApiKey, // Pass EXA API key to backend
             custom_providers: settings.customProviders || [],
           }, i18n.language);
         } catch (error) {
@@ -304,15 +307,15 @@ function App() {
       console.log('Sessions API response:', response);
       const sessionsList = response.data || [];
       setSessions(sessionsList);
-      
+
       // FIXED: Better session initialization logic
       if (sessionsList.length > 0) {
         // Find a session that's already open in tabs or use the most recent one
         const mostRecent = sessionsList[0];
-        const sessionToActivate = openTabIds.length > 0 ? 
-          sessionsList.find(s => openTabIds.includes(s.id)) || mostRecent : 
+        const sessionToActivate = openTabIds.length > 0 ?
+          sessionsList.find(s => openTabIds.includes(s.id)) || mostRecent :
           mostRecent;
-        
+
         setActiveSessionId(sessionToActivate.id);
         setOpenTabIds(prev => {
           if (prev.includes(sessionToActivate.id)) {
@@ -349,7 +352,7 @@ function App() {
 
   const loadSessionMessages = async (sessionId) => {
     if (!sessionId) return;
-    
+
     try {
       const response = await sessionsAPI.getSession(sessionId, i18n.language);
       setCurrentMessages(response.data?.messages || []);
@@ -371,23 +374,23 @@ function App() {
       } else {
         model = settings.defaultModel || 'gemini-2.5-flash';
       }
-      
+
       console.log('Creating new session with model:', model, 'type:', typeof model);
-      
+
       // Create a clean session object without any potential circular references
       const sessionData = {
         title: t('new_chat'),
         model: String(model), // Ensure it's a string
         temperature: Number(settings.temperature) || 1.0, // Ensure it's a number
       };
-      
+
       console.log('Sending session creation request with data:', sessionData);
       const response = await sessionsAPI.createSession(sessionData, i18n.language);
       console.log('Session creation API response:', response);
-      
+
       const newSession = response.data;
       setSessions(prev => [newSession, ...prev.filter(s => s.id !== newSession.id)]);
-      
+
       // Immediately set as active session and open tab
       setActiveSessionId(newSession.id);
       setOpenTabIds(prev => [newSession.id, ...prev]);
@@ -409,7 +412,7 @@ function App() {
 
   const selectSession = useCallback(async (sessionId) => {
     setActiveSessionId(sessionId);
-    
+
     // Add to open tabs if not already open
     setOpenTabIds(prev => {
       if (!prev.includes(sessionId)) {
@@ -417,7 +420,7 @@ function App() {
       }
       return prev;
     });
-    
+
     await loadSessionMessages(sessionId);
     if (isMobile) setIsSidebarOpen(false);
   }, [isMobile]);
@@ -425,10 +428,10 @@ function App() {
   // Tab management functions
   const closeTabOnly = useCallback((sessionId) => {
     console.log('Closing tab only for session:', sessionId);
-    
+
     // Remove from open tabs only (keep in sessions list)
     setOpenTabIds(prev => prev.filter(id => id !== sessionId));
-    
+
     // If closing active session, switch to another open tab or create new
     if (sessionId === activeSessionId) {
       setOpenTabIds(current => {
@@ -441,21 +444,21 @@ function App() {
         return remainingOpenTabs;
       });
     }
-    
+
     // No backend call, no toast - just visual tab removal
   }, [activeSessionId, selectSession]);
 
   const deleteSession = useCallback(async (sessionId) => {
     console.log('Actually deleting session:', sessionId);
-    
+
     try {
       // Close the session on backend (mark as closed/deleted)
       await sessionsAPI.closeSession(sessionId);
-      
+
       // Remove from both sessions list and open tabs
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       setOpenTabIds(prev => prev.filter(id => id !== sessionId));
-      
+
       // If deleting active session, switch to another or create new
       if (sessionId === activeSessionId) {
         const remainingSessions = sessions.filter(s => s.id !== sessionId);
@@ -465,7 +468,7 @@ function App() {
           await createNewSession();
         }
       }
-      
+
       toast.success(t('chat_deleted_from_history'));
     } catch (error) {
       console.error('Failed to delete session:', error);
@@ -473,11 +476,26 @@ function App() {
     }
   }, [activeSessionId, sessions, selectSession, t]);
 
+  const addAssistantMessage = useCallback((content) => {
+    setCurrentMessages(prev => [
+      ...prev,
+      {
+        id: `assistant_${Date.now()}`,
+        role: 'assistant',
+        content: content,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  }, []);
+
   // Message handling with improved error handling and UX
-  const sendMessage = useCallback(async (message, files = []) => {
+  const sendMessage = useCallback(async (message, files = [], searchMode = false) => {
     if (!message || !message.trim()) {
-      toast.error(t('please_enter_a_message'));
-      return { success: false };
+      // Allow empty message if in searchMode
+      if (!searchMode) {
+        toast.error(t('please_enter_a_message'));
+        return { success: false };
+      }
     }
 
     // Don't auto-create session here, let MessageInput handle it
@@ -506,7 +524,7 @@ function App() {
     // Immediately add user message to chat
     setCurrentMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
-    
+
     try {
       // Upload files if any
       const uploadedFileIds = [];
@@ -517,16 +535,16 @@ function App() {
           const fileId = uploadResponse.data.id;
           uploadedFileIds.push(fileId);
           setUploadedFileIds(prev => [...prev, fileId]); // Add to tracking state
-          
+
           // Check file status after upload to ensure it's ready
           try {
             let retries = 0;
             const maxRetries = 30; // 30 * 4 seconds = 120 seconds max wait
             let fileReady = false;
-            
+
             while (retries < maxRetries && !fileReady) {
               await new Promise(resolve => setTimeout(resolve, 4000)); // Wait 4 seconds between checks
-              
+
               try {
                 const statusResponse = await filesAPI.getFileStatus(fileId, i18n.language);
                 if (statusResponse.data.status === 'ready' && statusResponse.data.processing_status === 'completed') {
@@ -541,7 +559,7 @@ function App() {
                 retries++;
               }
             }
-            
+
             if (!fileReady) {
               console.warn(t('file_not_ready_after_timeout', { fileName: file.name, time: maxRetries * 4 }));
               // Continue anyway - the backend will handle file processing
@@ -550,11 +568,11 @@ function App() {
             console.warn(t('status_checking_failed_for_file', { fileName: file.name }), statusError);
             // Continue anyway - the backend will handle file processing
           }
-          
+
         } catch (error) {
           console.error('Failed to upload file:', file.name, error);
           let errorMsg = t('failed_to_upload_file', { fileName: file.name });
-          
+
           if (error.message.includes('timeout')) {
             errorMsg = t('upload_timeout_file_processing', { fileName: file.name });
           } else if (error.message.includes('size')) {
@@ -562,14 +580,14 @@ function App() {
           } else if (error.message.includes('Authentication')) {
             errorMsg = t('authentication_failed_for_file', { fileName: file.name });
           }
-          
+
           toast.error(errorMsg);
-          
+
           // Try to retry the upload once
           try {
             console.log(t('retrying_upload_for_file', { fileName: file.name }));
             await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
-            
+
             const retryResponse = await filesAPI.uploadFile(file, i18n.language);
             const retryFileId = retryResponse.data.id;
             uploadedFileIds.push(retryFileId);
@@ -580,7 +598,7 @@ function App() {
             console.error(t('retry_failed_for_file', { fileName: file.name }), retryError);
             toast.error(t('retry_failed_for_file_try_again', { fileName: file.name }));
           }
-          
+
           // Don't add failed files to the list if retry also failed
           continue;
         }
@@ -590,6 +608,7 @@ function App() {
       const response = await sessionsAPI.sendMessage(activeSessionId, {
         message: message.trim(),
         files: uploadedFileIds,
+        search_mode: searchMode, // Pass the searchMode flag
       }, i18n.language);
 
       // Replace temporary message with real messages from server
@@ -605,7 +624,7 @@ function App() {
       });
 
       // Update session in list (update title, message count, etc.)
-      setSessions(prev => prev.map(s => 
+      setSessions(prev => prev.map(s =>
         s.id === activeSessionId ? response.data.session : s
       ));
 
@@ -621,10 +640,10 @@ function App() {
 
     } catch (error) {
       console.error('Failed to send message:', error);
-      
+
       // Remove the temporary user message on error
       setCurrentMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
-      
+
       // More specific error messages
       let errorMessage = t('failed_to_send_message');
       if (error.message.includes('Authentication required')) {
@@ -641,9 +660,9 @@ function App() {
       } else {
         errorMessage = t('failed_to_send_message_with_error', { error: error.message });
       }
-      
+
       toast.error(errorMessage);
-      
+
       // Return error with the original message to restore in input
       return { success: false, originalMessage: message, originalFiles: files };
     } finally {
@@ -693,7 +712,7 @@ function App() {
         ];
       });
 
-      setSessions(prev => prev.map(s => 
+      setSessions(prev => prev.map(s =>
         s.id === activeSessionId ? response.data.session : s
       ));
 
@@ -723,14 +742,14 @@ function App() {
   // Add periodic file status checking
   const checkFileStatuses = useCallback(async (fileIds) => {
     if (!fileIds || fileIds.length === 0) return;
-    
+
     console.log(t('checking_status_for_files', { count: fileIds.length }));
-    
+
     for (const fileId of fileIds) {
       try {
         const statusResponse = await filesAPI.getFileStatus(fileId, i18n.language);
         const status = statusResponse.data;
-        
+
         if (status.status === 'ready' && status.processing_status === 'completed') {
           console.log(t('file_is_ready', { fileName: status.original_filename }));
         } else {
@@ -748,7 +767,7 @@ function App() {
       const interval = setInterval(() => {
         checkFileStatuses(uploadedFileIds);
       }, 10000); // Check every 10 seconds
-      
+
       return () => clearInterval(interval);
     }
   }, [uploadedFileIds, checkFileStatuses]);
@@ -763,15 +782,15 @@ function App() {
     try {
       // Remove message from local state immediately for better UX
       setCurrentMessages(prev => prev.filter(msg => msg.id !== messageId));
-      
+
       // Call API to delete message from server
       await sessionsAPI.deleteMessage(activeSessionId, messageId, i18n.language);
-      
+
       toast.success(t('message_deleted_successfully'));
     } catch (error) {
       console.error('Failed to delete message:', error);
       toast.error(t('failed_to_delete_message'));
-      
+
       // Reload messages from server to restore state
       try {
         const response = await sessionsAPI.getSession(activeSessionId, i18n.language);
@@ -798,9 +817,9 @@ function App() {
     try {
       // Increment usage count
       await promptsAPI.usePrompt(prompt.id, i18n.language);
-      
+
       // Update prompts list
-      setPrompts(prev => prev.map(p => 
+      setPrompts(prev => prev.map(p =>
         p.id === prompt.id ? { ...p, usage_count: p.usage_count + 1 } : p
       ));
 
@@ -854,12 +873,12 @@ function App() {
       await sessionsAPI.updateSession(sessionId, {
         title: newTitle.trim()
       }, i18n.language);
-      
+
       // Update sessions list
-      setSessions(prev => prev.map(s => 
+      setSessions(prev => prev.map(s =>
         s.id === sessionId ? { ...s, title: newTitle.trim() } : s
       ));
-      
+
       toast.success(t('chat_renamed_successfully'));
     } catch (error) {
       console.error('Failed to rename session:', error);
@@ -870,12 +889,12 @@ function App() {
   const changeSessionModel = useCallback(async (sessionId, newModel) => {
     try {
       await sessionsAPI.updateSession(sessionId, { model: newModel }, i18n.language);
-      
+
       // Update sessions list
-      setSessions(prev => prev.map(s => 
+      setSessions(prev => prev.map(s =>
         s.id === sessionId ? { ...s, model: newModel } : s
       ));
-      
+
       toast.success(t('model_changed_to', { model: newModel }));
     } catch (error) {
       console.error('Failed to change session model:', error);
@@ -884,28 +903,29 @@ function App() {
   }, [t]);
 
   // Find current session object
-  const currentSession = useMemo(() => 
-    sessions.find(s => s.id === activeSessionId), 
+  const currentSession = useMemo(() =>
+    sessions.find(s => s.id === activeSessionId),
     [sessions, activeSessionId]
   );
 
   // Settings management with improved error handling
   const updateSettings = useCallback(async (newSettings) => {
     setSettings(newSettings);
-    
+
     // Update i18n language immediately
     if (newSettings.language && newSettings.language !== i18n.language) {
       i18n.changeLanguage(newSettings.language);
     }
 
     try {
-      if (newSettings.geminiApiKey || newSettings.openrouterApiKey || (newSettings.customProviders && newSettings.customProviders.length > 0)) {
+      if (newSettings.geminiApiKey || newSettings.openrouterApiKey || newSettings.exaApiKey || (newSettings.customProviders && newSettings.customProviders.length > 0)) {
         await configAPI.setConfig({
           gemini_api_key: newSettings.geminiApiKey,
           openrouter_api_key: newSettings.openrouterApiKey,
+          exa_api_key: newSettings.exaApiKey, // Pass EXA API key to backend
           custom_providers: newSettings.customProviders || [],
         }, newSettings.language);
-        
+
         // Try to reload models
         try {
           const modelsResponse = await configAPI.getModels(newSettings.language);
@@ -984,7 +1004,7 @@ function App() {
             </div>
           </div>
         </div>
-        
+
         <AdminDashboard />
       </div>
     );
@@ -1038,7 +1058,7 @@ function App() {
             onOpenAdmin={() => setShowAdminDashboard(true)}
           />
         )}
-        
+
         {/* Mobile overlay sidebar */}
         {isMobile && isSidebarOpen && (
           <div className="sidebar-overlay" role="dialog" aria-modal="true">
@@ -1069,7 +1089,7 @@ function App() {
             </div>
           </div>
         )}
-        
+
         <div className="flex-1 flex flex-col main-content">
           {!isMobile && (
             <ChatTabs
@@ -1081,17 +1101,18 @@ function App() {
               onRenameSession={renameSession}
             />
           )}
-          
+
           <MessageList
             messages={currentMessages}
             isLoading={isLoading}
             onAddToPrompt={openPromptDialogWithContent}
             onDeleteMessage={deleteMessage}
           />
-          
+
           <MessageInput
             onSendMessage={sendMessage}
             onImageGeneration={generateImage}
+            onAddAssistantMessage={addAssistantMessage} // Pass the new function
             isLoading={isLoading}
             disabled={!isConfigured}
             availableModels={availableModels}

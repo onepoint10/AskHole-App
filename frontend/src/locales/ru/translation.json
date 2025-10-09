@@ -293,6 +293,18 @@
   "dont_have_account": "Нет учетной записи? ",
   "already_have_account": "Уже есть учетная запись? ",
   "sign_up": "Зарегистрироваться",
+  "exa": {
+    "settings": "Настройки поиска EXA",
+    "api_key": "API ключ EXA",
+    "enter_api_key": "Введите ваш API ключ EXA",
+    "api_key_saved": "Ваш API ключ EXA успешно сохранен.",
+    "search_results": "Результаты поиска EXA",
+    "enter_search_query": "Введите поисковый запрос EXA...",
+    "toggle_search_mode": "Переключить режим поиска EXA",
+    "client_not_configured": "Клиент EXA не настроен. Пожалуйста, проверьте ваш API ключ в настройках.",
+    "search_failed": "Поиск EXA не удался: {{error}}",
+    "copy_results": "Копировать результаты поиска"
+  },
   "publicPrompts": {
     "failedToLoad": "Не удалось загрузить публичные промпты",
     "failedToLike": "Не удалось поставить лайк промпту",

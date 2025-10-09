@@ -4,7 +4,7 @@ const getApiBaseUrl = () => {
   const currentHost = window.location.hostname;
   const currentProtocol = window.location.protocol;
   const currentPort = window.location.port;
-  
+
   // Check if we're accessing via a network IP (not localhost/127.0.0.1)
   if (currentPort === '5173' || currentPort === '3000' || currentPort === '8080') {
     return `http://${currentHost}:5000/api`;
@@ -36,12 +36,12 @@ const apiCall = async (url, options = {}, language = 'en') => {
   // FIXED: Get session ID from multiple sources with better priority
   const sessionIdFromStorage = localStorage.getItem('session_id');
   const sessionIdFromCookie = getCookie('session');
-  
+
   // Prefer localStorage over cookie for network compatibility
   const sessionId = sessionIdFromStorage || sessionIdFromCookie;
-  
+
   console.log(`API Call ${url}: session_id = ${sessionId}`);
-  
+
   const defaultOptions = {
     credentials: 'include',  // Changed to 'include' to ensure cookies are sent
     mode: 'cors',
@@ -51,7 +51,7 @@ const apiCall = async (url, options = {}, language = 'en') => {
       'Accept': 'application/json',
       'Accept-Language': language, // Use the passed language parameter
       // FIXED: Always send session ID in Authorization header for network requests
-      ...(sessionId && { 
+      ...(sessionId && {
         'Authorization': `Bearer ${sessionId}`
       }),
       ...options.headers,
@@ -74,7 +74,7 @@ const apiCall = async (url, options = {}, language = 'en') => {
     // Handle different response types
     let data;
     const contentType = response.headers.get('content-type');
-    
+
     if (contentType && contentType.includes('application/json')) {
       data = await response.json();
     } else {
@@ -114,11 +114,11 @@ const apiCall = async (url, options = {}, language = 'en') => {
 
   } catch (error) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
       throw new Error('Request timeout');
     }
-    
+
     // Log errors for debugging
     console.error(`API ${url} Error:`, error.message);
     throw error;
@@ -133,13 +133,13 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify(userData),
     }, language);
-    
+
     // Handle session from registration response
     if (response.data.session_id) {
       localStorage.setItem('session_id', response.data.session_id);
       setCookie('session', response.data.session_id);
     }
-    
+
     return response;
   },
 
@@ -149,7 +149,7 @@ export const authAPI = {
       method: 'POST',
       body: JSON.stringify(credentials),
     }, language);
-    
+
     // FIXED: Always prefer session_id from response data for network compatibility
     if (response.data.session_id) {
       localStorage.setItem('session_id', response.data.session_id);
@@ -164,7 +164,7 @@ export const authAPI = {
         console.log('Session stored from header:', sessionFromHeader);
       }
     }
-    
+
     return response;
   },
 
@@ -174,11 +174,11 @@ export const authAPI = {
       const response = await apiCall('/auth/logout', {
         method: 'POST',
       }, language);
-      
+
       // Clear session data after successful logout
       localStorage.removeItem('session_id');
       document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=None';
-      
+
       return response;
     } catch (error) {
       // Even if logout fails on server, clear local data
@@ -230,7 +230,7 @@ export const sessionsAPI = {
     console.log('API Request: GET /sessions');
     return apiCall('/sessions', {}, language);
   },
-  
+
   getSessionHistory: async (language) => {
     console.log('API Request: GET /sessions/history');
     return apiCall('/sessions/history', {}, language);
@@ -285,12 +285,12 @@ export const sessionsAPI = {
 
   sendMessage: async (sessionId, messageData, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/messages');
-    
-    // Validate message data before sending
-    if (!messageData.message || !messageData.message.trim()) {
+
+    // Validate message data before sending, unless in search_mode with potentially empty message
+    if (!messageData.search_mode && (!messageData.message || !messageData.message.trim())) {
       throw new Error('Message content cannot be empty');
     }
-    
+
     return apiCall(`/sessions/${sessionId}/messages`, {
       method: 'POST',
       body: JSON.stringify(messageData),
@@ -329,7 +329,7 @@ export const promptsAPI = {
 
   createPrompt: async (promptData, language) => {
     console.log('API Request: POST /prompts', { title: promptData.title, is_public: promptData.is_public });
-    
+
     // Validate required fields on frontend
     if (!promptData.title?.trim()) {
       throw new Error('Title is required');
@@ -337,7 +337,7 @@ export const promptsAPI = {
     if (!promptData.content?.trim()) {
       throw new Error('Content is required');
     }
-    
+
     // Clean data before sending
     const cleanData = {
       title: promptData.title.trim(),
@@ -346,7 +346,7 @@ export const promptsAPI = {
       tags: Array.isArray(promptData.tags) ? promptData.tags : [],
       is_public: Boolean(promptData.is_public)
     };
-    
+
     return apiCall('/prompts', {
       method: 'POST',
       body: JSON.stringify(cleanData),
@@ -355,7 +355,7 @@ export const promptsAPI = {
 
   updatePrompt: async (promptId, updates, language) => {
     console.log('API Request: PUT /prompts/' + promptId, { is_public: updates.is_public });
-    
+
     // Validate if updating title or content
     if ('title' in updates && !updates.title?.trim()) {
       throw new Error('Title cannot be empty');
@@ -363,14 +363,14 @@ export const promptsAPI = {
     if ('content' in updates && !updates.content?.trim()) {
       throw new Error('Content cannot be empty');
     }
-    
+
     // Clean updates data
     const cleanUpdates = { ...updates };
     if (cleanUpdates.title) cleanUpdates.title = cleanUpdates.title.trim();
     if (cleanUpdates.content) cleanUpdates.content = cleanUpdates.content.trim();
     if (cleanUpdates.category) cleanUpdates.category = cleanUpdates.category.trim();
     if ('is_public' in cleanUpdates) cleanUpdates.is_public = Boolean(cleanUpdates.is_public);
-    
+
     return apiCall(`/prompts/${promptId}`, {
       method: 'PUT',
       body: JSON.stringify(cleanUpdates),
@@ -393,13 +393,13 @@ export const promptsAPI = {
 
   getPublicPrompts: async (params = {}, language) => {
     console.log('API Request: GET /public-prompts', params);
-    
+
     // Validate parameters
     const validatedParams = {
       page: Math.max(1, parseInt(params.page) || 1),
       per_page: Math.min(100, Math.max(1, parseInt(params.per_page) || 20)),
     };
-    
+
     if (params.search?.trim()) {
       validatedParams.search = params.search.trim();
     }
@@ -409,27 +409,27 @@ export const promptsAPI = {
     if (params.tag?.trim()) { // Add this block to include tag parameter
       validatedParams.tag = params.tag.trim();
     }
-    
+
     const queryParams = new URLSearchParams();
     Object.entries(validatedParams).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         queryParams.append(key, value.toString());
       }
     });
-    
+
     const queryString = queryParams.toString();
     const url = queryString ? `/public-prompts?${queryString}` : '/public-prompts';
-    
+
     return apiCall(url, {}, language);
   },
 
   likePrompt: async (promptId, language) => {
     console.log('API Request: POST /prompts/' + promptId + '/like');
-    
+
     if (!promptId || isNaN(promptId)) {
       throw new Error('Invalid prompt ID');
     }
-    
+
     return apiCall(`/prompts/${promptId}/like`, {
       method: 'POST',
     }, language);
@@ -437,11 +437,11 @@ export const promptsAPI = {
 
   getPromptLikeStatus: async (promptId, language) => {
     console.log('API Request: GET /prompts/' + promptId + '/like-status');
-    
+
     if (!promptId || isNaN(promptId)) {
       throw new Error('Invalid prompt ID');
     }
-    
+
     return apiCall(`/prompts/${promptId}/like-status`, {}, language);
   },
 };
@@ -455,12 +455,12 @@ export const filesAPI = {
 
   uploadFile: async (file, language) => {
     console.log('API Request: POST /files/upload');
-    
+
     // Validate file before upload
     if (!file || file.size === 0) {
       throw new Error('Please select a valid file to upload');
     }
-    
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -475,7 +475,7 @@ export const filesAPI = {
       headers: {
         // Remove Content-Type to let browser set it with boundary
         // Keep other headers like Authorization
-        ...(sessionId && { 
+        ...(sessionId && {
           'Authorization': `Bearer ${sessionId}`
         }),
       },
@@ -558,4 +558,29 @@ export const adminAPI = {
     return apiCall(`/admin/files?${params.toString()}`, {}, language);
   },
   getSystemInfo: async (language) => apiCall('/admin/system/info', {}, language),
+};
+
+// Exa API
+export const exaAPI = {
+  search: async (query, apiKey, options = {}, language) => {
+    console.log('API Request: POST /exa/search');
+    return apiCall('/exa/search', {
+      method: 'POST',
+      body: JSON.stringify({ ...options, query, api_key: apiKey }),
+    }, language);
+  },
+  getContents: async (ids, apiKey, language) => {
+    console.log('API Request: POST /exa/contents');
+    return apiCall('/exa/contents', {
+      method: 'POST',
+      body: JSON.stringify({ ids, api_key: apiKey }),
+    }, language);
+  },
+  searchAndContents: async (query, apiKey, options = {}, language) => {
+    console.log('API Request: POST /exa/search_and_contents');
+    return apiCall('/exa/search_and_contents', {
+      method: 'POST',
+      body: JSON.stringify({ ...options, query, api_key: apiKey }),
+    }, language);
+  },
 };

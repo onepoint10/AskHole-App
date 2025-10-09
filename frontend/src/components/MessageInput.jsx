@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, ImageIcon } from 'lucide-react';
+import { Send, Paperclip, X, ImageIcon, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import ModelSelector from './ModelSelector';
 import { useTranslation } from 'react-i18next';
+import { exaAPI } from '../services/api'; // Import exaAPI
 
 const MessageInput = ({
   onSendMessage,
@@ -17,7 +18,8 @@ const MessageInput = ({
   settings,
   initialContent,
   onContentSet,
-  onImageGeneration, // New prop for image generation
+  onImageGeneration,
+  onAddAssistantMessage, // New prop for adding assistant messages
 }) => {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
@@ -26,6 +28,7 @@ const MessageInput = ({
   const [isDragOver, setIsDragOver] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isImageGenerationMode, setIsImageGenerationMode] = useState(false); // New state for image generation mode
+  const [isExaSearchMode, setIsExaSearchMode] = useState(false); // New state for EXA search mode
   const dragCounterRef = useRef(0);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -42,7 +45,7 @@ const MessageInput = ({
     }
   }, [currentSession, settings?.defaultModel]);
 
-   // Initialize plugins and device detection
+  // Initialize plugins and device detection
   useEffect(() => {
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
@@ -71,7 +74,7 @@ const MessageInput = ({
     const handleDragEnter = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Increment counter and activate drag state only on first enter
       dragCounterRef.current++;
       if (dragCounterRef.current === 1) {
@@ -82,7 +85,7 @@ const MessageInput = ({
     const handleDragLeave = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Decrement counter and deactivate only when all drags have left
       dragCounterRef.current--;
       if (dragCounterRef.current === 0) {
@@ -100,7 +103,7 @@ const MessageInput = ({
     const handleDrop = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      
+
       // Reset everything on drop
       dragCounterRef.current = 0;
       setIsDragOver(false);
@@ -128,13 +131,13 @@ const MessageInput = ({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (message.trim() || attachedFiles.length > 0 || isImageGenerationMode) { // Allow submission in image generation mode even with empty message
+    if (message.trim() || attachedFiles.length > 0 || isImageGenerationMode || isExaSearchMode) { // Allow submission in EXA search mode even with empty message
       // If we have an empty session, update its model before sending
       if (currentSession && currentSession.message_count === 0 && selectedModel !== currentSession.model) {
         console.log(t('updating_empty_session_model', { currentModel: currentSession.model, newModel: selectedModel }));
         await onModelChange(currentSession.id, String(selectedModel));
       }
-      
+
       // If no session exists at all, create one
       if (!currentSession) {
         console.log(t('creating_new_session_with_model', { model: selectedModel, type: typeof selectedModel }));
@@ -146,20 +149,24 @@ const MessageInput = ({
         // Wait a bit to ensure session is properly created and state updated
         await new Promise(resolve => setTimeout(resolve, 200));
       }
-      
+
       // Send message to current/updated session
       let result;
       if (isImageGenerationMode) {
-        result = await onImageGeneration(message.trim()); // Call new prop for image generation
+        result = await onImageGeneration(message.trim());
+      } else if (isExaSearchMode) {
+        // In EXA search mode, send the message with the search_mode flag
+        result = await onSendMessage(message.trim(), attachedFiles, true); // Pass true for search_mode
       } else {
         result = await onSendMessage(message.trim(), attachedFiles);
       }
-      
+
       // Only clear input if message was sent successfully
       if (result && result.success) {
         setMessage('');
         setAttachedFiles([]);
         setIsImageGenerationMode(false); // Exit image generation mode on success
+        setIsExaSearchMode(false); // Exit EXA search mode on success
         // Reset textarea height after clearing
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto';
@@ -174,7 +181,7 @@ const MessageInput = ({
   const handleModelChange = async (newModel) => {
     console.log(t('model_changed_to_with_type', { model: newModel, type: typeof newModel }));
     setSelectedModel(String(newModel)); // Ensure it's always a string
-    
+
     // If session exists and has messages, update the session model
     if (currentSession && currentSession.message_count > 0) {
       await onModelChange(currentSession.id, String(newModel));
@@ -213,7 +220,7 @@ const MessageInput = ({
       // Content exceeds max lines - fix height and enable scrolling
       textarea.style.height = `${maxHeight}px`;
       textarea.style.overflowY = 'auto';
-      
+
       // Scroll to bottom to show latest text
       textarea.scrollTop = textarea.scrollHeight;
     }
@@ -222,11 +229,11 @@ const MessageInput = ({
   const handlePaste = async (e) => {
     const clipboardItems = e.clipboardData.items;
     const imageFiles = [];
-    
+
     // Check for image files in clipboard
     for (let i = 0; i < clipboardItems.length; i++) {
       const item = clipboardItems[i];
-      
+
       // Check if the item is an image
       if (item.type.indexOf('image') !== -1) {
         const file = item.getAsFile();
@@ -242,22 +249,22 @@ const MessageInput = ({
         }
       }
     }
-    
+
     // If we found image files, add them to attached files
     if (imageFiles.length > 0) {
       e.preventDefault(); // Prevent default paste behavior for images
       setAttachedFiles(prev => [...prev, ...imageFiles]);
-      
+
       // Show feedback to user
       const fileCount = imageFiles.length;
-      const message = fileCount === 1 ? 
-        t('image_pasted_and_attached', { fileName: imageFiles[0].name }) : 
+      const message = fileCount === 1 ?
+        t('image_pasted_and_attached', { fileName: imageFiles[0].name }) :
         t('images_pasted_and_attached', { count: fileCount });
-      
+
       // You can add a toast notification here if you have toast functionality
       console.log(message);
     }
-    
+
     // For text content, let the default paste behavior happen
   };
 
@@ -311,15 +318,14 @@ const MessageInput = ({
             ))}
           </div>
         )}
-        
+
         <form onSubmit={handleSubmit} className="relative">
-          <div 
+          <div
             ref={dropZoneRef}
-            className={`relative flex items-end gap-2 transition-all duration-200 rounded-3xl ${
-              isDragOver 
-                ? '' 
-                : ''
-            }`}
+            className={`relative flex items-end gap-2 transition-all duration-200 rounded-3xl ${isDragOver
+              ? ''
+              : ''
+              }`}
           >
             {/* Drag overlay */}
             {isDragOver && (
@@ -330,7 +336,7 @@ const MessageInput = ({
                 </div>
               </div>
             )}
-            
+
             <div className={`flex-1 rounded-3xl relative ${isMobileDevice ? '' : 'px-4'}`}> {/* existing textarea content */}
               <Textarea
                 ref={textareaRef}
@@ -338,7 +344,7 @@ const MessageInput = ({
                 onChange={handleTextChange}
                 onKeyPress={handleKeyPress}
                 onPaste={handlePaste}
-                placeholder={isImageGenerationMode ? t('describe_image_to_generate') : (disabled ? t('configure_api_keys_to_chat') : t('text_to_ask_hole'))}
+                placeholder={isImageGenerationMode ? t('describe_image_to_generate') : (isExaSearchMode ? t('exa.enter_search_query') : (disabled ? t('configure_api_keys_to_chat') : t('text_to_ask_hole')))}
                 className="chat-input resize-none text-base leading-relaxed input-custom-scrollbar"
                 disabled={disabled || isLoading}
                 rows={2}
@@ -348,9 +354,9 @@ const MessageInput = ({
                   lineHeight: '24px'
                 }}
               />
-              
+
               {/* Model selector - positioned in reserved bottom area */}
-              {shouldShowModelSelector && !disabled && !isImageGenerationMode && ( // Hide model selector in image generation mode
+              {shouldShowModelSelector && !disabled && !isImageGenerationMode && !isExaSearchMode && ( // Hide model selector in EXA search mode
                 <div className={`absolute bottom-2 z-10 ${isMobileDevice ? 'left-3 ' : 'left-6 '}`}>
                   <ModelSelector
                     availableModels={availableModels}
@@ -360,18 +366,37 @@ const MessageInput = ({
                   />
                 </div>
               )}
-              
+
               {/* Image Generation Button - positioned next to file attachment */}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-16 ' : 'right-22 '} ${isImageGenerationMode ? 'text-primary' : ''}`}
-                onClick={() => setIsImageGenerationMode(prev => !prev)}
+                onClick={() => {
+                  setIsImageGenerationMode(prev => !prev);
+                  setIsExaSearchMode(false); // Disable EXA search mode when enabling image generation
+                }}
                 disabled={disabled || isLoading}
                 title={t('toggle_image_generation_mode')}
               >
                 <ImageIcon className="h-5 w-5" />
+              </Button>
+
+              {/* EXA Search Button - positioned next to image generation button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-24 ' : 'right-30 '} ${isExaSearchMode ? 'text-primary' : ''}`}
+                onClick={() => {
+                  setIsExaSearchMode(prev => !prev);
+                  setIsImageGenerationMode(false); // Disable image generation mode when enabling EXA search
+                }}
+                disabled={disabled || isLoading}
+                title={t('exa.toggle_search_mode')}
+              >
+                <Search className="h-5 w-5" />
               </Button>
 
               {/* File attachment button - positioned in reserved bottom area */}
@@ -381,28 +406,28 @@ const MessageInput = ({
                 size="sm"
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-8 ' : 'right-14 '}`}
                 onClick={() => fileInputRef.current?.click()}
-                disabled={disabled || isLoading || isImageGenerationMode} // Disable when in image generation mode
+                disabled={disabled || isLoading || isImageGenerationMode || isExaSearchMode} // Disable when in image generation or EXA search mode
                 title={t('attach_files')}
               >
                 <Paperclip className="h-5 w-5" />
               </Button>
-              
+
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
                 className="hidden"
                 onChange={handleFileSelect}
-                accept={isImageGenerationMode ? "image/*" : ".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.jsx,.html,.css,.xml"} // Restrict to images in image generation mode
-                disabled={isImageGenerationMode} // Disable file input when in image generation mode
+                accept={isImageGenerationMode ? "image/*" : (isExaSearchMode ? "" : ".txt,.pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.md,.json,.csv,.py,.js,.jsx,.html,.css,.xml")} // Restrict to images in image generation mode, no files in EXA search mode
+                disabled={isImageGenerationMode || isExaSearchMode} // Disable file input when in image generation or EXA search mode
               />
-              
+
               {/* Send button - positioned in reserved bottom area */}
               <Button
                 type="submit"
                 variant="ghost"
                 size="sm"
-                disabled={(!message.trim() && attachedFiles.length === 0 && !isImageGenerationMode) || (isImageGenerationMode && !message.trim()) || disabled || isLoading}
+                disabled={(!message.trim() && attachedFiles.length === 0 && !isImageGenerationMode && !isExaSearchMode) || ((isImageGenerationMode || isExaSearchMode) && !message.trim()) || disabled || isLoading}
                 className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
               >
                 <Send className="h-5 w-5" />
@@ -410,7 +435,7 @@ const MessageInput = ({
             </div>
           </div>
         </form>
-        
+
         {disabled && (
           <div className="mt-3 text-center">
             <p className="text-sm text-muted-foreground">

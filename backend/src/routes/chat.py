@@ -6,6 +6,7 @@ from src.routes.auth import get_current_user
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
 from src.custom_client import CustomClient
+from src.exa_client import ExaClient # Import ExaClient
 from src.file_converter import FileConverter
 import uuid
 import os
@@ -81,7 +82,7 @@ def determine_client_from_model(model: str):
 
     if any(model.startswith(gm.split('-')[0] + '-') or model == gm for gm in gemini_models):
         return 'gemini'
-    
+
     # Check if it's a custom model by looking through custom clients
     for client in custom_clients.values():
         try:
@@ -89,7 +90,7 @@ def determine_client_from_model(model: str):
                 return 'custom'
         except:
             continue
-    
+
     return 'openrouter'
 
 chat_bp = Blueprint('chat', __name__)
@@ -97,13 +98,14 @@ chat_bp = Blueprint('chat', __name__)
 # Global clients - will be initialized when API keys are provided
 gemini_client = None
 openrouter_client = None
+exa_client = None # Add ExaClient
 custom_clients = {}  # Dictionary to store custom clients by provider name
 
 
 @chat_bp.route('/config', methods=['POST'])
 def set_config():
     """Set API keys and initialize clients"""
-    global gemini_client, openrouter_client, custom_clients
+    global gemini_client, openrouter_client, custom_clients, exa_client # Add exa_client
 
     # Check authentication
     current_user = get_current_user()
@@ -113,6 +115,7 @@ def set_config():
     data = request.get_json()
     gemini_key = data.get('gemini_api_key')
     openrouter_key = data.get('openrouter_api_key')
+    exa_key = data.get('exa_api_key') # Get Exa API key
     custom_providers = data.get('custom_providers', [])
 
     try:
@@ -123,6 +126,9 @@ def set_config():
         if openrouter_key:
             if (openrouter_client is None) or (getattr(openrouter_client, 'api_key', None) != openrouter_key):
                 openrouter_client = OpenRouterClient(openrouter_key)
+        if exa_key: # Initialize ExaClient
+            if (exa_client is None) or (getattr(exa_client, 'api_key', None) != exa_key):
+                exa_client = ExaClient(exa_key)
 
         # Handle custom providers
         custom_clients.clear()  # Clear existing custom clients
@@ -142,6 +148,7 @@ def set_config():
             'message': 'API keys configured successfully',
             'gemini_available': gemini_client is not None,
             'openrouter_available': openrouter_client is not None,
+            'exa_available': exa_client is not None, # Add Exa availability
             'custom_providers_available': list(custom_clients.keys())
         })
     except Exception as e:
@@ -386,6 +393,7 @@ def send_message(session_id):
 
     message_content = data.get('message', '')
     file_ids = data.get('files', [])
+    search_mode = data.get('search_mode', False) # Get search_mode flag
 
     # Validate message content
     if not message_content or not message_content.strip():
@@ -442,93 +450,193 @@ def send_message(session_id):
     )
 
     # Use no_autoflush to prevent premature flushing
-    with db.session.no_autoflush:
+    with (db.session.no_autoflush):
         db.session.add(user_message)
 
         try:
             # Get appropriate client and generate response
             response_content = None
 
-            if session.client_type == 'gemini':
-                if not gemini_client:
-                    raise Exception("Gemini client not configured. Please check your API key in settings.")
-                # Rehydrate Gemini chat session with DB history on first use if needed
-                history_messages = None
-                try:
-                    if session_id not in getattr(gemini_client, 'chat_sessions', {}):
-                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
-                        history_messages = []
-                        for m in prior_messages:
-                            role = 'user' if m.role == 'user' else 'model'
-                            text = m.content or ''
-                            history_messages.append({'role': role, 'parts': [text]})
-                except Exception as hist_err:
-                    logger.warning(f"History build error for session {session_id}: {hist_err}")
-                response_content = gemini_client.chat_message(
-                    session_id=session_id,
-                    message=message_content,
-                    model=session.model,
-                    files=file_paths,
-                    temperature=session.temperature,
-                    history_messages=history_messages
-                )
-            elif session.client_type == 'openrouter':
-                if not openrouter_client:
-                    raise Exception("OpenRouter client not configured. Please check your API key in settings.")
-                try:
-                    if session_id not in getattr(openrouter_client, 'chat_sessions', {}):
-                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
-                        history_messages = []
-                        for m in prior_messages:
-                            role = 'user' if m.role == 'user' else 'assistant'
-                            text = m.content or ''
-                            history_messages.append({'role': role, 'content': [{ 'type': 'text', 'text': text }]})
-                        openrouter_client.chat_sessions[session_id] = history_messages
-                except Exception as or_hist_err:
-                    logger.warning(f"OpenRouter history build error for session {session_id}: {or_hist_err}")
-                response_content = openrouter_client.chat_message(
-                    session_id=session_id,
-                    message=message_content,
-                    model=session.model,
-                    files=file_paths,
-                    temperature=session.temperature
-                )
-            elif session.client_type == 'custom':
-                # Find the appropriate custom client for this model
-                custom_client = None
-                for client in custom_clients.values():
+            if search_mode: # Handle search mode
+                if not exa_client:
+                    raise Exception("Exa client not configured. Please check your API key in settings.")
+
+                # 1. Send user's request to Exa
+                exa_response = exa_client.search_and_contents(query=message_content,type="auto", text=True)
+
+                # Check if exa_response is an error dictionary
+                if isinstance(exa_response, dict) and "error" in exa_response:
+                    raise Exception(f"Exa search failed: {exa_response['error']}")
+
+                # Extract content from Exa response (now we are sure it's an Exa SearchResponse object)
+                # Iterate over exa_response.results to get individual Result objects
+                exa_contents_list = [r.text for r in exa_response.results if r.text]
+                exa_contents = "\n\n".join(exa_contents_list)
+
+                if not exa_contents:
+                    response_content = "I couldn't find any relevant information using Exa search."
+                else:
+                # 2. Send Exa response and user's original request to the currently selected model
+                # for summarization and formatted presentation.
+                    model_query = (f"1. System Instruction (SI)\n"
+                                   f"                        You are an expert data structuring and formatting engine. Your primary goal is to transform highly unstructured, mixed-text data from an Exa search result into a clear, professional, and reader-friendly format. The output must adhere strictly to the following two-part structure: 1) A summary of the main extracted information, and 2) a list of all useful web links presented as search engine snippets.\n"
+                                   f"    \n"
+                                   f"                        2. Role Instruction (RI)\n"
+                                   f"                        Assume the role of a meticulous editorial assistant who specializes in synthesizing complex search results. You must identify key topics, extract all relevant URLs, and generate a concise, descriptive summary for each link that is distinct from its title. The output must be free of extraneous commentary, markdown formatting errors, or incomplete sections.\n"
+                                   f"    \n"
+                                   f"                        3. Query Instruction (QI)\n"
+                                   f"                        **User's original question**: '{message_content}'\n"
+                                   f"    \n"
+                                   f"                        **Search Results**:\n"
+                                   f"                        {exa_contents}\n"
+                                   f"    \n"
+                                   f"                        **Task Steps & Output Format:** \n"
+                                   f"                        1. **Main Content Synthesis:** Analyze the entire input text and generate a concise, single paragraph summary of the primary findings, key concepts, or main content of the search results. \n"
+                                   f"                        2. **Link Extraction and Snippet Formatting:** \n"
+                                   f"                            * Scan the text to find every useful URL. \n"
+                                   f"                            * For each URL, identify its associated title or a relevant phrase to use as a title. \n"
+                                   f"                            * Write a **Brief description of the linked content** (max 2-3 sentences) by synthesizing information found near the link or within the broader search result text. This description must clearly convey what the user will find on the page. \n"
+                                   f"                            * Present the final list of links using the following template for each entry: \n"
+                                   f"                            **Template for Links:** \n"
+                                   f"                            **[Clickable link as a title](URL)**\n"
+                                   f"                            Brief description of the linked content. \n"
+                                   f"                            *Example:* **[Best Practices for Prompt Engineering with Gemini 2.5 Pro](https://medium.com/example-url)**\n"
+                                   f"                            This article details essential techniques for optimizing prompts, such as defining a clear role for the model, setting specific goals, and providing guidance instead of direct orders to improve accuracy and reduce costs.\n"
+                                   f"    \n"
+                                   f"                        **Final Output Structure (Must be in this exact order and format):** \n"
+                                   f"                        # Synthesis of Exa Search Results \n"
+                                   f"                        [The concise, single paragraph summary goes here.] \n"
+                                   f"                        # Useful Links & Snippets \n"
+                                   f"                        [List all extracted links in the specified snippet format here.]")
+                    # Determine which client to use for the model query
+                    if session.client_type == 'gemini':
+                        if not gemini_client:
+                            raise Exception("Gemini client not configured. Please check your API key in settings.")
+                        response_content = gemini_client.chat_message(
+                            session_id=session_id,
+                            message=model_query,
+                            model=session.model,
+                            temperature=session.temperature
+                        )
+                    elif session.client_type == 'openrouter':
+                        if not openrouter_client:
+                            raise Exception("OpenRouter client not configured. Please check your API key in settings.")
+                        response_content = openrouter_client.chat_message(
+                            session_id=session_id,
+                            message=model_query,
+                            model=session.model,
+                            temperature=session.temperature
+                        )
+                    elif session.client_type == 'custom':
+                        custom_client = None
+                        for client in custom_clients.values():
+                            try:
+                                if session.model in client.get_available_models():
+                                    custom_client = client
+                                    break
+                            except:
+                                continue
+                        if not custom_client:
+                            raise Exception(f"Custom client not found for model: {session.model}. Please check your custom provider configuration.")
+                        response = custom_client.send_message(
+                            session_id=session_id,
+                            message=model_query,
+                            model=session.model,
+                            temperature=session.temperature
+                        )
+                        response_content = response.get('response', '')
+                    else:
+                        raise Exception(f"Unknown client type for summarization: {session.client_type}")
+
+                    if not response_content or not response_content.strip():
+                        response_content = "I apologize, but I couldn't generate a summary from the search results. Please try again."
+
+                # 3. Place the received response (along with Exa's original response) from the model in the MessageList
+                # For now, we'll just combine them. Frontend can separate if needed.
+                full_response_content = f"**Exa Search Results:**\n\n{exa_contents}\n\n**Summary from {session.model}:**\n\n{response_content}"
+                response_content = full_response_content
+
+            else: # Original chat mode logic
+                if session.client_type == 'gemini':
+                    if not gemini_client:
+                        raise Exception("Gemini client not configured. Please check your API key in settings.")
+                    # Rehydrate Gemini chat session with DB history on first use if needed
+                    history_messages = None
                     try:
-                        if session.model in client.get_available_models():
-                            custom_client = client
-                            break
-                    except:
-                        continue
-                
-                if not custom_client:
-                    raise Exception(f"Custom client not found for model: {session.model}. Please check your custom provider configuration.")
-                
-                try:
-                    if session_id not in getattr(custom_client, 'chat_sessions', {}):
-                        prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
-                        history_messages = []
-                        for m in prior_messages:
-                            role = 'user' if m.role == 'user' else 'assistant'
-                            text = m.content or ''
-                            history_messages.append({'role': role, 'content': text})
-                        custom_client.chat_sessions[session_id] = history_messages
-                except Exception as custom_hist_err:
-                    logger.warning(f"Custom client history build error for session {session_id}: {custom_hist_err}")
-                
-                response = custom_client.send_message(
-                    session_id=session_id,
-                    message=message_content,
-                    model=session.model,
-                    files=file_paths,
-                    temperature=session.temperature
-                )
-                response_content = response.get('response', '')
-            else:
-                raise Exception(f"Unknown client type: {session.client_type}")
+                        if session_id not in getattr(gemini_client, 'chat_sessions', {}):
+                            prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                            history_messages = []
+                            for m in prior_messages:
+                                role = 'user' if m.role == 'user' else 'model'
+                                text = m.content or ''
+                                history_messages.append({'role': role, 'parts': [text]})
+                    except Exception as hist_err:
+                        logger.warning(f"History build error for session {session_id}: {hist_err}")
+                    response_content = gemini_client.chat_message(
+                        session_id=session_id,
+                        message=message_content,
+                        model=session.model,
+                        files=file_paths,
+                        temperature=session.temperature,
+                        history_messages=history_messages
+                    )
+                elif session.client_type == 'openrouter':
+                    if not openrouter_client:
+                        raise Exception("OpenRouter client not configured. Please check your API key in settings.")
+                    try:
+                        if session_id not in getattr(openrouter_client, 'chat_sessions', {}):
+                            prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                            history_messages = []
+                            for m in prior_messages:
+                                role = 'user' if m.role == 'user' else 'assistant'
+                                text = m.content or ''
+                                history_messages.append({'role': role, 'content': [{ 'type': 'text', 'text': text }]})
+                            openrouter_client.chat_sessions[session_id] = history_messages
+                    except Exception as or_hist_err:
+                        logger.warning(f"OpenRouter history build error for session {session_id}: {or_hist_err}")
+                    response_content = openrouter_client.chat_message(
+                        session_id=session_id,
+                        message=message_content,
+                        model=session.model,
+                        files=file_paths,
+                        temperature=session.temperature
+                    )
+                elif session.client_type == 'custom':
+                    # Find the appropriate custom client for this model
+                    custom_client = None
+                    for client in custom_clients.values():
+                        try:
+                            if session.model in client.get_available_models():
+                                custom_client = client
+                                break
+                        except:
+                            continue
+
+                    if not custom_client:
+                        raise Exception(f"Custom client not found for model: {session.model}. Please check your custom provider configuration.")
+
+                    try:
+                        if session_id not in getattr(custom_client, 'chat_sessions', {}):
+                            prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
+                            history_messages = []
+                            for m in prior_messages:
+                                role = 'user' if m.role == 'user' else 'assistant'
+                                text = m.content or ''
+                                history_messages.append({'role': role, 'content': text})
+                            custom_client.chat_sessions[session_id] = history_messages
+                    except Exception as custom_hist_err:
+                        logger.warning(f"Custom client history build error for session {session_id}: {custom_hist_err}")
+
+                    response = custom_client.send_message(
+                        session_id=session_id,
+                        message=message_content,
+                        model=session.model,
+                        files=file_paths,
+                        temperature=session.temperature
+                    )
+                    response_content = response.get('response', '')
+                else:
+                    raise Exception(f"Unknown client type: {session.client_type}")
 
             if not response_content or not response_content.strip():
                 response_content = "I apologize, but I couldn't generate a response. Please try again."
@@ -606,7 +714,7 @@ def generate_image_route(session_id):
             # Save image to disk
             upload_dir = os.path.join(current_app.root_path, 'uploads')
             os.makedirs(upload_dir, exist_ok=True)
-            
+
             # Sanitize prompt for filename
             sanitized_prompt = secure_filename(prompt.strip()[:50]) # Take first 50 chars and sanitize
             if not sanitized_prompt:
@@ -832,7 +940,7 @@ def delete_prompt(prompt_id):
     ).first()
 
     if not prompt:
-        return jsonify({'error': 'Prompt not found or access denied'}), 404
+        return jsonify({'error': 'Prompt not found'}), 404
 
     try:
         db.session.delete(prompt)
@@ -1061,7 +1169,7 @@ def test_auth():
     print("Test auth endpoint called")
     print(f"Headers: {dict(request.headers)}")
     print(f"Cookies: {dict(request.cookies)}")
-    
+
     current_user = get_current_user()
     if current_user:
         return jsonify({
@@ -1085,7 +1193,7 @@ def upload_file():
         logger.info(f"Request files: {list(request.files.keys()) if request.files else 'No files'}")
         logger.info(f"Authorization header: {request.headers.get('Authorization', 'Not present')}")
         logger.info(f"Cookies: {dict(request.cookies)}")
-        
+
         current_user = get_current_user()
         logger.info(f"Current user result: {current_user}")
         if not current_user:
@@ -1112,7 +1220,7 @@ def upload_file():
 
         # Handle Cyrillic and special characters in filename
         original_filename = file.filename
-        
+
         # Ensure filename is properly encoded
         if isinstance(original_filename, bytes):
             original_filename = original_filename.decode('utf-8')
@@ -1157,13 +1265,13 @@ def upload_file():
             file_ext = os.path.splitext(original_filename.lower())[1]
             logger.debug(f"File extension detected: {file_ext}")
             logger.debug(f"Original file_path: {file_path}")
-            
+
             if file_ext in ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.md', '.py', '.js', '.html', '.css', '.xml', '.json', '.csv']:
                 logger.info(f"Converting {file_ext} file to PDF...")
                 logger.debug(f"Calling FileConverter.convert_to_pdf({file_path}, {upload_dir})")
                 converted_file_path = FileConverter.convert_to_pdf(file_path, upload_dir)
                 logger.debug(f"FileConverter.convert_to_pdf returned: {converted_file_path}")
-                
+
                 if converted_file_path and converted_file_path != file_path:
                     logger.info(f"File converted successfully to: {converted_file_path}")
                     # Update file info for the converted file
@@ -1231,7 +1339,7 @@ def upload_file():
         # Save to database with original filename preserved
         logger.info(f"About to save file to database. User ID: {current_user.id}")
         logger.debug(f"Storing file_path={file_path}, filename={os.path.basename(file_path)}, mime_type={mime_type}")
-        
+
         file_upload = FileUpload(
             user_id=current_user.id,
             filename=os.path.basename(file_path),  # Use converted filename if available
@@ -1266,7 +1374,7 @@ def upload_file():
         logger.debug(f"Error type: {type(e).__name__}")
         import traceback
         logger.debug(f"Traceback: {traceback.format_exc()}")
-        
+
         # Clean up file if database save fails
         if 'file_path' in locals() and os.path.exists(file_path):
             try:
@@ -1317,11 +1425,11 @@ def search_content():
         return jsonify({'sessions': [], 'prompts': []})
 
     query_lower = query.lower()
-    
+
     # Search in sessions (including message content)
     sessions_results = []
     sessions = ChatSession.query.filter_by(user_id=current_user.id).all()
-    
+
     for session in sessions:
         # Check if query matches session title
         if query_lower in session.title.lower():
@@ -1337,7 +1445,7 @@ def search_content():
                 'match_content': session.title
             })
             continue
-            
+
         # Check if query matches any message content
         for message in session.messages:
             if query_lower in message.content.lower():
@@ -1355,26 +1463,26 @@ def search_content():
                     'message_timestamp': message.timestamp.isoformat() if message.timestamp else None
                 })
                 break  # Only add session once even if multiple messages match
-    
+
     # Search in prompts
     prompts_results = []
     prompts = PromptTemplate.query.filter_by(user_id=current_user.id).all()
-    
+
     print(f"DEBUG: Found {len(prompts)} prompts to search through")
     print(f"DEBUG: Search query: '{query}'")
-    
+
     for prompt in prompts:
         # Debug: Print prompt details
         # print(f"DEBUG: Checking prompt '{prompt.title}' - content length: {len(prompt.content) if prompt.content else 0}")
-        
+
         # Check if query matches prompt title, content, or category
         title_match = query_lower in prompt.title.lower()
         content_match = query_lower in prompt.content.lower() if prompt.content else False
         category_match = query_lower in prompt.category.lower() if prompt.category else False
-        
+
         if title_match or content_match or category_match:
             print(f"DEBUG: Prompt '{prompt.title}' matches - title: {title_match}, content: {content_match}, category: {category_match}")
-            
+
             # Determine match type and content with priority: content > title > category
             if content_match:
                 match_type = 'content'
@@ -1390,13 +1498,13 @@ def search_content():
                 # Fallback (shouldn't happen with the if condition above)
                 match_type = 'title'
                 match_content = prompt.title
-                
+
             # Safely handle tags
             try:
                 tags = json.loads(prompt.tags) if prompt.tags and prompt.tags.strip() else []
             except (json.JSONDecodeError, ValueError):
                 tags = []
-                
+
             prompts_results.append({
                 'id': prompt.id,
                 'title': prompt.title,
@@ -1408,13 +1516,13 @@ def search_content():
                 'match_type': match_type,
                 'match_content': match_content
             })
-    
+
     # Sort results by relevance (title matches first, then by recency)
     sessions_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
     prompts_results.sort(key=lambda x: (x['match_type'] != 'title', x['updated_at'] or ''), reverse=True)
-    
+
     print(f"DEBUG: Final results - sessions: {len(sessions_results)}, prompts: {len(prompts_results)}")
-    
+
     return jsonify({
         'sessions': sessions_results,
         'prompts': prompts_results,
@@ -1475,12 +1583,12 @@ def get_file_status(file_id):
     ).first()
 
     if not file_upload:
-        return jsonify({'error': 'File not found or access denied'}), 404
+        return jsonify({'error': 'File not found'}), 404
 
     # Check if file exists on disk
     file_exists = os.path.exists(file_upload.file_path)
     file_size = os.path.getsize(file_upload.file_path) if file_exists else 0
-    
+
     # Get file modification time
     file_modified = None
     if file_exists:

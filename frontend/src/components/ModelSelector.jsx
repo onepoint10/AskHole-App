@@ -28,7 +28,7 @@ const ModelSelector = ({
         onValueChange={onModelChange}
         disabled={disabled}
       >
-        <SelectTrigger className={`rounded-3xl w-64 h-8 text-xs bg-background/50 border-border/50 hover:bg-background/80 transition-colors ${isMobileOverlay ? 'w-84' : 'w-58'}`}>
+        <SelectTrigger className={`rounded-3xl w-64 h-8 text-xs bg-background/50 border-border/50 hover:bg-background/80 transition-colors ${isMobileOverlay ? 'w-84' : 'w-48'}`}>
           <SelectValue placeholder="Choose model..." />
         </SelectTrigger>
         <SelectContent align="start" side="top" className="max-h-48">
