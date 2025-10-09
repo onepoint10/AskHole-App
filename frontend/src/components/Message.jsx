@@ -51,19 +51,19 @@ const Message = ({
         >
             <div
                 className={`flex gap-3 ${isMobileDevice
-                        ? message.role === 'user'
-                            ? 'max-w-[90%] w-full flex-row-reverse'
-                            : 'max-w-[95%] w-full flex-row'
-                        : message.role === 'user'
-                            ? 'max-w-[85%] flex-row-reverse'
-                            : 'max-w-[85%] flex-row'
+                    ? message.role === 'user'
+                        ? 'max-w-[90%] w-full flex-row-reverse'
+                        : 'max-w-[95%] w-full flex-row'
+                    : message.role === 'user'
+                        ? 'max-w-[85%] flex-row-reverse'
+                        : 'max-w-[85%] flex-row'
                     }`}
             >
                 {/* Avatar */}
                 <div
                     className={`flex-shrink-0 w-8 h-8 mt-1 rounded-full flex items-center justify-center ${message.role === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted border border-border'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted border border-border'
                         }`}
                 >
                     {message.role === 'user' ? (
@@ -191,13 +191,14 @@ const Message = ({
                                             onOpenChange={setIsExaCollapsed}
                                             className="w-full space-y-2"
                                         >
-                                            <CollapsibleTrigger asChild>
-                                                <div className="flex items-center justify-between px-4 py-2 cursor-pointer bg-muted/70 hover:bg-muted rounded-md transition-colors duration-200">
-                                                    <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                                                        <ChevronsUpDown className="h-4 w-4" />
-                                                        {t('exa_search_results')}
-                                                    </h4>
-                                                </div>
+                                            <CollapsibleTrigger
+                                                className="flex items-center justify-between px-4 py-2 cursor-pointer bg-muted/70 hover:bg-muted rounded-md transition-colors duration-200 w-full"
+                                                onClick={() => setIsExaCollapsed(!isExaCollapsed)}
+                                            >
+                                                <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                                                    <ChevronsUpDown className="h-4 w-4" />
+                                                    {t('exa_search_results')}
+                                                </h4>
                                             </CollapsibleTrigger>
                                             <CollapsibleContent className="space-y-2">
                                                 <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''
