@@ -1,10 +1,15 @@
 from exa_py import Exa
+from openai import OpenAI
 import os
 
 class ExaClient:
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.exa = Exa(api_key)
+        self.openai = OpenAI(
+            base_url="https://api.exa.ai",
+            api_key=api_key
+            )
 
     def search(self, query: str, num_results: int = 10, type: str = "auto", category: str = None, include_domains: list = None, exclude_domains: list = None):
         try:
@@ -43,4 +48,15 @@ class ExaClient:
             return result # Return the raw Exa object
         except Exception as e:
             print(f"Error during EXA search_and_contents API call: {e}")
+            return {"error": str(e)}
+
+    def research(self, input: str, model: str = "exa-research"):
+        try:
+            result = self.openai.responses.create(
+                input=input,
+                model=model
+            )
+            return result # Return the raw Exa object
+        except Exception as e:
+            print(f"Error during EXA research API call: {e}")
             return {"error": str(e)}
