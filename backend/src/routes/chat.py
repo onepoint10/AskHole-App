@@ -450,7 +450,7 @@ def send_message(session_id):
     )
 
     # Use no_autoflush to prevent premature flushing
-    with db.session.no_autoflush:
+    with (db.session.no_autoflush):
         db.session.add(user_message)
 
         try:
@@ -462,7 +462,7 @@ def send_message(session_id):
                     raise Exception("Exa client not configured. Please check your API key in settings.")
 
                 # 1. Send user's request to Exa
-                exa_response = exa_client.search_and_contents(query=message_content, text=True)
+                exa_response = exa_client.search_and_contents(query=message_content,type="auto", text=True)
 
                 # Check if exa_response is an error dictionary
                 if isinstance(exa_response, dict) and "error" in exa_response:
@@ -476,10 +476,38 @@ def send_message(session_id):
                 if not exa_contents:
                     response_content = "I couldn't find any relevant information using Exa search."
                 else:
-                    # 2. Send Exa response and user's original request to the currently selected model
-                    # for summarization and formatted presentation.
-                    model_query = f"Based on the following search results, please summarize the information and present it in a well-formatted manner, answering the user's original question: '{message_content}'\n\nSearch Results:\n{exa_contents}"
-
+                # 2. Send Exa response and user's original request to the currently selected model
+                # for summarization and formatted presentation.
+                    model_query = (f"1. System Instruction (SI)\n"
+                                   f"                        You are an expert data structuring and formatting engine. Your primary goal is to transform highly unstructured, mixed-text data from an Exa search result into a clear, professional, and reader-friendly format. The output must adhere strictly to the following two-part structure: 1) A summary of the main extracted information, and 2) a list of all useful web links presented as search engine snippets.\n"
+                                   f"    \n"
+                                   f"                        2. Role Instruction (RI)\n"
+                                   f"                        Assume the role of a meticulous editorial assistant who specializes in synthesizing complex search results. You must identify key topics, extract all relevant URLs, and generate a concise, descriptive summary for each link that is distinct from its title. The output must be free of extraneous commentary, markdown formatting errors, or incomplete sections.\n"
+                                   f"    \n"
+                                   f"                        3. Query Instruction (QI)\n"
+                                   f"                        **User's original question**: '{message_content}'\n"
+                                   f"    \n"
+                                   f"                        **Search Results**:\n"
+                                   f"                        {exa_contents}\n"
+                                   f"    \n"
+                                   f"                        **Task Steps & Output Format:** \n"
+                                   f"                        1. **Main Content Synthesis:** Analyze the entire input text and generate a concise, single paragraph summary of the primary findings, key concepts, or main content of the search results. \n"
+                                   f"                        2. **Link Extraction and Snippet Formatting:** \n"
+                                   f"                            * Scan the text to find every useful URL. \n"
+                                   f"                            * For each URL, identify its associated title or a relevant phrase to use as a title. \n"
+                                   f"                            * Write a **Brief description of the linked content** (max 2-3 sentences) by synthesizing information found near the link or within the broader search result text. This description must clearly convey what the user will find on the page. \n"
+                                   f"                            * Present the final list of links using the following template for each entry: \n"
+                                   f"                            **Template for Links:** \n"
+                                   f"                            **[Clickable link as a title](URL)**\n"
+                                   f"                            Brief description of the linked content. \n"
+                                   f"                            *Example:* **[Best Practices for Prompt Engineering with Gemini 2.5 Pro](https://medium.com/example-url)**\n"
+                                   f"                            This article details essential techniques for optimizing prompts, such as defining a clear role for the model, setting specific goals, and providing guidance instead of direct orders to improve accuracy and reduce costs.\n"
+                                   f"    \n"
+                                   f"                        **Final Output Structure (Must be in this exact order and format):** \n"
+                                   f"                        # Synthesis of Exa Search Results \n"
+                                   f"                        [The concise, single paragraph summary goes here.] \n"
+                                   f"                        # Useful Links & Snippets \n"
+                                   f"                        [List all extracted links in the specified snippet format here.]")
                     # Determine which client to use for the model query
                     if session.client_type == 'gemini':
                         if not gemini_client:
