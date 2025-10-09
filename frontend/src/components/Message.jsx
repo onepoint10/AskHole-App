@@ -188,12 +188,11 @@ const Message = ({
                                     {isExaMessage && exaResultsContent ? (
                                         <Collapsible
                                             open={!isExaCollapsed}
-                                            onOpenChange={setIsExaCollapsed}
+                                            onOpenChange={(open) => setIsExaCollapsed(!open)}
                                             className="w-full space-y-2"
                                         >
                                             <CollapsibleTrigger
                                                 className="flex items-center justify-between px-4 py-2 cursor-pointer bg-muted/70 hover:bg-muted rounded-md transition-colors duration-200 w-full"
-                                                onClick={() => setIsExaCollapsed(!isExaCollapsed)}
                                             >
                                                 <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
                                                     <ChevronsUpDown className="h-4 w-4" />
