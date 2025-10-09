@@ -437,7 +437,7 @@ def send_message(session_id):
     user_message = ChatMessage(
         session_id=session_id,
         role='user',
-        content=message_content.strip(),
+        decrypted_content=message_content.strip(), # Use decrypted_content setter
         files=json.dumps(file_ids) if file_ids else None
     )
 
@@ -460,7 +460,7 @@ def send_message(session_id):
                         history_messages = []
                         for m in prior_messages:
                             role = 'user' if m.role == 'user' else 'model'
-                            text = m.content or ''
+                            text = m.decrypted_content or '' # Use decrypted_content
                             history_messages.append({'role': role, 'parts': [text]})
                 except Exception as hist_err:
                     logger.warning(f"History build error for session {session_id}: {hist_err}")
@@ -481,7 +481,7 @@ def send_message(session_id):
                         history_messages = []
                         for m in prior_messages:
                             role = 'user' if m.role == 'user' else 'assistant'
-                            text = m.content or ''
+                            text = m.decrypted_content or '' # Use decrypted_content
                             history_messages.append({'role': role, 'content': [{ 'type': 'text', 'text': text }]})
                         openrouter_client.chat_sessions[session_id] = history_messages
                 except Exception as or_hist_err:
@@ -513,7 +513,7 @@ def send_message(session_id):
                         history_messages = []
                         for m in prior_messages:
                             role = 'user' if m.role == 'user' else 'assistant'
-                            text = m.content or ''
+                            text = m.decrypted_content or '' # Use decrypted_content
                             history_messages.append({'role': role, 'content': text})
                         custom_client.chat_sessions[session_id] = history_messages
                 except Exception as custom_hist_err:
@@ -536,7 +536,7 @@ def send_message(session_id):
             assistant_message = ChatMessage(
                 session_id=session_id,
                 role='assistant',
-                content=response_content.strip()
+                decrypted_content=response_content.strip() # Use decrypted_content setter
             )
             db.session.add(assistant_message)
 
@@ -1340,7 +1340,7 @@ def search_content():
             
         # Check if query matches any message content
         for message in session.messages:
-            if query_lower in message.content.lower():
+            if query_lower in message.decrypted_content.lower(): # Use decrypted_content
                 sessions_results.append({
                     'id': session.id,
                     'title': session.title,
@@ -1350,7 +1350,7 @@ def search_content():
                     'updated_at': session.updated_at.isoformat() if session.updated_at else None,
                     'message_count': len(session.messages),
                     'match_type': 'message',
-                    'match_content': message.content[:200] + '...' if len(message.content) > 200 else message.content,
+                    'match_content': message.decrypted_content[:200] + '...' if len(message.decrypted_content) > 200 else message.decrypted_content,
                     'message_role': message.role,
                     'message_timestamp': message.timestamp.isoformat() if message.timestamp else None
                 })
