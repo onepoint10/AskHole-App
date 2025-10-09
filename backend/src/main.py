@@ -17,7 +17,7 @@ os.environ['FLASK_REQUEST_TIMEOUT'] = '120'
 os.environ['WERKZEUG_TIMEOUT'] = '120'
 
 from flask import Flask, send_from_directory, session, jsonify, request
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from src.database import db
 from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload, PromptLike
 from src.models.user import User, UserSession
@@ -87,6 +87,9 @@ def create_app():
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
+    # Exa routes
+    # These are defined directly on the app, so no blueprint registration needed for them
+
     @app.route('/api/exa/search', methods=['POST'])
     def exa_search():
         data = request.json
@@ -124,6 +127,34 @@ def create_app():
         exa_client = ExaClient(api_key)
         contents = exa_client.get_contents(ids)
         return jsonify(contents)
+
+    @app.route('/api/exa/search_and_contents', methods=['POST', 'OPTIONS'])
+    @cross_origin(origins=allowed_origins, methods=['POST', 'OPTIONS'], headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Cookie', 'Set-Cookie', 'X-Session-ID', 'Accept-Language'], supports_credentials=True)
+    def exa_search_and_contents():
+        data = request.json
+        query = data.get('query')
+        api_key = data.get('api_key')
+        num_results = data.get('num_results', 10)
+        search_type = data.get('type', 'auto')
+        category = data.get('category')
+        include_domains = data.get('include_domains')
+        exclude_domains = data.get('exclude_domains')
+        text = data.get('text', False)
+
+        if not query or not api_key:
+            return jsonify({'error': 'Query and API key are required.'}), 400
+
+        exa_client = ExaClient(api_key)
+        results = exa_client.search_and_contents(
+            query=query,
+            num_results=num_results,
+            type=search_type,
+            category=category,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains,
+            text=text
+        )
+        return jsonify(results)
 
     # Create database tables
     with app.app_context():

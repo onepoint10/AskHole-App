@@ -476,11 +476,26 @@ function App() {
     }
   }, [activeSessionId, sessions, selectSession, t]);
 
+  const addAssistantMessage = useCallback((content) => {
+    setCurrentMessages(prev => [
+      ...prev,
+      {
+        id: `assistant_${Date.now()}`,
+        role: 'assistant',
+        content: content,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+  }, []);
+
   // Message handling with improved error handling and UX
-  const sendMessage = useCallback(async (message, files = []) => {
+  const sendMessage = useCallback(async (message, files = [], searchMode = false) => {
     if (!message || !message.trim()) {
-      toast.error(t('please_enter_a_message'));
-      return { success: false };
+      // Allow empty message if in searchMode
+      if (!searchMode) {
+        toast.error(t('please_enter_a_message'));
+        return { success: false };
+      }
     }
 
     // Don't auto-create session here, let MessageInput handle it
@@ -593,6 +608,7 @@ function App() {
       const response = await sessionsAPI.sendMessage(activeSessionId, {
         message: message.trim(),
         files: uploadedFileIds,
+        search_mode: searchMode, // Pass the searchMode flag
       }, i18n.language);
 
       // Replace temporary message with real messages from server
@@ -1096,6 +1112,7 @@ function App() {
           <MessageInput
             onSendMessage={sendMessage}
             onImageGeneration={generateImage}
+            onAddAssistantMessage={addAssistantMessage} // Pass the new function
             isLoading={isLoading}
             disabled={!isConfigured}
             availableModels={availableModels}

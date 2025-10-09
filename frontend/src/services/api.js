@@ -286,8 +286,8 @@ export const sessionsAPI = {
   sendMessage: async (sessionId, messageData, language) => {
     console.log('API Request: POST /sessions/' + sessionId + '/messages');
 
-    // Validate message data before sending
-    if (!messageData.message || !messageData.message.trim()) {
+    // Validate message data before sending, unless in search_mode with potentially empty message
+    if (!messageData.search_mode && (!messageData.message || !messageData.message.trim())) {
       throw new Error('Message content cannot be empty');
     }
 
@@ -574,6 +574,13 @@ export const exaAPI = {
     return apiCall('/exa/contents', {
       method: 'POST',
       body: JSON.stringify({ ids, api_key: apiKey }),
+    }, language);
+  },
+  searchAndContents: async (query, apiKey, options = {}, language) => {
+    console.log('API Request: POST /exa/search_and_contents');
+    return apiCall('/exa/search_and_contents', {
+      method: 'POST',
+      body: JSON.stringify({ ...options, query, api_key: apiKey }),
     }, language);
   },
 };

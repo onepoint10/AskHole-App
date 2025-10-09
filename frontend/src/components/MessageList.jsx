@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import Message from './Message'; // Import the new Message component
 
 const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
   const { t } = useTranslation();
@@ -48,8 +49,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   // Helper function to determine if a file is an image
   const isImageFile = useCallback((file) => {
     const fileName = typeof file === 'string' ? file : file.original_filename || file.filename || file.name || '';
-    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) || 
-           (file.mime_type && file.mime_type.startsWith('image/'));
+    return /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName) ||
+      (file.mime_type && file.mime_type.startsWith('image/'));
   }, []);
 
   // Initialize plugins and device detection
@@ -57,7 +58,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
     setIsMobileDevice(isMobile);
-    
+
     const loadPlugins = async () => {
       try {
         if (!isMobile) {
@@ -83,21 +84,21 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     };
 
     updateDarkMode();
-    
+
     const observer = new MutationObserver(updateDarkMode);
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class']
     });
-    
+
     return () => observer.disconnect();
   }, []);
 
   // Scroll management
   const scrollToBottom = useCallback((immediate = false) => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: immediate ? 'instant' : 'smooth' 
+      messagesEndRef.current.scrollIntoView({
+        behavior: immediate ? 'instant' : 'smooth'
       });
     }
   }, []);
@@ -139,7 +140,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         console.log(t('trying_execcommand_fallback'));
         const textArea = document.createElement('textarea');
         textArea.value = text;
-        
+
         // Make textarea invisible but still functional
         textArea.style.position = 'fixed';
         textArea.style.top = '0';
@@ -153,21 +154,21 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         textArea.style.background = 'transparent';
         textArea.style.opacity = '0';
         textArea.style.zIndex = '-1000';
-        
+
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
+
         // For mobile devices
         textArea.setSelectionRange(0, 99999);
-        
+
         try {
           success = document.execCommand('copy');
           console.log(t('execcommand_result'), success);
         } catch (execError) {
           console.log(t('execcommand_failed'), execError);
         }
-        
+
         document.body.removeChild(textArea);
       }
 
@@ -176,7 +177,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         console.log(t('trying_alternative_selection_method'));
         const range = document.createRange();
         const selection = window.getSelection();
-        
+
         const textNode = document.createTextNode(text);
         const span = document.createElement('span');
         span.appendChild(textNode);
@@ -185,19 +186,19 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         span.style.left = '0';
         span.style.opacity = '0';
         span.style.pointerEvents = 'none';
-        
+
         document.body.appendChild(span);
         range.selectNode(span);
         selection.removeAllRanges();
         selection.addRange(range);
-        
+
         try {
           success = document.execCommand('copy');
           console.log(t('alternative_method_result'), success);
         } catch (altError) {
           console.log(t('alternative_method_failed'), altError);
         }
-        
+
         selection.removeAllRanges();
         document.body.removeChild(span);
       }
@@ -212,7 +213,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           setCopiedId(messageId);
           setTimeout(() => setCopiedId(null), 2000);
         }
-        
+
         toast.success(t('copied_to_clipboard'));
       } else {
         console.log(t('all_copy_methods_failed'));
@@ -227,18 +228,18 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   // Mobile table preprocessing
   const preprocessMarkdownForMobile = useCallback((markdown) => {
     if (!isMobileDevice || !markdown) return markdown;
-    
+
     const lines = markdown.split('\n');
     const processedLines = [];
     let tableData = [];
     let inTable = false;
-    
+
     const convertTableForMobile = (tableData) => {
       if (tableData.length === 0) return '';
-      
+
       const headers = tableData[0];
       const rows = tableData.slice(1);
-      
+
       return rows.map((row, rowIndex) => {
         const rowContent = headers.map((header, cellIndex) => {
           if (cellIndex < row.length) {
@@ -246,7 +247,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           }
           return '';
         }).filter(Boolean).join('\n\n');
-        
+
         return rowContent;
       }).join('\n\n---\n\n');
     };
@@ -254,7 +255,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     for (const line of lines) {
       const isTableRow = /^\|(.+)\|$/.test(line);
       const isTableSeparator = /^[-|\s:]+$/.test(line);
-      
+
       if (isTableRow) {
         if (!inTable) {
           inTable = true;
@@ -275,12 +276,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         processedLines.push(line);
       }
     }
-    
+
     // Handle table at end
     if (inTable && tableData.length > 0) {
       processedLines.push(convertTableForMobile(tableData));
     }
-    
+
     return processedLines.join('\n');
   }, [isMobileDevice]);
 
@@ -293,7 +294,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       a = ((a << 5) - a) + b.charCodeAt(0);
       return a & a;
     }, 0))}`;
-    
+
     if (inline || !match) {
       return (
         <code className="bg-muted/60 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
@@ -331,9 +332,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             style={isDark ? oneDark : oneLight}
             language={match[1]}
             PreTag="div"
-            className={`!mt-0 !rounded-t-none !border-t-0 ${
-              isMobileDevice ? '!w-full !max-w-full !overflow-x-auto' : ''
-            }`}
+            className={`!mt-0 !rounded-t-none !border-t-0 ${isMobileDevice ? '!w-full !max-w-full !overflow-x-auto' : ''
+              }`}
             customStyle={isMobileDevice ? {
               width: '100%',
               maxWidth: '100%',
@@ -367,10 +367,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </blockquote>
     ),
     a: ({ href, children }) => (
-      <a 
-        href={href} 
-        className="text-primary hover:text-primary/80 underline transition-colors" 
-        target="_blank" 
+      <a
+        href={href}
+        className="text-primary hover:text-primary/80 underline transition-colors"
+        target="_blank"
         rel="noopener noreferrer"
       >
         {children}
@@ -378,324 +378,46 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     ),
     table: ({ children }) => (
       <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${
-          isMobileDevice ? 'min-w-full' : 'w-full'
-        }`}>{children}</table>
+        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
+          }`}>{children}</table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
     th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${
-        isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-      }`}>
+      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
+        }`}>
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className={`border border-border ${
-        isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-      }`}>{children}</td>
+      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
+        }`}>{children}</td>
     ),
-  }; 
+  };
 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
       <div className={`mx-auto px-4 py-6 space-y-6 ${isMobileDevice ? 'max-w-full w-full' : 'max-w-4xl'}`}>
         {messages.map((message) => (
-          <div
+          <Message
             key={message.id}
-            className={`fade-in ${isMobileDevice ? 'w-full' : ''} ${
-              message.role === 'user' ? 'flex justify-end' : 'flex justify-start'
-            }`}
-          >
-            <div
-              className={`flex gap-3 ${
-                isMobileDevice 
-                  ? message.role === 'user' 
-                    ? 'max-w-[90%] w-full flex-row-reverse' 
-                    : 'max-w-[95%] w-full flex-row'
-                  : message.role === 'user'
-                    ? 'max-w-[85%] flex-row-reverse'
-                    : 'max-w-[85%] flex-row'
-              }`}
-            >
-              {/* Avatar */}
-              <div
-                className={`flex-shrink-0 w-8 h-8 mt-1 rounded-full flex items-center justify-center ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted border border-border'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <User className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4 text-muted-foreground" />
-                )}
-              </div>
-
-              {/* Message Content */}
-              {message.role === 'user' ? (
-                <CM>
-                  <ContextMenuTrigger asChild>
-                    <div className={`group relative pl-4 pr-2 py-2 rounded-3xl rounded-tr-sm bg-message-primary text-primary-foreground ${
-                      {/*isMobileDevice ? 'max-w-full w-full' : 'max-w-full'*/}
-                    }`}>
-                      <div className="whitespace-pre-wrap leading-relaxed break-words">
-                        {message.content}
-                      </div>
-                      
-                      {/* File attachments and images for user messages */}
-                      {message.files && message.files.length > 0 && (
-                        <div className="mt-2 pt-2 border-primary-foreground/20">
-                          {/* Separate images and other files */}
-                          {(() => {
-                            const images = message.files.filter(file => isImageFile(file));
-                            
-                            const otherFiles = message.files.filter(file => !isImageFile(file));
-
-                            return (
-                              <>
-                                {/* Display images */}
-                                {images.length > 0 && (
-                                  <div className="space-y-2">
-                                    <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                      {images.map((image, index) => {
-                                        const imageUrl = getFileUrl(image);
-                                        console.log(t('image_object'), image);
-                                        console.log(t('image_url'), imageUrl);
-                                        return (
-                                          <div key={`image-${index}`} className="relative group">
-                                            <img
-                                              src={imageUrl}
-                                              alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('image_alt', { index: index + 1 }))}
-                                              className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
-                                                isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
-                                              }`}
-                                              onClick={(e) => {
-                                                // Open image in new tab on click
-                                                const imgSrc = e.target.src;
-                                                window.open(imgSrc, '_blank');
-                                              }}
-                                              onError={(e) => {
-                                                // Hide broken images
-                                                e.target.style.display = 'none';
-                                                console.error(t('failed_to_load_image'), imageUrl, e);
-                                              }}
-                                            />
-                                            <div className="absolute bottom-1 left-1 bg-black/50 text-white text-xs px-1 rounded truncate max-w-[calc(100%-8px)]">
-                                              {typeof image === 'string' ? image.split('/').pop() : getFileDisplayName(image)}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Display other files */}
-                                {otherFiles.length > 0 && (
-                                  <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
-                                    <div className="flex flex-wrap gap-1">
-                                      {otherFiles.map((file, index) => (
-                                        <span 
-                                          key={`file-${index}`}
-                                          className="inline-flex items-center gap-1 px-2 py-1 bg-primary-foreground/10 rounded text-xs text-primary-foreground/90 border border-primary-foreground/20"
-                                          title={getFileDisplayName(file)}
-                                        >
-                                          <span>📄</span>
-                                          <span className={`truncate ${isMobileDevice ? 'max-w-[120px]' : 'max-w-[200px]'}`}>
-                                            {getFileDisplayName(file)}
-                                          </span>
-                                        </span>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      {t('copy')}
-                    </ContextMenuItem>
-                    {onAddToPrompt && (
-                      <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
-                        <Database className="h-4 w-4 mr-2" />
-                        {t('add_to_database')}
-                      </ContextMenuItem>
-                    )}
-                    {onDeleteMessage && (
-                      <ContextMenuItem 
-                        onSelect={() => onDeleteMessage(message.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {t('delete')}
-                      </ContextMenuItem>
-                    )}
-                  </ContextMenuContent>
-                </CM>
-              ) : (
-                <div className={`relative group min-h-[60px] ${
-                  isMobileDevice ? 'w-full max-w-full' : 'w-full'
-                }`}>
-                  <CM>
-                    <ContextMenuTrigger asChild>
-                      <div className={`px-4 py-4 rounded-3xl rounded-tl-sm bg-muted/50 border border-border/50 relative ${
-                        isMobileDevice ? 'max-w-full overflow-x-hidden' : ''
-                      }`}>
-                        <div className={`prose prose-sm dark:prose-invert max-w-none ${
-                          isMobileDevice ? 'overflow-x-hidden' : ''
-                        }`}>
-                          <ReactMarkdown
-                            remarkPlugins={remarkPlugins}
-                            components={markdownComponents}
-                          >
-                            {preprocessMarkdownForMobile(message.content)}
-                          </ReactMarkdown>
-                        </div>
-                        
-                        {/* File attachments and images for assistant messages */}
-                        {message.files && message.files.length > 0 && (
-                          <div className="mt-2 pt-2">
-                            {(() => {
-                              const images = message.files.filter(file => isImageFile(file));
-                              
-                              const otherFiles = message.files.filter(file => !isImageFile(file));
-
-                              return (
-                                <>
-                                  {/* Display images */}
-                                  {images.length > 0 && (
-                                    <div className="space-y-2">
-                                      <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-                                        <span>🖼️</span>
-                                        <span>{t('generated_images')}:</span>
-                                      </div>
-                                      <div className={`grid gap-2 ${isMobileDevice ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                        {images.map((image, index) => {
-                                          const imageUrl = getFileUrl(image);
-                                          console.log(t('assistant_image_object'), image);
-                                          console.log(t('assistant_image_url'), imageUrl);
-                                          return (
-                                            <div key={`image-${index}`} className="relative group">
-                                              <img
-                                                src={imageUrl}
-                                                alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('generated_image_alt', { index: index + 1 }))}
-                                                className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${
-                                                  isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
-                                                }`}
-                                                onClick={(e) => {
-                                                  const imgSrc = e.target.src;
-                                                  window.open(imgSrc, '_blank');
-                                                }}
-                                                onError={(e) => {
-                                                  e.target.style.display = 'none';
-                                                  console.error(t('failed_to_load_assistant_image'), imageUrl, e);
-                                                }}
-                                              />
-                                              <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                className="absolute top-1 right-1 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-all duration-200 z-20"
-                                                onClick={() => {
-                                                  const link = document.createElement('a');
-                                                  link.href = imageUrl;
-                                                  link.download = image.original_filename || `generated-image-${new Date().toISOString().replace(/[:.]/g, '-')}.png`; // Use original filename for download
-                                                  document.body.appendChild(link);
-                                                  link.click();
-                                                  document.body.removeChild(link);
-                                                  toast.success(t('image_downloaded'));
-                                                }}
-                                                title={t('download_image')}
-                                              >
-                                                <Download className="h-3.5 w-3.5" />
-                                              </Button>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Display other files */}
-                                  {otherFiles.length > 0 && (
-                                    <div className={`space-y-1 ${images.length > 0 ? 'mt-3 pt-3 border-t border-primary-foreground/10' : ''}`}>
-                                      <div className="flex flex-wrap gap-1">
-                                        {otherFiles.map((file, index) => (
-                                          <span 
-                                            key={`file-${index}`}
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-primary-foreground/10 rounded text-xs text-primary-foreground/90 border border-primary-foreground/20"
-                                            title={getFileDisplayName(file)}
-                                          >
-                                            <span>📄</span>
-                                            <span className={`truncate ${isMobileDevice ? 'max-w-[120px]' : 'max-w-[200px]'}`}>
-                                              {getFileDisplayName(file)}
-                                            </span>
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </>
-                              );
-                            })()}
-                          </div>
-                        )}
-                        {/* Copy button for assistant messages - positioned inside the message */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-background/90 transition-all duration-200 z-20 border border-border/50 bg-background/95 backdrop-blur-sm shadow-sm hover:scale-105"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            copyToClipboard(message.content, message.id);
-                          }}
-                          title={t('copy_message')}
-                        >
-                          {copiedId === message.id ? (
-                            <Check className="h-3.5 w-3.5 text-green-500 animate-in fade-in-0 zoom-in-95 duration-200" />
-                          ) : (
-                            <Copy className="h-3.5 w-3.5 transition-transform hover:scale-110" />
-                          )}
-                        </Button>
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem onSelect={() => copyToClipboard(message.content, message.id)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        {t('copy')}
-                      </ContextMenuItem>
-                      {onAddToPrompt && (
-                        <ContextMenuItem onSelect={() => onAddToPrompt(message.content)}>
-                          <Database className="h-4 w-4 mr-2" />
-                          {t('add_to_database')}
-                        </ContextMenuItem>
-                      )}
-                      {onDeleteMessage && (
-                        <ContextMenuItem 
-                          onSelect={() => onDeleteMessage(message.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t('delete')}
-                        </ContextMenuItem>
-                      )}
-                    </ContextMenuContent>
-                  </CM>
-                </div>
-              )}
-            </div>
-          </div>
+            message={message}
+            isMobileDevice={isMobileDevice}
+            copyToClipboard={copyToClipboard}
+            onAddToPrompt={onAddToPrompt}
+            onDeleteMessage={onDeleteMessage}
+            markdownComponents={markdownComponents}
+            remarkPlugins={remarkPlugins}
+            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
+            getFileUrl={getFileUrl}
+            getFileDisplayName={getFileDisplayName}
+            isImageFile={isImageFile}
+            copiedId={copiedId}
+            copiedCodeId={copiedCodeId}
+            isDark={isDark}
+          />
         ))}
         {/* Loading indicator */}
         {isLoading && (
@@ -706,9 +428,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
               </div>
               <div className="px-4 py-3 rounded-3xl bg-muted/50 border border-border/50">
                 <div className="typing-indicator flex space-x-1">
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="typing-dot w-2 h-2 bg-muted-foreground/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                 </div>
               </div>
             </div>

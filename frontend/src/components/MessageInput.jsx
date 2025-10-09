@@ -18,7 +18,8 @@ const MessageInput = ({
   settings,
   initialContent,
   onContentSet,
-  onImageGeneration, // New prop for image generation
+  onImageGeneration,
+  onAddAssistantMessage, // New prop for adding assistant messages
 }) => {
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
@@ -152,27 +153,10 @@ const MessageInput = ({
       // Send message to current/updated session
       let result;
       if (isImageGenerationMode) {
-        result = await onImageGeneration(message.trim()); // Call new prop for image generation
+        result = await onImageGeneration(message.trim());
       } else if (isExaSearchMode) {
-        const exaApiKey = settings.exaApiKey; // Get EXA API key from settings
-        if (!exaApiKey) {
-          console.error(t('exa_api_key_not_configured'));
-          // Optionally show a toast or other user feedback
-          return;
-        }
-        result = await exaAPI.search(message.trim(), exaApiKey); // Call exaAPI.search
-        // For EXA search, we need to format the results into a message
-        if (result && result.data && !result.error) {
-          const formattedResults = result.data.results.map(item =>
-            `Title: ${item.title}\nURL: ${item.url}\nSummary: ${item.summary || 'N/A'}`
-          ).join('\n\n');
-          await onSendMessage(`EXA Search Results for "${message.trim()}":\n\n${formattedResults}`);
-          result = { success: true }; // Mark as success for clearing input
-        } else {
-          console.error('EXA Search failed:', result.error || result.data?.error);
-          await onSendMessage(`EXA Search for "${message.trim()}" failed: ${result.error || result.data?.error}`);
-          result = { success: false, originalMessage: message };
-        }
+        // In EXA search mode, send the message with the search_mode flag
+        result = await onSendMessage(message.trim(), attachedFiles, true); // Pass true for search_mode
       } else {
         result = await onSendMessage(message.trim(), attachedFiles);
       }
