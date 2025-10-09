@@ -25,13 +25,14 @@ from src.routes.user import user_bp
 from src.routes.chat import chat_bp
 from src.routes.auth import auth_bp
 from src.routes.admin import admin_bp
+from src.exa_client import ExaClient
 from datetime import timedelta
 
 def create_app():
     """Create and configure Flask application."""
     app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
     app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
-    
+
     # Timeout configurations for file uploads
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
@@ -41,15 +42,15 @@ def create_app():
     app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow cross-domain cookies
     app.config['SESSION_COOKIE_NAME'] = 'session'  # Explicit session cookie name
     app.config['SESSION_COOKIE_PATH'] = '/'
-    
+
     # Increase timeout for file operations
     app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
-    
+
     # Flask timeout configurations
     app.config['REQUEST_TIMEOUT'] = 150  # 120 seconds for request timeout
     app.config['UPLOAD_TIMEOUT'] = 150   # 120 seconds for upload timeout
-    
+
     # Ensure upload directory exists
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
@@ -63,11 +64,11 @@ def create_app():
     # Configure Werkzeug for better file handling
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-    
+
     # Set Werkzeug timeout for file operations
     import werkzeug
     werkzeug.serving.WSGIRequestHandler.protocol_version = "HTTP/1.1"
-    
+
     # Enable CORS for all routes with more specific configuration
     allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://192.168.1.138:5173",
                        "https://app.askhole.ru", "https://www.app.askhole.ru"]
@@ -86,15 +87,53 @@ def create_app():
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
 
+    @app.route('/api/exa/search', methods=['POST'])
+    def exa_search():
+        data = request.json
+        query = data.get('query')
+        api_key = data.get('api_key')
+        num_results = data.get('num_results', 10)
+        search_type = data.get('type', 'auto')
+        category = data.get('category')
+        include_domains = data.get('include_domains')
+        exclude_domains = data.get('exclude_domains')
+
+        if not query or not api_key:
+            return jsonify({'error': 'Query and API key are required.'}), 400
+
+        exa_client = ExaClient(api_key)
+        results = exa_client.search(
+            query=query,
+            num_results=num_results,
+            type=search_type,
+            category=category,
+            include_domains=include_domains,
+            exclude_domains=exclude_domains
+        )
+        return jsonify(results)
+
+    @app.route('/api/exa/contents', methods=['POST'])
+    def exa_get_contents():
+        data = request.json
+        ids = data.get('ids')
+        api_key = data.get('api_key')
+
+        if not ids or not api_key:
+            return jsonify({'error': 'IDs and API key are required.'}), 400
+
+        exa_client = ExaClient(api_key)
+        contents = exa_client.get_contents(ids)
+        return jsonify(contents)
+
     # Create database tables
     with app.app_context():
         # Ensure database directory exists
         db_dir = os.path.join(os.path.dirname(__file__), 'database')
         os.makedirs(db_dir, exist_ok=True)
-        
+
         # Create all tables
         db.create_all()
-        
+
         # Migration: Add new columns to existing tables if they don't exist
         try:
             from sqlalchemy import inspect, text
@@ -166,10 +205,10 @@ app = create_app()
 
 if __name__ == '__main__':
     app = create_app()
-    
+
     logger.info("Starting Flask app with 150-second timeout for file operations...")
     logger.info("File upload timeout: 150 seconds; Max file size: 100MB")
-    
+
     app.run(
         host='0.0.0.0',
         port=5000,

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  Settings, 
-  Key, 
-  Palette, 
+import {
+  Settings,
+  Key,
+  Palette,
   Sliders,
   Moon,
   Sun,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import AddProviderDialog from './AddProviderDialog';
 import AddModelDialog from './AddModelDialog';
+import ExaSettings from './ExaSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -118,11 +119,12 @@ const SettingsDialog = ({
         </DialogHeader>
 
         <Tabs defaultValue="api" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="api">{t('api_keys')}</TabsTrigger>
             <TabsTrigger value="models">{t('models')}</TabsTrigger>
             <TabsTrigger value="appearance">{t('appearance')}</TabsTrigger>
             <TabsTrigger value="advanced">{t('advanced')}</TabsTrigger>
+            <TabsTrigger value="exa">EXA Search</TabsTrigger>
           </TabsList>
 
           <TabsContent value="api" className="space-y-4">
@@ -447,6 +449,10 @@ const SettingsDialog = ({
                 </p>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="exa" className="space-y-4">
+            <ExaSettings settings={localSettings} onUpdateSettings={onUpdateSettings} />
           </TabsContent>
         </Tabs>
 
