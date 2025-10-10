@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 
 const ExaSettings = ({ settings, onUpdateSettings }) => {
+    const { t } = useTranslation();
     const [exaApiKey, setExaApiKey] = useState(settings.exaApiKey || '');
 
     useEffect(() => {
