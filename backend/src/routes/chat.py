@@ -18,6 +18,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+def _get_localized_default_title(language: str) -> str:
+    """Returns the localized default title for a new chat session."""
+    # Using a simple dictionary for localization based on language prefix
+    localization_map = {
+        'ru': 'Новый чат',
+        'en': 'New Chat',
+        # Add more languages as needed
+    }
+    # Extract the primary language tag (e.g., 'ru' from 'ru-RU')
+    primary_language = language.split('-')[0].lower()
+    return localization_map.get(primary_language, 'New Chat')
+
+def _generate_session_title_from_message(message_content: str, language: str) -> str:
+    """Generates a session title from the message content, considering language."""
+    # For Russian, a simple split might still work for common phrases,
+    # but for more robust handling, a proper NLP tokenizer would be needed.
+    # For now, we'll keep the simple split but ensure it's applied to the message.
+    title_words = message_content.split()[:5]
+    return ' '.join(title_words) + ('...' if len(title_words) == 5 else '')
 
 def _guess_mime_type(safe_filename: str, original_filename: str) -> str:
     """Guess MIME type using multiple strategies, with a manual fallback map."""
@@ -226,6 +245,10 @@ def create_session():
     data = request.get_json()
     model = data.get('model', 'gemini-2.5-flash')
 
+    # Get language from request header
+    accept_language = request.headers.get('Accept-Language', 'en')
+    default_title = _get_localized_default_title(accept_language)
+
     # Auto-determine client type based on model
     client_type = determine_client_from_model(model)
 
@@ -233,7 +256,7 @@ def create_session():
     session = ChatSession(
         id=session_id,
         user_id=current_user.id,
-        title=data.get('title', 'New Chat'),
+        title=data.get('title', default_title), # Use localized default title
         model=model,
         client_type=client_type,  # Auto-determined
         temperature=data.get('temperature', 1.0),
@@ -399,6 +422,10 @@ def send_message(session_id):
     if not message_content or not message_content.strip():
         return jsonify({'error': 'Message content cannot be empty'}), 400
 
+    # Get language from request header
+    accept_language = request.headers.get('Accept-Language', 'en')
+    localized_default_title = _get_localized_default_title(accept_language)
+
     # Convert file IDs to actual file paths (batch lookup for performance)
     file_paths = []
     passthrough_paths = []
@@ -448,6 +475,14 @@ def send_message(session_id):
         content=message_content.strip(),
         files=json.dumps(file_ids) if file_ids else None
     )
+
+    # Check if this is the first message in the session for auto-naming
+    is_first_message = False
+    if session.title == localized_default_title:
+        existing_message_count = ChatMessage.query.filter_by(session_id=session_id).count()
+        if existing_message_count == 0:
+            is_first_message = True
+            logger.debug(f"Session {session_id} is a new chat, will attempt to auto-name.")
 
     # Use no_autoflush to prevent premature flushing
     with (db.session.no_autoflush):
@@ -650,11 +685,11 @@ def send_message(session_id):
 
             session.updated_at = datetime.utcnow()
 
-            if session.title == 'New Chat':
-                existing_message_count = ChatMessage.query.filter_by(session_id=session_id).count()
-                if existing_message_count == 0:
-                    title_words = message_content.split()[:5]
-                    session.title = ' '.join(title_words) + ('...' if len(title_words) == 5 else '')
+            # Auto-name the session if it's the first message and title is still default
+            if is_first_message:
+                new_title = _generate_session_title_from_message(message_content, accept_language)
+                session.title = new_title
+                logger.info(f"Auto-named session {session_id} to: '{new_title}' (Language: {accept_language})")
 
             db.session.commit()
 
