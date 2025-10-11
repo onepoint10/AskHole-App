@@ -14,8 +14,7 @@ import {
   MarkdownTableBody,
   MarkdownTableRow,
   MarkdownTableHeader,
-  MarkdownTableCell,
-  MarkdownTableResponsive
+  MarkdownTableCell
 } from '@/components/ui/markdown-table';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
@@ -72,13 +71,8 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        if (!isMobile) {
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
-        } else {
-          const remarkBreaks = await import('remark-breaks');
-          setRemarkPlugins([remarkBreaks.default]);
-        }
+        const remarkGfm = await import('remark-gfm');
+        setRemarkPlugins([remarkGfm.default]);
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
@@ -236,141 +230,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing with enhanced accessibility and edge case handling
-  const preprocessMarkdownForMobile = useCallback((markdown) => {
-    if (!isMobileDevice || !markdown) return markdown;
 
-    const lines = markdown.split('\n');
-    const processedLines = [];
-    let tableData = [];
-    let inTable = false;
-    let hasComplexTable = false;
-    let tableCaption = ''; // Store optional table caption
-
-    const sanitizeCell = (cell) => {
-      // Remove HTML-like tags but preserve content
-      return cell.replace(/<[^>]+>/g, '').trim();
-    };
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0].map(sanitizeCell);
-      const rows = tableData.slice(1).map(row => row.map(sanitizeCell));
-
-      // Check if table is complex (many columns, long content, or nested structure)
-      const isComplexTable = headers.length > 4 ||
-        tableData.some(row => row.some(cell => cell && cell.length > 50)) ||
-        tableData.some(row => row.some(cell => cell && cell.includes('|')));
-
-      if (isComplexTable) {
-        hasComplexTable = true;
-        // Create accessible scrollable table for complex tables
-        const tableRows = [
-          `| ${headers.join(' | ')} |`,
-          `| ${headers.map(() => '---').join(' | ')} |`,
-          ...rows.map(row => `| ${row.join(' | ')} |`)
-        ].join('\n');
-
-        const caption = tableCaption ? `\n\n*${tableCaption}*` : '';
-        return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
-      }
-
-      // For simpler tables, create a card-based layout optimized for mobile
-      return `<div class="mobile-table-wrapper" style="margin: 1rem 0;">
-    ${rows.map((row, rowIndex) =>
-        `<div class="mobile-table-row" style="margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; background: var(--background);">
-        ${headers.map((header, i) =>
-          `<div class="mobile-table-cell" style="display: flex; border-bottom: ${i === headers.length - 1 ? 'none' : '1px solid var(--border)'}; min-height: 2.5rem;">
-            <div style="flex: 0 0 40%; padding: 0.75rem; font-weight: 500; color: var(--muted-foreground); background: var(--muted); border-right: 1px solid var(--border);">
-              ${header}
-            </div>
-            <div style="flex: 0 0 60%; padding: 0.75rem;">
-              ${row[i] || ''}
-            </div>
-          </div>`
-        ).join('')}
-      </div>`
-      ).join('')}
-  </div>
-  <style>
-    @media (min-width: 641px) {
-      .mobile-table-wrapper {
-        border: 1px solid var(--border);
-        border-radius: 0.5rem;
-        overflow: hidden;
-      }
-      .mobile-table-row {
-        margin: 0 !important;
-        border: none !important;
-        border-radius: 0 !important;
-        border-bottom: 1px solid var(--border) !important;
-        display: flex !important;
-      }
-      .mobile-table-row:last-child {
-        border-bottom: none !important;
-      }
-      .mobile-table-cell {
-        flex: 1 !important;
-        border-bottom: none !important;
-        border-right: 1px solid var(--border) !important;
-      }
-      .mobile-table-cell:last-child {
-        border-right: none !important;
-      }
-      .mobile-table-cell > div:first-child {
-        display: none !important;
-      }
-      .mobile-table-cell > div:last-child {
-        flex: 1 1 auto !important;
-      }
-    }
-  </style>`;
-    };
-
-    // Process lines
-    for (const line of lines) {
-      // Check for table caption
-      if (line.startsWith('Table:')) {
-        tableCaption = line.slice(6).trim();
-        continue;
-      }
-
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
-          tableCaption = ''; // Reset caption for new table
-        }
-        const cells = line.split('|')
-          .slice(1, -1)
-          .map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
-        processedLines.push(line);
-      }
-    }
-
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
-    }
-
-    // Return processed markdown
-    return processedLines.join('\n');
-  }, [isMobileDevice]);
 
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
@@ -496,7 +356,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
-            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
+
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}
             isImageFile={isImageFile}
