@@ -73,6 +73,49 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     loadPlugins();
   }, [t]);
 
+  // Add scroll detection for tables to show/hide scroll indicators
+  useEffect(() => {
+    const handleTableScroll = () => {
+      const tableContainers = document.querySelectorAll('.markdown-table-container');
+      tableContainers.forEach((container) => {
+        const { scrollLeft, scrollWidth, clientWidth } = container;
+        const isScrollable = scrollWidth > clientWidth;
+
+        if (isScrollable) {
+          // Can scroll left (not at the start)
+          if (scrollLeft > 0) {
+            container.classList.add('scrollable-left');
+          } else {
+            container.classList.remove('scrollable-left');
+          }
+
+          // Can scroll right (not at the end)
+          if (scrollLeft < scrollWidth - clientWidth - 1) {
+            container.classList.add('scrollable-right');
+          } else {
+            container.classList.remove('scrollable-right');
+          }
+        }
+      });
+    };
+
+    // Run on mount and when messages change
+    setTimeout(handleTableScroll, 100);
+
+    // Add scroll listeners to all table containers
+    const tableContainers = document.querySelectorAll('.markdown-table-container');
+    tableContainers.forEach((container) => {
+      container.addEventListener('scroll', handleTableScroll);
+    });
+
+    // Cleanup
+    return () => {
+      tableContainers.forEach((container) => {
+        container.removeEventListener('scroll', handleTableScroll);
+      });
+    };
+  }, [messages]);
+
   // Dark mode detection
   useEffect(() => {
     const updateDarkMode = () => {
