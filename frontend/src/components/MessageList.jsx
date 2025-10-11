@@ -288,33 +288,29 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       );
 
       let headers = normalizedTable[0].map(sanitizeCell);
-      let rows = normalizedTable.slice(1).map(row => row.map(sanitizeCell));
+      let rows;
 
-      // Handle missing or malformed alignment row
+      // Handle alignment row and extract data rows
       if (normalizedTable.length > 1) {
-        const secondRow = normalizedTable[1].map(sanitizeCell);
-        const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell.replace(/\s+/g, '')));
+        const secondRow = normalizedTable[1];
+        const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell.trim()));
 
-        if (!isAlignment && !alignmentRowInserted) {
-          // Insert standardized alignment row
-          const alignmentRow = headers.map(() => '---');
-          normalizedTable.splice(1, 0, alignmentRow);
-          alignmentRowInserted = true;
-          // Recompute rows after alignment insertion
+        if (isAlignment) {
+          // Alignment row found, data starts from index 2
           rows = normalizedTable.slice(2).map(row => row.map(sanitizeCell));
+        } else {
+          // No alignment row, treat everything after header as data
+          rows = normalizedTable.slice(1).map(row => row.map(sanitizeCell));
         }
-      } else if (normalizedTable.length === 1) {
-        // Only header row exists, add alignment row
-        normalizedTable.push(headers.map(() => '---'));
-        alignmentRowInserted = true;
-        headers = tableData[0].map(sanitizeCell);
+      } else {
+        // Only header row exists
         rows = [];
       }
 
       // Check if table is complex (many columns, long content, or nested structure)
       const isComplexTable = headers.length > 4 ||
-        tableData.some(row => row.some(cell => cell && cell.length > 50)) ||
-        tableData.some(row => row.some(cell => cell && cell.includes('|')));
+        rows.flat().some(cell => cell && cell.length > 50) ||
+        rows.flat().some(cell => cell && cell.includes('|'));
 
       if (isComplexTable) {
         hasComplexTable = true;
