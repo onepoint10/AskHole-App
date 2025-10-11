@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
+﻿import React, { useEffect, useRef, useState, useCallback, useMemo, createContext, useContext } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -9,6 +9,25 @@ import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrig
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import Message from './Message'; // Import the new Message component
+
+const TableContext = createContext(null);
+const TableSectionContext = createContext('tbody');
+
+const getNodeText = (children) => {
+  return React.Children.toArray(children)
+    .map((child) => {
+      if (typeof child === 'string' || typeof child === 'number') {
+        return String(child);
+      }
+      if (React.isValidElement(child)) {
+        return getNodeText(child.props.children);
+      }
+      return '';
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
 
 const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
   const { t } = useTranslation();
@@ -58,15 +77,20 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
     setIsMobileDevice(isMobile);
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
 
     const loadPlugins = async () => {
       try {
-        if (!isMobile) {
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
-        } else {
-          const remarkBreaks = await import('remark-breaks');
-          setRemarkPlugins([remarkBreaks.default]);
+        const [remarkGfm, remarkBreaks] = await Promise.all([
+          import('remark-gfm'),
+          import('remark-breaks')
+        ]);
+
+        if (isMounted) {
+          setRemarkPlugins([remarkGfm.default, remarkBreaks.default]);
         }
       } catch (error) {
         // Silently fail - markdown will render without plugins
@@ -75,6 +99,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     };
 
     loadPlugins();
+
+    return () => {
+      isMounted = false;
+    };
   }, [t]);
 
   // Dark mode detection
@@ -226,64 +254,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   }, [t]);
 
   // Mobile table preprocessing
-  const preprocessMarkdownForMobile = useCallback((markdown) => {
-    if (!isMobileDevice || !markdown) return markdown;
-
-    const lines = markdown.split('\n');
-    const processedLines = [];
-    let tableData = [];
-    let inTable = false;
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
-
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
-
-        return rowContent;
-      }).join('\n\n---\n\n');
-    };
-
-    for (const line of lines) {
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
-        }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
-        processedLines.push(line);
-      }
-    }
-
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
-    }
-
-    return processedLines.join('\n');
-  }, [isMobileDevice]);
+  const preprocessMarkdownForMobile = useCallback((markdown) => markdown ?? '', []);
 
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
@@ -350,8 +321,105 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     );
   }, [copyToClipboard, copiedCodeId, isDark, isMobileDevice, t]);
 
+  const ResponsiveTable = ({ children }) => {
+    const headersRef = useRef([]);
+    headersRef.current = [];
+
+    const contextValue = useMemo(() => ({ headersRef }), [headersRef]);
+
+    return (
+      <TableContext.Provider value={contextValue}>
+        <div className={`responsive-table my-3 w-full ${isMobileDevice ? 'max-w-full' : ''}`}>
+          <table
+            className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'}`}
+            role="table"
+          >
+            {children}
+          </table>
+        </div>
+      </TableContext.Provider>
+    );
+  };
+
+  const ResponsiveThead = ({ children, ...props }) => (
+    <TableSectionContext.Provider value="head">
+      <thead className="bg-muted/50" {...props}>
+        {children}
+      </thead>
+    </TableSectionContext.Provider>
+  );
+
+  const ResponsiveTbody = ({ children, ...props }) => (
+    <TableSectionContext.Provider value="body">
+      <tbody {...props}>{children}</tbody>
+    </TableSectionContext.Provider>
+  );
+
+  const ResponsiveRow = ({ children, className = '', ...props }) => {
+    const tableContext = useContext(TableContext);
+    const section = useContext(TableSectionContext);
+    const headersRef = tableContext?.headersRef;
+
+    const cells = React.Children.toArray(children);
+
+    if (section === 'head' && headersRef) {
+      cells.forEach((cell, index) => {
+        if (React.isValidElement(cell)) {
+          headersRef.current[index] = getNodeText(cell.props.children);
+        }
+      });
+      return (
+        <tr className={className} {...props}>
+          {children}
+        </tr>
+      );
+    }
+
+    const enhancedCells = headersRef
+      ? cells.map((cell, index) => {
+        if (React.isValidElement(cell)) {
+          return React.cloneElement(cell, {
+            headerLabel: headersRef.current[index] || ''
+          });
+        }
+        return cell;
+      })
+      : cells;
+
+    const rowClasses = ['even:bg-muted/20', className].filter(Boolean).join(' ');
+
+    return (
+      <tr className={rowClasses} {...props}>
+        {enhancedCells}
+      </tr>
+    );
+  };
+
+  const ResponsiveTh = ({ children, className = '', ...props }) => (
+    <th
+      className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
+        } ${className}`.trim()}
+      scope="col"
+      {...props}
+    >
+      {children}
+    </th>
+  );
+
+  const ResponsiveTd = ({ children, className = '', headerLabel = '', ...props }) => (
+    <td
+      className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm align-top' : 'px-3 py-2'
+        } ${className}`.trim()}
+      data-label={headerLabel}
+      role="cell"
+      {...props}
+    >
+      {children}
+    </td>
+  );
+
   // Markdown components configuration
-  const markdownComponents = {
+  const markdownComponents = useMemo(() => ({
     code: CodeBlock,
     pre: ({ children }) => <div className={isMobileDevice ? 'w-full overflow-x-auto' : ''}>{children}</div>,
     p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
@@ -376,26 +444,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         {children}
       </a>
     ),
-    table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
-      </div>
-    ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-    tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
-    th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
-        {children}
-      </th>
-    ),
-    td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
-    ),
-  };
+    table: (props) => <ResponsiveTable {...props} />,
+    thead: (props) => <ResponsiveThead {...props} />,
+    tbody: (props) => <ResponsiveTbody {...props} />,
+    tr: (props) => <ResponsiveRow {...props} />,
+    th: (props) => <ResponsiveTh {...props} />,
+    td: (props) => <ResponsiveTd {...props} />
+  }), [CodeBlock, isMobileDevice]);
 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
