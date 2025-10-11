@@ -2,10 +2,20 @@
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react'; // Add Download icon
+import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { cn } from '@/lib/utils';
+import {
+  MarkdownTable,
+  MarkdownTableHead,
+  MarkdownTableBody,
+  MarkdownTableRow,
+  MarkdownTableHeader,
+  MarkdownTableCell,
+  MarkdownTableResponsive
+} from '@/components/ui/markdown-table';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import Message from './Message'; // Import the new Message component
@@ -225,7 +235,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing
+  // Mobile table preprocessing with enhanced accessibility and edge case handling
   const preprocessMarkdownForMobile = useCallback((markdown) => {
     if (!isMobileDevice || !markdown) return markdown;
 
@@ -233,26 +243,63 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     const processedLines = [];
     let tableData = [];
     let inTable = false;
+    let hasComplexTable = false;
+    let tableCaption = ''; // Store optional table caption
+
+    const sanitizeCell = (cell) => {
+      // Remove HTML-like tags but preserve content
+      return cell.replace(/<[^>]+>/g, '').trim();
+    };
 
     const convertTableForMobile = (tableData) => {
       if (tableData.length === 0) return '';
 
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
+      const headers = tableData[0].map(sanitizeCell);
+      const rows = tableData.slice(1).map(row => row.map(sanitizeCell));
 
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
+      // Check if table is complex (many columns, long content, or nested structure)
+      const isComplexTable = headers.length > 4 ||
+        tableData.some(row => row.some(cell => cell && cell.length > 50)) ||
+        tableData.some(row => row.some(cell => cell && cell.includes('|')));
 
-        return rowContent;
-      }).join('\n\n---\n\n');
+      if (isComplexTable) {
+        hasComplexTable = true;
+        // Create accessible scrollable table
+        const tableRows = [
+          `| ${headers.join(' | ')} |`,
+          `| ${headers.map(() => '---').join(' | ')} |`,
+          ...rows.map(row => `| ${row.join(' | ')} |`)
+        ].join('\n');
+
+        const caption = tableCaption ? `\n\n*${tableCaption}*` : '';
+        return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
+      }
+
+      // For simpler tables, create an accessible card-based layout
+      return `<div class="mobile-table" role="table" aria-label="${tableCaption || 'Data table'}">\n` +
+        rows.map((row, rowIndex) => {
+          const cells = headers.map((header, cellIndex) => {
+            if (cellIndex < row.length) {
+              return `<div class="mobile-table-cell" role="cell">
+                <span class="mobile-table-header" role="rowheader">${header}</span>
+                <span class="mobile-table-value">${row[cellIndex] || ''}</span>
+              </div>`;
+            }
+            return '';
+          }).filter(Boolean).join('\n');
+
+          return `<div class="mobile-table-row" role="row">\n${cells}\n</div>`;
+        }).join('\n') + '\n</div>';
     };
 
+    // Process lines
     for (const line of lines) {
+      // Check for table caption
+      if (line.startsWith('Table:')) {
+        tableCaption = line.slice(6).trim();
+        continue;
+      }
+
       const isTableRow = /^\|(.+)\|$/.test(line);
       const isTableSeparator = /^[-|\s:]+$/.test(line);
 
@@ -260,8 +307,11 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         if (!inTable) {
           inTable = true;
           tableData = [];
+          tableCaption = ''; // Reset caption for new table
         }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+        const cells = line.split('|')
+          .slice(1, -1)
+          .map(cell => cell.trim());
         tableData.push(cells);
       } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
         if (tableData.length > 0) {
@@ -282,6 +332,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       processedLines.push(convertTableForMobile(tableData));
     }
 
+    // Return processed markdown
     return processedLines.join('\n');
   }, [isMobileDevice]);
 
@@ -377,23 +428,22 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
-      </div>
+      <MarkdownTable isMobile={isMobileDevice}>{children}</MarkdownTable>
     ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-    tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+    thead: ({ children }) => (
+      <MarkdownTableHead>{children}</MarkdownTableHead>
+    ),
+    tbody: ({ children }) => (
+      <MarkdownTableBody>{children}</MarkdownTableBody>
+    ),
+    tr: ({ children }) => (
+      <MarkdownTableRow>{children}</MarkdownTableRow>
+    ),
     th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
-        {children}
-      </th>
+      <MarkdownTableHeader isMobile={isMobileDevice}>{children}</MarkdownTableHeader>
     ),
     td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
+      <MarkdownTableCell isMobile={isMobileDevice}>{children}</MarkdownTableCell>
     ),
   };
 
