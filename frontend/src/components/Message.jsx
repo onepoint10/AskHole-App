@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check, Trash2, Database, Download, ChevronsUpDown } from 'lucide-react';
@@ -205,6 +206,7 @@ const Message = ({
                                                     <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
                                                         <ReactMarkdown
                                                             remarkPlugins={remarkPlugins}
+                                                            rehypePlugins={[rehypeRaw]}
                                                             components={markdownComponents}
                                                         >
                                                             {preprocessMarkdownForMobile(exaResultsContent)}
@@ -239,6 +241,7 @@ const Message = ({
                                             } ${isExaMessage && exaResultsContent ? 'mt-4 pt-4 border-t border-border/50' : ''}`}>
                                             <ReactMarkdown
                                                 remarkPlugins={remarkPlugins}
+                                                rehypePlugins={[rehypeRaw]}
                                                 components={markdownComponents}
                                             >
                                                 {preprocessMarkdownForMobile(summaryContent)}
