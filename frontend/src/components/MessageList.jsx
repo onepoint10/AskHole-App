@@ -248,44 +248,64 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     let tableCaption = '';
     let alignmentRowInserted = false;
 
-    // Enhanced regex for table row detection - more permissive
+    // Enhanced regex for table row detection with improved handling
     const isTableRow = (line) => {
       const trimmed = line.trim();
-      // Match both standard and irregular table rows
+      // More flexible row detection that handles:
       // 1. Standard format: |col1|col2|col3|
       // 2. Irregular format: | col1 | col2 |col3|
       // 3. Missing outer pipes: col1|col2|col3
-      return (
-        (/^\|.*\|$/.test(trimmed) || /^.*\|.*$/.test(trimmed)) &&
+      // 4. No spacing tables: |a|b|c|
+      return Boolean(
+        trimmed &&
         trimmed.includes('|') &&
-        trimmed.split('|').length > 1
+        trimmed.split('|')
+          .filter(cell => cell.trim() !== '').length > 0
       );
     };
 
-    // Enhanced separator detection
+    // Enhanced separator detection with better alignment support
     const isTableSeparator = (line) => {
-      const trimmed = line.trim().replace(/\s+/g, '');
-      // Match both standard and irregular separators
+      const trimmed = line.trim();
+      // More flexible separator detection that handles:
       // 1. Standard format: |---|---|---|
       // 2. With alignment: |:---:|---:|:---|
       // 3. Irregular format: ---|---|---
-      return /^[\|:\-]+$/.test(trimmed) && trimmed.includes('-');
+      // 4. No spacing: |-|-|-|
+      // 5. Mixed formats: |:--|--:|---|
+      return Boolean(
+        trimmed &&
+        /^[\s\|\-:]+$/.test(trimmed) &&
+        trimmed.includes('-') &&
+        !trimmed.match(/[^\s\|\-:]/)
+      );
     }; const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
 
     const normalizeTableRow = (row) => {
-      // Remove outer pipes and split
-      const cells = row.trim().replace(/^\||\|$/g, '').split('|');
-      // Clean each cell
-      return cells.map(cell => cell.trim());
+      // Improved normalization that handles various table formats
+      const cells = row.trim()
+        // Handle cases with or without outer pipes
+        .replace(/^\||\|$/g, '')
+        // Split by pipe and handle multiple spaces
+        .split('|')
+        // Clean and normalize each cell
+        .map(cell => cell.trim());
+
+      // Filter out empty cells that might occur from double pipes
+      return cells.filter(cell => cell !== '' || cell === '0');
     };
 
     const convertTableForMobile = (tableData) => {
       if (tableData.length === 0) return '';
 
-      // Normalize and clean all rows
-      const normalizedTable = tableData.map(row =>
-        Array.isArray(row) ? row.map(cell => cell.trim()) : normalizeTableRow(row)
-      );
+      // Normalize and clean all rows with improved handling
+      const normalizedTable = tableData.map(row => {
+        // Handle both array and string inputs
+        if (Array.isArray(row)) {
+          return row.map(cell => cell.trim());
+        }
+        return normalizeTableRow(row);
+      });
 
       let headers = normalizedTable[0].map(sanitizeCell);
       let rows;
@@ -307,10 +327,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         rows = [];
       }
 
-      // Check if table is complex (many columns, long content, or nested structure)
-      const isComplexTable = headers.length > 4 ||
-        rows.flat().some(cell => cell && cell.length > 50) ||
-        rows.flat().some(cell => cell && cell.includes('|'));
+      // Enhanced complexity detection for better mobile handling
+      const isComplexTable =
+        headers.length > 4 || // Many columns
+        rows.flat().some(cell => cell && cell.length > 50) || // Long content
+        rows.flat().some(cell => cell && (cell.includes('|') || cell.includes('\n'))) || // Nested structure or multiline
+        rows.length > 10 || // Many rows
+        headers.some(header => header && header.length > 30); // Long headers
 
       if (isComplexTable) {
         hasComplexTable = true;
