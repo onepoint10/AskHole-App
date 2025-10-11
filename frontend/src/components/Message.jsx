@@ -17,7 +17,6 @@ const Message = ({
     onDeleteMessage,
     markdownComponents,
     remarkPlugins,
-    preprocessMarkdownForMobile,
     getFileUrl,
     getFileDisplayName,
     isImageFile,
@@ -207,7 +206,7 @@ const Message = ({
                                                             remarkPlugins={remarkPlugins}
                                                             components={markdownComponents}
                                                         >
-                                                            {preprocessMarkdownForMobile(exaResultsContent)}
+                                                            {exaResultsContent}
                                                         </ReactMarkdown>
                                                     </div>
                                                     <Button
@@ -241,7 +240,7 @@ const Message = ({
                                                 remarkPlugins={remarkPlugins}
                                                 components={markdownComponents}
                                             >
-                                                {preprocessMarkdownForMobile(summaryContent)}
+                                                {summaryContent}
                                             </ReactMarkdown>
                                         </div>
                                     )}
