@@ -279,15 +279,15 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       // For simpler tables, create a flex-based layout
       return `<div class="mobile-table-wrapper" style="margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; background: var(--background); border: 1px solid var(--border);">
     <div class="mobile-table-header" style="display: flex; background: var(--accent); border-bottom: 1px solid var(--border); padding: 0.75rem;">
-      ${headers.map(header => 
+      ${headers.map(header =>
         `<div style="flex: 1; min-width: 0; font-weight: 600; padding: 0 0.5rem; color: var(--accent-foreground);">
           ${header}
         </div>`
       ).join('')}
     </div>
-    ${rows.map(row => 
-      `<div class="mobile-table-row" style="display: flex; border-bottom: 1px solid var(--border); padding: 0.75rem;">
-        ${row.map((cell, i) => 
+    ${rows.map(row =>
+        `<div class="mobile-table-row" style="display: flex; border-bottom: 1px solid var(--border); padding: 0.75rem;">
+        ${row.map((cell, i) =>
           `<div style="flex: 1; min-width: 0; padding: 0 0.5rem; display: flex;">
             <div class="mobile-only" style="display: none; font-weight: 500; color: var(--muted-foreground); width: 40%; margin-right: 1rem;">
               ${headers[i]}
@@ -296,7 +296,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           </div>`
         ).join('')}
       </div>`
-    ).join('')}
+      ).join('')}
   </div>
   <style>
     @media (max-width: 640px) {
