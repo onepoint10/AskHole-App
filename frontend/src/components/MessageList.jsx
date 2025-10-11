@@ -279,7 +279,22 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         trimmed.includes('-') &&
         !trimmed.match(/[^\s\|\-:]/)
       );
-    }; const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
+    };
+
+    // Sanitize and minimally format inline markdown within a cell
+    const sanitizeCell = (cell) => {
+      const text = String(cell ?? '').trim();
+      if (!text) return '';
+      // strip existing HTML tags to avoid nested HTML when using rehypeRaw
+      let safe = text.replace(/<[^>]+>/g, '');
+      // minimal inline markdown support: bold, italics, code, links
+      safe = safe
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`([^`]+)`/g, '<code>$1</code>')
+        .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1<\/a>');
+      return safe;
+    };
 
     const normalizeTableRow = (row) => {
       // Improved normalization that handles various table formats
@@ -337,14 +352,37 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
       if (isComplexTable) {
         hasComplexTable = true;
-        // Create accessible scrollable table
-        const tableRows = [
-          `| ${headers.join(' | ')} |`,
-          `| ${headers.map(() => '---').join(' | ')} |`,
-          ...rows.map(row => `| ${row.join(' | ')} |`)
-        ].join('\n');
-        const caption = tableCaption ? `\n\n*${tableCaption}*` : '';
-        return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
+        // Normalize rows to header length (pad/trim) to avoid broken layout
+        const normalizedRows = rows.map((row) => {
+          const r = [...row];
+          while (r.length < headers.length) r.push('');
+          if (r.length > headers.length) r.length = headers.length;
+          return r;
+        });
+
+        // Build real HTML table (not markdown) so it renders without remark-gfm
+        const captionHtml = tableCaption ? `<caption style="caption-side: top; text-align: left; color: rgba(0,0,0,0.6); padding: 0.25rem 0 0.5rem;">${tableCaption}</caption>` : '';
+        return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">
+  <table class="mobile-table" style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+    ${captionHtml}
+    <thead>
+      <tr>
+        ${headers.map(header =>
+          `<th style="text-align: left; padding: 0.5rem 0.75rem; background-color: rgba(0,0,0,0.05); font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1); white-space: nowrap;">${header}</th>`
+        ).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${normalizedRows.map(row =>
+          `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+            ${row.map((cell) =>
+            `<td style=\"padding: 0.5rem 0.75rem; vertical-align: top;\">${sanitizeCell(cell) || ''}</td>`
+          ).join('')}
+          </tr>`
+        ).join('')}
+    </tbody>
+  </table>
+</div>`;
       }
 
       // Create a proper HTML table structure that works better on iOS Safari
