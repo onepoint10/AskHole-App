@@ -61,13 +61,9 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        if (!isMobile) {
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
-        } else {
-          const remarkBreaks = await import('remark-breaks');
-          setRemarkPlugins([remarkBreaks.default]);
-        }
+        // Enable remark-gfm on all devices for proper table rendering
+        const remarkGfm = await import('remark-gfm');
+        setRemarkPlugins([remarkGfm.default]);
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
@@ -225,68 +221,14 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing
+  // Mobile table preprocessing - disabled, now using proper table rendering
   const preprocessMarkdownForMobile = useCallback((markdown) => {
-    if (!isMobileDevice || !markdown) return markdown;
-
-    const lines = markdown.split('\n');
-    const processedLines = [];
-    let tableData = [];
-    let inTable = false;
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
-
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
-
-        return rowContent;
-      }).join('\n\n---\n\n');
-    };
-
-    for (const line of lines) {
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
-        }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
-        processedLines.push(line);
-      }
-    }
-
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
-    }
-
-    return processedLines.join('\n');
-  }, [isMobileDevice]);
+    // Return markdown as-is for proper table rendering
+    return markdown;
+  }, []);
 
   // Code block component with improved copy functionality
-  const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
+  const CodeBlock = useCallback(({ inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
     const codeString = String(children).replace(/\n$/, '');
     // Create a more unique ID that includes content hash for better state tracking
@@ -377,23 +319,22 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
+      <div className="markdown-table-container my-3">
+        <table className="markdown-table">
+          {children}
+        </table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
     th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
+      <th>
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
+      <td>{children}</td>
     ),
   };
 

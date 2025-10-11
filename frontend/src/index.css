@@ -2,3 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Responsive table styles for universal compatibility */
+.markdown-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Smooth scrolling on iOS */
+    max-width: 100%;
+}
+
+.markdown-table {
+    min-width: 100%;
+    border-collapse: collapse;
+}
+
+.markdown-table th,
+.markdown-table td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.markdown-table th {
+    background-color: hsl(var(--muted) / 0.3);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.markdown-table td {
+    word-break: break-word;
+}
+
+/* Mobile-specific table adjustments */
+@media (max-width: 768px) {
+
+    .markdown-table th,
+    .markdown-table td {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .markdown-table th {
+        font-size: 0.75rem;
+    }
+}
+
+/* Ensure table doesn't break layout on very small screens */
+@media (max-width: 480px) {
+    .markdown-table-container {
+        margin-left: -1rem;
+        margin-right: -1rem;
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
