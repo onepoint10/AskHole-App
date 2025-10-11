@@ -61,9 +61,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        const remarkGfm = await import('remark-gfm');
-        const remarkBreaks = await import('remark-breaks');
-        setRemarkPlugins([remarkGfm.default, remarkBreaks.default]);
+        // Temporarily remove remark-gfm and remark-breaks to isolate regex error
+        // const remarkGfm = await import('remark-gfm');
+        // const remarkBreaks = await import('remark-breaks');
+        setRemarkPlugins([]); // Set to empty array
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
