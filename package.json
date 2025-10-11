@@ -2,9 +2,6 @@
   "dependencies": {
     "i18next": "^25.5.3",
     "i18next-browser-languagedetector": "^8.2.0",
-    "react-i18next": "^16.0.0",
-    "react-markdown": "^9.0.0",
-    "remark-breaks": "^3.0.0",
-    "remark-gfm": "^3.0.1"
+    "react-i18next": "^16.0.0"
   }
 }
