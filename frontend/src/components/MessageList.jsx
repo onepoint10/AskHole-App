@@ -248,9 +248,16 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     let tableCaption = '';
     let alignmentRowInserted = false;
 
-    // Improved regex for table row and separator
-    const isTableRow = (line) => /^\|(.+)\|$/.test(line.trim());
-    const isTableSeparator = (line) => /^\s*\|?\s*(:?-+:?\s*\|\s*)+(:?-+:?)?\s*$/.test(line.trim()) || /^[-|\s:]+$/.test(line.trim());
+    // Improved regex for table row and separator (accepts any line starting and ending with | and at least one more |)
+    const isTableRow = (line) => {
+      const trimmed = line.trim();
+      return /^\|.*\|$/.test(trimmed) && trimmed.split('|').length > 2;
+    };
+    // Accept alignment row if only contains dashes, colons, pipes, or spaces
+    const isTableSeparator = (line) => {
+      const trimmed = line.trim();
+      return /^\|?[:\-\s|]+\|?$/.test(trimmed);
+    };
 
     const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
 
@@ -259,7 +266,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       let headers = tableData[0].map(sanitizeCell);
       let rows = tableData.slice(1).map(row => row.map(sanitizeCell));
 
-      // If alignment row is missing, insert a default one
+      // If alignment row is missing or malformed, insert a default one
       if (tableData.length > 1 && !alignmentRowInserted) {
         const secondRow = tableData[1].map(sanitizeCell);
         const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell));
@@ -271,6 +278,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           headers = tableData[0].map(sanitizeCell);
           rows = tableData.slice(2).map(row => row.map(sanitizeCell));
         }
+      } else if (tableData.length === 1) {
+        // Only header row, insert alignment row
+        tableData.push(headers.map(() => '---'));
+        alignmentRowInserted = true;
+        headers = tableData[0].map(sanitizeCell);
+        rows = [];
       }
 
       // Check if table is complex (many columns, long content, or nested structure)
@@ -365,8 +378,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           tableCaption = '';
           alignmentRowInserted = false;
         }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
+        // Split by |, but preserve empty cells and trim
+        let cells = line.split('|');
+        // Remove first and last empty string if line starts/ends with |
+        if (cells.length > 0 && cells[0].trim() === '') cells = cells.slice(1);
+        if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells = cells.slice(0, -1);
+        tableData.push(cells.map(cell => cell.trim()));
       } else if (inTable && (line.trim() === '' || !isTableSeparator(line))) {
         if (tableData.length > 0) {
           processedLines.push(convertTableForMobile(tableData));
