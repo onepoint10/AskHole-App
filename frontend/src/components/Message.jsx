@@ -207,6 +207,8 @@ const Message = ({
                                                         <ReactMarkdown
                                                             remarkPlugins={remarkPlugins}
                                                             rehypePlugins={[rehypeRaw]}
+                                                            remarkRehypeOptions={{ allowDangerousHtml: true }}
+                                                            skipHtml={false}
                                                             components={markdownComponents}
                                                         >
                                                             {preprocessMarkdownForMobile(exaResultsContent)}
@@ -242,6 +244,8 @@ const Message = ({
                                             <ReactMarkdown
                                                 remarkPlugins={remarkPlugins}
                                                 rehypePlugins={[rehypeRaw]}
+                                                remarkRehypeOptions={{ allowDangerousHtml: true }}
+                                                skipHtml={false}
                                                 components={markdownComponents}
                                             >
                                                 {preprocessMarkdownForMobile(summaryContent)}
