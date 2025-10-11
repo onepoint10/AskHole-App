@@ -245,18 +245,33 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     let tableData = [];
     let inTable = false;
     let hasComplexTable = false;
-    let tableCaption = ''; // Store optional table caption
+    let tableCaption = '';
+    let alignmentRowInserted = false;
 
-    const sanitizeCell = (cell) => {
-      // Remove HTML-like tags but preserve content
-      return cell.replace(/<[^>]+>/g, '').trim();
-    };
+    // Improved regex for table row and separator
+    const isTableRow = (line) => /^\|(.+)\|$/.test(line.trim());
+    const isTableSeparator = (line) => /^\s*\|?\s*(:?-+:?\s*\|\s*)+(:?-+:?)?\s*$/.test(line.trim()) || /^[-|\s:]+$/.test(line.trim());
+
+    const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
 
     const convertTableForMobile = (tableData) => {
       if (tableData.length === 0) return '';
+      let headers = tableData[0].map(sanitizeCell);
+      let rows = tableData.slice(1).map(row => row.map(sanitizeCell));
 
-      const headers = tableData[0].map(sanitizeCell);
-      const rows = tableData.slice(1).map(row => row.map(sanitizeCell));
+      // If alignment row is missing, insert a default one
+      if (tableData.length > 1 && !alignmentRowInserted) {
+        const secondRow = tableData[1].map(sanitizeCell);
+        const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell));
+        if (!isAlignment) {
+          // Insert alignment row after headers
+          tableData.splice(1, 0, headers.map(() => '---'));
+          alignmentRowInserted = true;
+          // Recompute rows
+          headers = tableData[0].map(sanitizeCell);
+          rows = tableData.slice(2).map(row => row.map(sanitizeCell));
+        }
+      }
 
       // Check if table is complex (many columns, long content, or nested structure)
       const isComplexTable = headers.length > 4 ||
@@ -271,7 +286,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           `| ${headers.map(() => '---').join(' | ')} |`,
           ...rows.map(row => `| ${row.join(' | ')} |`)
         ].join('\n');
-
         const caption = tableCaption ? `\n\n*${tableCaption}*` : '';
         return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
       }
@@ -344,29 +358,25 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         continue;
       }
 
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
+      if (isTableRow(line)) {
         if (!inTable) {
           inTable = true;
           tableData = [];
-          tableCaption = ''; // Reset caption for new table
+          tableCaption = '';
+          alignmentRowInserted = false;
         }
-        const cells = line.split('|')
-          .slice(1, -1)
-          .map(cell => cell.trim());
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
         tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
+      } else if (inTable && (line.trim() === '' || !isTableSeparator(line))) {
         if (tableData.length > 0) {
           processedLines.push(convertTableForMobile(tableData));
           tableData = [];
         }
         inTable = false;
-        if (!isTableSeparator) {
+        if (!isTableSeparator(line)) {
           processedLines.push(line);
         }
-      } else if (!isTableSeparator) {
+      } else if (!isTableSeparator(line)) {
         processedLines.push(line);
       }
     }
