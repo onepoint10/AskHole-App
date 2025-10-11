@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-5a4f9ad8-b235-4c55-832c-a2d4e7b5811a"
+      }
+    }
+  }  
+}
