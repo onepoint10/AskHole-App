@@ -1,11 +1,21 @@
 ﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react'; // Add Download icon
+import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
+import { cn } from '@/lib/utils';
+import {
+  MarkdownTable,
+  MarkdownTableHead,
+  MarkdownTableBody,
+  MarkdownTableRow,
+  MarkdownTableHeader,
+  MarkdownTableCell
+} from '@/components/ui/markdown-table';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import Message from './Message'; // Import the new Message component
@@ -225,65 +235,76 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing
+  // Mobile table preprocessing with enhanced accessibility and edge case handling
   const preprocessMarkdownForMobile = useCallback((markdown) => {
     if (!isMobileDevice || !markdown) return markdown;
 
     const lines = markdown.split('\n');
     const processedLines = [];
-    let tableData = [];
     let inTable = false;
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
-
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
-
-        return rowContent;
-      }).join('\n\n---\n\n');
-    };
+    let tableLines = [];
 
     for (const line of lines) {
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        // This looks like a table row or separator
+        inTable = true;
+        tableLines.push(line);
+      } else {
+        if (inTable) {
+          // End of table, process it
+          if (tableLines.length > 0) {
+            processedLines.push(convertMarkdownTableToHtml(tableLines));
+            tableLines = [];
+          }
+          inTable = false;
         }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
         processedLines.push(line);
       }
     }
 
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
+    // Handle table at the end of the markdown
+    if (inTable && tableLines.length > 0) {
+      processedLines.push(convertMarkdownTableToHtml(tableLines));
     }
 
     return processedLines.join('\n');
   }, [isMobileDevice]);
+
+  const convertMarkdownTableToHtml = (tableLines) => {
+    if (tableLines.length < 2) return tableLines.join('\n'); // Not a valid table
+
+    const headerLine = tableLines[0];
+    const separatorLine = tableLines[1];
+    const dataLines = tableLines.slice(2);
+
+    const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+
+    let html = '<div class="table-wrapper-responsive" style="overflow-x: auto; margin: 1em 0;">';
+    html += '<table class="min-w-full divide-y divide-border/50 border border-border/50 rounded-lg">';
+    html += '<thead class="bg-muted/50">';
+    html += '<tr>';
+    headers.forEach(header => {
+      html += `<th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">${header}</th>`;
+    });
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody class="bg-background/50 divide-y divide-border/50">';
+
+    dataLines.forEach(line => {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      html += '<tr>';
+      cells.forEach(cell => {
+        html += `<td class="px-4 py-2 whitespace-nowrap text-sm text-foreground">${cell}</td>`;
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody>';
+    html += '</table>';
+    html += '</div>';
+
+    return html;
+  };
 
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
@@ -377,23 +398,22 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
-      </div>
+      <MarkdownTable isMobile={isMobileDevice}>{children}</MarkdownTable>
     ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
-    tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
+    thead: ({ children }) => (
+      <MarkdownTableHead>{children}</MarkdownTableHead>
+    ),
+    tbody: ({ children }) => (
+      <MarkdownTableBody>{children}</MarkdownTableBody>
+    ),
+    tr: ({ children }) => (
+      <MarkdownTableRow>{children}</MarkdownTableRow>
+    ),
     th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
-        {children}
-      </th>
+      <MarkdownTableHeader isMobile={isMobileDevice}>{children}</MarkdownTableHeader>
     ),
     td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
+      <MarkdownTableCell isMobile={isMobileDevice}>{children}</MarkdownTableCell>
     ),
   };
 
@@ -410,13 +430,11 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
-            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
+
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}
             isImageFile={isImageFile}
-            copiedId={copiedId}
-            copiedCodeId={copiedCodeId}
-            isDark={isDark}
+            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
           />
         ))}
         {/* Loading indicator */}
