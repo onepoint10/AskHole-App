@@ -276,21 +276,64 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
       }
 
-      // For simpler tables, create an accessible card-based layout
-      return `<div class="mobile-table" role="table" aria-label="${tableCaption || 'Data table'}">\n` +
-        rows.map((row, rowIndex) => {
-          const cells = headers.map((header, cellIndex) => {
-            if (cellIndex < row.length) {
-              return `<div class="mobile-table-cell" role="cell">
-                <span class="mobile-table-header" role="rowheader">${header}</span>
-                <span class="mobile-table-value">${row[cellIndex] || ''}</span>
-              </div>`;
-            }
-            return '';
-          }).filter(Boolean).join('\n');
-
-          return `<div class="mobile-table-row" role="row">\n${cells}\n</div>`;
-        }).join('\n') + '\n</div>';
+      // Create a proper HTML table structure that works better on iOS Safari
+      return `<div class="mobile-table-container" style="overflow-x: auto;">
+  <table class="mobile-table" style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
+    <thead>
+      <tr>
+        ${headers.map(header =>
+        `<th style="text-align: left; padding: 0.75rem; background-color: rgba(0,0,0,0.05); font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1);">
+            ${header}
+          </th>`
+      ).join('')}
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(row =>
+        `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+          ${row.map((cell, i) =>
+          `<td style="padding: 0.75rem; vertical-align: top;">
+              <div class="mobile-only" style="font-weight: 500; color: rgba(0,0,0,0.6); font-size: 0.875rem; margin-bottom: 0.25rem; display: none;">
+                ${headers[i]}
+              </div>
+              <div>${cell || ''}</div>
+            </td>`
+        ).join('')}
+        </tr>`
+      ).join('')}
+    </tbody>
+  </table>
+</div>\n\n<style>
+@media (max-width: 640px) {
+  .mobile-table-container table {
+    display: block;
+  }
+  .mobile-table-container thead {
+    display: none;
+  }
+  .mobile-table-container tbody {
+    display: block;
+  }
+  .mobile-table-container tr {
+    display: block;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 0.5rem;
+    background-color: rgba(255,255,255,0.05);
+  }
+  .mobile-table-container td {
+    display: block;
+    text-align: left;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+  }
+  .mobile-table-container td:last-child {
+    border-bottom: none;
+  }
+  .mobile-table-container .mobile-only {
+    display: block !important;
+  }
+}
+</style>`;
     };
 
     // Process lines
