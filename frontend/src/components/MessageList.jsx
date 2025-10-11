@@ -61,13 +61,10 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        if (!isMobile) {
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
-        } else {
-          const remarkBreaks = await import('remark-breaks');
-          setRemarkPlugins([remarkBreaks.default]);
-        }
+        // Temporarily remove remark-gfm and remark-breaks to isolate regex error
+        // const remarkGfm = await import('remark-gfm');
+        // const remarkBreaks = await import('remark-breaks');
+        setRemarkPlugins([]); // Set to empty array
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
@@ -225,66 +222,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing
-  const preprocessMarkdownForMobile = useCallback((markdown) => {
-    if (!isMobileDevice || !markdown) return markdown;
-
-    const lines = markdown.split('\n');
-    const processedLines = [];
-    let tableData = [];
-    let inTable = false;
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
-
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
-
-        return rowContent;
-      }).join('\n\n---\n\n');
-    };
-
-    for (const line of lines) {
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
-        }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
-        processedLines.push(line);
-      }
-    }
-
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
-    }
-
-    return processedLines.join('\n');
-  }, [isMobileDevice]);
-
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
@@ -327,13 +264,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             )}
           </Button>
         </div>
-        <div className={`${isMobileDevice ? 'w-full overflow-x-auto' : ''}`}>
+        <div className="w-full overflow-x-auto">
           <SyntaxHighlighter
             style={isDark ? oneDark : oneLight}
             language={match[1]}
             PreTag="div"
-            className={`!mt-0 !rounded-t-none !border-t-0 ${isMobileDevice ? '!w-full !max-w-full !overflow-x-auto' : ''
-              }`}
+            className="!mt-0 !rounded-t-none !border-t-0"
             customStyle={isMobileDevice ? {
               width: '100%',
               maxWidth: '100%',
@@ -353,7 +289,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   // Markdown components configuration
   const markdownComponents = {
     code: CodeBlock,
-    pre: ({ children }) => <div className={isMobileDevice ? 'w-full overflow-x-auto' : ''}>{children}</div>,
+    pre: ({ children }) => <div className="w-full overflow-x-auto">{children}</div>,
     p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
     h1: ({ children }) => <h1 className="text-xl font-semibold mb-3 text-foreground">{children}</h1>,
     h2: ({ children }) => <h2 className="text-lg font-semibold mb-3 text-foreground">{children}</h2>,
@@ -377,23 +313,20 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
+      <div className="my-3 w-full overflow-x-auto">
+        <table className="border-collapse text-sm w-full">{children}</table>
       </div>
     ),
     thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
     tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
     th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
+      <th className="border border-border text-left font-semibold bg-muted/30 px-3 py-2">
         {children}
       </th>
     ),
     td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
+      <td className="border border-border px-3 py-2">{children}</td>
     ),
   };
 
@@ -410,7 +343,6 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
-            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}
             isImageFile={isImageFile}
