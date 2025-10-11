@@ -434,9 +434,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}
             isImageFile={isImageFile}
-            copiedId={copiedId}
-            copiedCodeId={copiedCodeId}
-            isDark={isDark}
+            preprocessMarkdownForMobile={preprocessMarkdownForMobile}
           />
         ))}
         {/* Loading indicator */}
