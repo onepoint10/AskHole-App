@@ -265,7 +265,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
       if (isComplexTable) {
         hasComplexTable = true;
-        // Create accessible scrollable table
+        // Create accessible scrollable table for complex tables
         const tableRows = [
           `| ${headers.join(' | ')} |`,
           `| ${headers.map(() => '---').join(' | ')} |`,
@@ -276,64 +276,54 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
       }
 
-      // Create a proper HTML table structure that works better on iOS Safari
-      return `<div class="mobile-table-container" style="overflow-x: auto;">
-  <table class="mobile-table" style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
-    <thead>
-      <tr>
-        ${headers.map(header =>
-        `<th style="text-align: left; padding: 0.75rem; background-color: rgba(0,0,0,0.05); font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1);">
-            ${header}
-          </th>`
+      // For simpler tables, create a flex-based layout
+      return `<div class="mobile-table-wrapper" style="margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; background: var(--background); border: 1px solid var(--border);">
+    <div class="mobile-table-header" style="display: flex; background: var(--accent); border-bottom: 1px solid var(--border); padding: 0.75rem;">
+      ${headers.map(header => 
+        `<div style="flex: 1; min-width: 0; font-weight: 600; padding: 0 0.5rem; color: var(--accent-foreground);">
+          ${header}
+        </div>`
       ).join('')}
-      </tr>
-    </thead>
-    <tbody>
-      ${rows.map(row =>
-        `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
-          ${row.map((cell, i) =>
-          `<td style="padding: 0.75rem; vertical-align: top;">
-              <div class="mobile-only" style="font-weight: 500; color: rgba(0,0,0,0.6); font-size: 0.875rem; margin-bottom: 0.25rem; display: none;">
-                ${headers[i]}
-              </div>
-              <div>${cell || ''}</div>
-            </td>`
+    </div>
+    ${rows.map(row => 
+      `<div class="mobile-table-row" style="display: flex; border-bottom: 1px solid var(--border); padding: 0.75rem;">
+        ${row.map((cell, i) => 
+          `<div style="flex: 1; min-width: 0; padding: 0 0.5rem; display: flex;">
+            <div class="mobile-only" style="display: none; font-weight: 500; color: var(--muted-foreground); width: 40%; margin-right: 1rem;">
+              ${headers[i]}
+            </div>
+            <div style="flex: 1;">${cell || ''}</div>
+          </div>`
         ).join('')}
-        </tr>`
-      ).join('')}
-    </tbody>
-  </table>
-</div>\n\n<style>
-@media (max-width: 640px) {
-  .mobile-table-container table {
-    display: block;
-  }
-  .mobile-table-container thead {
-    display: none;
-  }
-  .mobile-table-container tbody {
-    display: block;
-  }
-  .mobile-table-container tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 0.5rem;
-    background-color: rgba(255,255,255,0.05);
-  }
-  .mobile-table-container td {
-    display: block;
-    text-align: left;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-  }
-  .mobile-table-container td:last-child {
-    border-bottom: none;
-  }
-  .mobile-table-container .mobile-only {
-    display: block !important;
-  }
-}
-</style>`;
+      </div>`
+    ).join('')}
+  </div>
+  <style>
+    @media (max-width: 640px) {
+      .mobile-table-wrapper {
+        border: 1px solid var(--border);
+      }
+      .mobile-table-header {
+        display: none !important;
+      }
+      .mobile-table-row {
+        display: block !important;
+        padding: 0 !important;
+        background: var(--background);
+      }
+      .mobile-table-row > div {
+        display: flex !important;
+        padding: 0.75rem !important;
+        border-bottom: 1px solid var(--border);
+      }
+      .mobile-table-row > div:last-child {
+        border-bottom: none;
+      }
+      .mobile-table-row > div .mobile-only {
+        display: block !important;
+      }
+    }
+  </style>`;
     };
 
     // Process lines
