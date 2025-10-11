@@ -18,6 +18,7 @@ const Message = ({
     onDeleteMessage,
     markdownComponents,
     remarkPlugins,
+    preprocessMarkdownForMobile,
 
     getFileUrl,
     getFileDisplayName,
@@ -204,15 +205,13 @@ const Message = ({
                                             <CollapsibleContent className="space-y-2">
                                                 <div className="relative">
                                                     <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
-                                                        <div className="overflow-x-auto">
-                                                            <ReactMarkdown
-                                                                remarkPlugins={remarkPlugins}
-                                                                rehypePlugins={[rehypeRaw]}
-                                                                components={markdownComponents}
-                                                            >
-                                                                {exaResultsContent}
-                                                            </ReactMarkdown>
-                                                        </div>
+                                                        <ReactMarkdown
+                                                            remarkPlugins={remarkPlugins}
+                                                            rehypePlugins={[rehypeRaw]}
+                                                            components={markdownComponents}
+                                                        >
+                                                            {preprocessMarkdownForMobile(exaResultsContent)}
+                                                        </ReactMarkdown>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -241,15 +240,13 @@ const Message = ({
                                     {summaryContent && (
                                         <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''
                                             } ${isExaMessage && exaResultsContent ? 'mt-4 pt-4 border-t border-border/50' : ''}`}>
-                                            <div className="overflow-x-auto">
-                                                <ReactMarkdown
-                                                    remarkPlugins={remarkPlugins}
-                                                    rehypePlugins={[rehypeRaw]}
-                                                    components={markdownComponents}
-                                                >
-                                                    {summaryContent}
-                                                </ReactMarkdown>
-                                            </div>
+                                            <ReactMarkdown
+                                                remarkPlugins={remarkPlugins}
+                                                rehypePlugins={[rehypeRaw]}
+                                                components={markdownComponents}
+                                            >
+                                                {preprocessMarkdownForMobile(summaryContent)}
+                                            </ReactMarkdown>
                                         </div>
                                     )}
 

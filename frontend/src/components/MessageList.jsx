@@ -71,8 +71,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        const remarkGfm = await import('remark-gfm');
-        setRemarkPlugins([remarkGfm.default]);
+        if (!isMobile) {
+          const remarkGfm = await import('remark-gfm');
+          setRemarkPlugins([remarkGfm.default]);
+        } else {
+          const remarkBreaks = await import('remark-breaks');
+          setRemarkPlugins([remarkBreaks.default]);
+        }
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
@@ -230,7 +235,76 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
+  // Mobile table preprocessing with enhanced accessibility and edge case handling
+  const preprocessMarkdownForMobile = useCallback((markdown) => {
+    if (!isMobileDevice || !markdown) return markdown;
 
+    const lines = markdown.split('\n');
+    const processedLines = [];
+    let inTable = false;
+    let tableLines = [];
+
+    for (const line of lines) {
+      if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+        // This looks like a table row or separator
+        inTable = true;
+        tableLines.push(line);
+      } else {
+        if (inTable) {
+          // End of table, process it
+          if (tableLines.length > 0) {
+            processedLines.push(convertMarkdownTableToHtml(tableLines));
+            tableLines = [];
+          }
+          inTable = false;
+        }
+        processedLines.push(line);
+      }
+    }
+
+    // Handle table at the end of the markdown
+    if (inTable && tableLines.length > 0) {
+      processedLines.push(convertMarkdownTableToHtml(tableLines));
+    }
+
+    return processedLines.join('\n');
+  }, [isMobileDevice]);
+
+  const convertMarkdownTableToHtml = (tableLines) => {
+    if (tableLines.length < 2) return tableLines.join('\n'); // Not a valid table
+
+    const headerLine = tableLines[0];
+    const separatorLine = tableLines[1];
+    const dataLines = tableLines.slice(2);
+
+    const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+
+    let html = '<div class="table-wrapper-responsive" style="overflow-x: auto; margin: 1em 0;">';
+    html += '<table class="min-w-full divide-y divide-border/50 border border-border/50 rounded-lg">';
+    html += '<thead class="bg-muted/50">';
+    html += '<tr>';
+    headers.forEach(header => {
+      html += `<th class="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">${header}</th>`;
+    });
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody class="bg-background/50 divide-y divide-border/50">';
+
+    dataLines.forEach(line => {
+      const cells = line.split('|').slice(1, -1).map(c => c.trim());
+      html += '<tr>';
+      cells.forEach(cell => {
+        html += `<td class="px-4 py-2 whitespace-nowrap text-sm text-foreground">${cell}</td>`;
+      });
+      html += '</tr>';
+    });
+
+    html += '</tbody>';
+    html += '</table>';
+    html += '</div>';
+
+    return html;
+  };
 
   // Code block component with improved copy functionality
   const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
