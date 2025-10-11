@@ -207,7 +207,7 @@ const Message = ({
                                                     <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
                                                         <ReactMarkdown
                                                             remarkPlugins={remarkPlugins}
-                                                            rehypePlugins={[rehypeRaw]}
+                                                            rehypePlugins={[rehypeRaw()]}
                                                             components={markdownComponents}
                                                         >
                                                             {preprocessMarkdownForMobile(exaResultsContent)}
@@ -242,7 +242,7 @@ const Message = ({
                                             } ${isExaMessage && exaResultsContent ? 'mt-4 pt-4 border-t border-border/50' : ''}`}>
                                             <ReactMarkdown
                                                 remarkPlugins={remarkPlugins}
-                                                rehypePlugins={[rehypeRaw]}
+                                                rehypePlugins={[rehypeRaw()]}
                                                 components={markdownComponents}
                                             >
                                                 {preprocessMarkdownForMobile(summaryContent)}
