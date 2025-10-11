@@ -209,7 +209,7 @@ const Message = ({
                                                             rehypePlugins={[rehypeRaw]}
                                                             components={markdownComponents}
                                                         >
-                                                            {preprocessMarkdownForMobile(exaResultsContent)}
+                                                            {exaResultsContent}
                                                         </ReactMarkdown>
                                                     </div>
                                                     <Button
@@ -244,7 +244,7 @@ const Message = ({
                                                 rehypePlugins={[rehypeRaw]}
                                                 components={markdownComponents}
                                             >
-                                                {preprocessMarkdownForMobile(summaryContent)}
+                                                {summaryContent}
                                             </ReactMarkdown>
                                         </div>
                                     )}

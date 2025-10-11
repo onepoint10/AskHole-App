@@ -242,141 +242,47 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const lines = markdown.split('\n');
     const processedLines = [];
-    let tableData = [];
     let inTable = false;
-    let hasComplexTable = false;
-    let tableCaption = ''; // Store optional table caption
+    let tableHeaders = [];
+    let tableRows = [];
 
-    const sanitizeCell = (cell) => {
-      // Remove HTML-like tags but preserve content
-      return cell.replace(/<[^>]+>/g, '').trim();
-    };
+    const isTableLine = (line) => /^\s*\|.*\|\s*$/.test(line);
+    const isSeparatorLine = (line) => /^\s*\|(:?-+:?)\|\s*$/.test(line);
 
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0].map(sanitizeCell);
-      const rows = tableData.slice(1).map(row => row.map(sanitizeCell));
-
-      // Check if table is complex (many columns, long content, or nested structure)
-      const isComplexTable = headers.length > 4 ||
-        tableData.some(row => row.some(cell => cell && cell.length > 50)) ||
-        tableData.some(row => row.some(cell => cell && cell.includes('|')));
-
-      if (isComplexTable) {
-        hasComplexTable = true;
-        // Create accessible scrollable table
-        const tableRows = [
-          `| ${headers.join(' | ')} |`,
-          `| ${headers.map(() => '---').join(' | ')} |`,
-          ...rows.map(row => `| ${row.join(' | ')} |`)
-        ].join('\n');
-
-        const caption = tableCaption ? `\n\n*${tableCaption}*` : '';
-        return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
-      }
-
-      // Create a proper HTML table structure that works better on iOS Safari
-      return `<div class="mobile-table-container" style="overflow-x: auto;">
-  <table class="mobile-table" style="width: 100%; border-collapse: collapse; margin: 1rem 0;">
-    <thead>
-      <tr>
-        ${headers.map(header =>
-        `<th style="text-align: left; padding: 0.75rem; background-color: rgba(0,0,0,0.05); font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1);">
-            ${header}
-          </th>`
-      ).join('')}
-      </tr>
-    </thead>
-    <tbody>
-      ${rows.map(row =>
-        `<tr style="border-bottom: 1px solid rgba(0,0,0,0.05);">
-          ${row.map((cell, i) =>
-          `<td style="padding: 0.75rem; vertical-align: top;">
-              <div class="mobile-only" style="font-weight: 500; color: rgba(0,0,0,0.6); font-size: 0.875rem; margin-bottom: 0.25rem; display: none;">
-                ${headers[i]}
-              </div>
-              <div>${cell || ''}</div>
-            </td>`
-        ).join('')}
-        </tr>`
-      ).join('')}
-    </tbody>
-  </table>
-</div>\n\n<style>
-@media (max-width: 640px) {
-  .mobile-table-container table {
-    display: block;
-  }
-  .mobile-table-container thead {
-    display: none;
-  }
-  .mobile-table-container tbody {
-    display: block;
-  }
-  .mobile-table-container tr {
-    display: block;
-    margin-bottom: 1rem;
-    border: 1px solid rgba(0,0,0,0.1);
-    border-radius: 0.5rem;
-    background-color: rgba(255,255,255,0.05);
-  }
-  .mobile-table-container td {
-    display: block;
-    text-align: left;
-    border-bottom: 1px solid rgba(0,0,0,0.05);
-  }
-  .mobile-table-container td:last-child {
-    border-bottom: none;
-  }
-  .mobile-table-container .mobile-only {
-    display: block !important;
-  }
-}
-</style>`;
-    };
-
-    // Process lines
     for (const line of lines) {
-      // Check for table caption
-      if (line.startsWith('Table:')) {
-        tableCaption = line.slice(6).trim();
-        continue;
-      }
-
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
+      if (isTableLine(line)) {
+        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
         if (!inTable) {
+          tableHeaders = cells;
           inTable = true;
-          tableData = [];
-          tableCaption = ''; // Reset caption for new table
+        } else {
+          tableRows.push(cells);
         }
-        const cells = line.split('|')
-          .slice(1, -1)
-          .map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
+      } else if (isSeparatorLine(line) && inTable) {
+        // This is the separator line, ignore for data but confirms table structure
+      } else {
+        if (inTable) {
+          // End of table, process it
+          if (tableHeaders.length > 0 && tableRows.length > 0) {
+            processedLines.push(
+              `<MarkdownTableResponsive isMobile={true} headers={${JSON.stringify(tableHeaders)}} rows={${JSON.stringify(tableRows)}} />`
+            );
+          }
+          tableHeaders = [];
+          tableRows = [];
+          inTable = false;
         }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
         processedLines.push(line);
       }
     }
 
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
+    // Handle table at the end of the markdown
+    if (inTable && tableHeaders.length > 0 && tableRows.length > 0) {
+      processedLines.push(
+        `<MarkdownTableResponsive isMobile={true} headers={${JSON.stringify(tableHeaders)}} rows={${JSON.stringify(tableRows)}} />`
+      );
     }
 
-    // Return processed markdown
     return processedLines.join('\n');
   }, [isMobileDevice]);
 
@@ -471,9 +377,14 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         {children}
       </a>
     ),
-    table: ({ children }) => (
-      <MarkdownTable isMobile={isMobileDevice}>{children}</MarkdownTable>
-    ),
+    table: ({ node, children }) => {
+      if (isMobileDevice && node.children[0]?.value?.startsWith('<MarkdownTableResponsive')) {
+        return <div dangerouslySetInnerHTML={{ __html: node.children[0].value }} />;
+      }
+      return (
+        <MarkdownTable isMobile={isMobileDevice}>{children}</MarkdownTable>
+      );
+    },
     thead: ({ children }) => (
       <MarkdownTableHead>{children}</MarkdownTableHead>
     ),
