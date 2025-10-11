@@ -248,39 +248,64 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     let tableCaption = '';
     let alignmentRowInserted = false;
 
-    // Improved regex for table row and separator (accepts any line starting and ending with | and at least one more |)
+    // Enhanced regex for table row detection - more permissive
     const isTableRow = (line) => {
       const trimmed = line.trim();
-      return /^\|.*\|$/.test(trimmed) && trimmed.split('|').length > 2;
-    };
-    // Accept alignment row if only contains dashes, colons, pipes, or spaces
-    const isTableSeparator = (line) => {
-      const trimmed = line.trim();
-      return /^\|?[:\-\s|]+\|?$/.test(trimmed);
+      // Match both standard and irregular table rows
+      // 1. Standard format: |col1|col2|col3|
+      // 2. Irregular format: | col1 | col2 |col3|
+      // 3. Missing outer pipes: col1|col2|col3
+      return (
+        (/^\|.*\|$/.test(trimmed) || /^.*\|.*$/.test(trimmed)) &&
+        trimmed.includes('|') &&
+        trimmed.split('|').length > 1
+      );
     };
 
-    const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
+    // Enhanced separator detection
+    const isTableSeparator = (line) => {
+      const trimmed = line.trim().replace(/\s+/g, '');
+      // Match both standard and irregular separators
+      // 1. Standard format: |---|---|---|
+      // 2. With alignment: |:---:|---:|:---|
+      // 3. Irregular format: ---|---|---
+      return /^[\|:\-]+$/.test(trimmed) && trimmed.includes('-');
+    }; const sanitizeCell = (cell) => cell.replace(/<[^>]+>/g, '').trim();
+
+    const normalizeTableRow = (row) => {
+      // Remove outer pipes and split
+      const cells = row.trim().replace(/^\||\|$/g, '').split('|');
+      // Clean each cell
+      return cells.map(cell => cell.trim());
+    };
 
     const convertTableForMobile = (tableData) => {
       if (tableData.length === 0) return '';
-      let headers = tableData[0].map(sanitizeCell);
-      let rows = tableData.slice(1).map(row => row.map(sanitizeCell));
 
-      // If alignment row is missing or malformed, insert a default one
-      if (tableData.length > 1 && !alignmentRowInserted) {
-        const secondRow = tableData[1].map(sanitizeCell);
-        const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell));
-        if (!isAlignment) {
-          // Insert alignment row after headers
-          tableData.splice(1, 0, headers.map(() => '---'));
+      // Normalize and clean all rows
+      const normalizedTable = tableData.map(row =>
+        Array.isArray(row) ? row.map(cell => cell.trim()) : normalizeTableRow(row)
+      );
+
+      let headers = normalizedTable[0].map(sanitizeCell);
+      let rows = normalizedTable.slice(1).map(row => row.map(sanitizeCell));
+
+      // Handle missing or malformed alignment row
+      if (normalizedTable.length > 1) {
+        const secondRow = normalizedTable[1].map(sanitizeCell);
+        const isAlignment = secondRow.every(cell => /^:?-+:?$/.test(cell.replace(/\s+/g, '')));
+
+        if (!isAlignment && !alignmentRowInserted) {
+          // Insert standardized alignment row
+          const alignmentRow = headers.map(() => '---');
+          normalizedTable.splice(1, 0, alignmentRow);
           alignmentRowInserted = true;
-          // Recompute rows
-          headers = tableData[0].map(sanitizeCell);
-          rows = tableData.slice(2).map(row => row.map(sanitizeCell));
+          // Recompute rows after alignment insertion
+          rows = normalizedTable.slice(2).map(row => row.map(sanitizeCell));
         }
-      } else if (tableData.length === 1) {
-        // Only header row, insert alignment row
-        tableData.push(headers.map(() => '---'));
+      } else if (normalizedTable.length === 1) {
+        // Only header row exists, add alignment row
+        normalizedTable.push(headers.map(() => '---'));
         alignmentRowInserted = true;
         headers = tableData[0].map(sanitizeCell);
         rows = [];
@@ -378,12 +403,13 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
           tableCaption = '';
           alignmentRowInserted = false;
         }
-        // Split by |, but preserve empty cells and trim
-        let cells = line.split('|');
-        // Remove first and last empty string if line starts/ends with |
-        if (cells.length > 0 && cells[0].trim() === '') cells = cells.slice(1);
-        if (cells.length > 0 && cells[cells.length - 1].trim() === '') cells = cells.slice(0, -1);
-        tableData.push(cells.map(cell => cell.trim()));
+
+        // Normalize and clean the row
+        const normalizedRow = line.trim();
+        // Handle rows with or without outer pipes
+        const rowWithPipes = normalizedRow.startsWith('|') ? normalizedRow : `|${normalizedRow}|`;
+        // Split and clean cells
+        tableData.push(normalizeTableRow(rowWithPipes));
       } else if (inTable && (line.trim() === '' || !isTableSeparator(line))) {
         if (tableData.length > 0) {
           processedLines.push(convertTableForMobile(tableData));
