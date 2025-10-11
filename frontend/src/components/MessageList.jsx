@@ -276,51 +276,53 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         return `<div class="table-wrapper-responsive" role="region" aria-label="Scrollable table">\n\n${tableRows}${caption}\n\n</div>`;
       }
 
-      // For simpler tables, create a flex-based layout
-      return `<div class="mobile-table-wrapper" style="margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; background: var(--background); border: 1px solid var(--border);">
-    <div class="mobile-table-header" style="display: flex; background: var(--accent); border-bottom: 1px solid var(--border); padding: 0.75rem;">
-      ${headers.map(header =>
-        `<div style="flex: 1; min-width: 0; font-weight: 600; padding: 0 0.5rem; color: var(--accent-foreground);">
-          ${header}
-        </div>`
-      ).join('')}
-    </div>
-    ${rows.map(row =>
-        `<div class="mobile-table-row" style="display: flex; border-bottom: 1px solid var(--border); padding: 0.75rem;">
-        ${row.map((cell, i) =>
-          `<div style="flex: 1; min-width: 0; padding: 0 0.5rem; display: flex;">
-            <div class="mobile-only" style="display: none; font-weight: 500; color: var(--muted-foreground); width: 40%; margin-right: 1rem;">
-              ${headers[i]}
+      // For simpler tables, create a card-based layout optimized for mobile
+      return `<div class="mobile-table-wrapper" style="margin: 1rem 0;">
+    ${rows.map((row, rowIndex) =>
+        `<div class="mobile-table-row" style="margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; background: var(--background);">
+        ${headers.map((header, i) =>
+          `<div class="mobile-table-cell" style="display: flex; border-bottom: ${i === headers.length - 1 ? 'none' : '1px solid var(--border)'}; min-height: 2.5rem;">
+            <div style="flex: 0 0 40%; padding: 0.75rem; font-weight: 500; color: var(--muted-foreground); background: var(--muted); border-right: 1px solid var(--border);">
+              ${header}
             </div>
-            <div style="flex: 1;">${cell || ''}</div>
+            <div style="flex: 0 0 60%; padding: 0.75rem;">
+              ${row[i] || ''}
+            </div>
           </div>`
         ).join('')}
       </div>`
       ).join('')}
   </div>
   <style>
-    @media (max-width: 640px) {
+    @media (min-width: 641px) {
       .mobile-table-wrapper {
         border: 1px solid var(--border);
-      }
-      .mobile-table-header {
-        display: none !important;
+        border-radius: 0.5rem;
+        overflow: hidden;
       }
       .mobile-table-row {
-        display: block !important;
-        padding: 0 !important;
-        background: var(--background);
-      }
-      .mobile-table-row > div {
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        border-bottom: 1px solid var(--border) !important;
         display: flex !important;
-        padding: 0.75rem !important;
-        border-bottom: 1px solid var(--border);
       }
-      .mobile-table-row > div:last-child {
-        border-bottom: none;
+      .mobile-table-row:last-child {
+        border-bottom: none !important;
       }
-      .mobile-table-row > div .mobile-only {
-        display: block !important;
+      .mobile-table-cell {
+        flex: 1 !important;
+        border-bottom: none !important;
+        border-right: 1px solid var(--border) !important;
+      }
+      .mobile-table-cell:last-child {
+        border-right: none !important;
+      }
+      .mobile-table-cell > div:first-child {
+        display: none !important;
+      }
+      .mobile-table-cell > div:last-child {
+        flex: 1 1 auto !important;
       }
     }
   </style>`;
