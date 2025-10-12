@@ -60,13 +60,20 @@ class GeminiClient:
     def create_chat_session_with_history(self, session_id: str, model: str, history_messages=None):
         """Create a new chat session and optionally preload history.
 
-        history_messages format: list of dicts like {"role": "user"|"model", "parts": ["text"]}
+        history_messages format: list of dicts like {"role": "user"|"model", "parts": [types.Part.from_text(text="...")]}
         """
         if history_messages and isinstance(history_messages, list) and len(history_messages) > 0:
             try:
                 chat = self.client.chats.create(model=model, history=history_messages)
             except Exception as e:
                 print(f"Failed to create chat with history, falling back without history: {e}")
+                print(f"History messages count: {len(history_messages)}")
+                if history_messages:
+                    print(f"First history message format: {type(history_messages[0])}")
+                    if isinstance(history_messages[0], dict) and 'parts' in history_messages[0]:
+                        print(f"First message parts format: {type(history_messages[0]['parts'])}")
+                        if history_messages[0]['parts']:
+                            print(f"First part type: {type(history_messages[0]['parts'][0])}")
                 chat = self.client.chats.create(model=model)
         else:
             chat = self.client.chats.create(model=model)
@@ -411,7 +418,7 @@ class GeminiClient:
                                 # Last resort: return the uploaded file as is
                                 print(f"Using uploaded file directly: {file_path}")
                                 return uploaded_file
-                    
+
                     # Check file state - handle different possible state structures
                     if hasattr(current_file, 'state') and hasattr(current_file.state, 'name'):
                         state_name = current_file.state.name
@@ -421,7 +428,7 @@ class GeminiClient:
                         # If no state information, assume it's ready
                         print(f"File upload completed (no state info): {file_path}")
                         return current_file
-                    
+
                     if state_name == "ACTIVE" or state_name == "READY":
                         print(f"File upload successful: {file_path}")
                         return current_file
@@ -440,7 +447,7 @@ class GeminiClient:
                     print(f"Uploaded file object: {uploaded_file}")
                     print(f"Uploaded file name: {getattr(uploaded_file, 'name', 'N/A')}")
                     print(f"Uploaded file id: {getattr(uploaded_file, 'id', 'N/A')}")
-                    
+
                     import time
                     time.sleep(check_interval)
                     wait_time += check_interval

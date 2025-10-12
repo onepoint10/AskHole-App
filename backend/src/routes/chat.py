@@ -599,12 +599,17 @@ def send_message(session_id):
                     history_messages = None
                     try:
                         if session_id not in getattr(gemini_client, 'chat_sessions', {}):
+                            from google.genai import types
                             prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
                             history_messages = []
                             for m in prior_messages:
                                 role = 'user' if m.role == 'user' else 'model'
                                 text = m.content or ''
-                                history_messages.append({'role': role, 'parts': [text]})
+                                # Create proper Part objects for Gemini API
+                                history_messages.append({
+                                    'role': role,
+                                    'parts': [types.Part.from_text(text=text)]
+                                })
                     except Exception as hist_err:
                         logger.warning(f"History build error for session {session_id}: {hist_err}")
                     response_content = gemini_client.chat_message(
