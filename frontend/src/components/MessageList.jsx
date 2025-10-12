@@ -392,17 +392,17 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     ),
     thead: ({ children }) => <thead>{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children, node, ...props }) => {
+    tr: ({ children, node, isHeader, ...props }) => {
       // Remove alternating background on Safari mobile for better alignment
       const trClassName = (isSafari && isMobileDevice) ? '' : 'even:bg-muted/20';
       return <tr className={trClassName} {...props}>{children}</tr>;
     },
-    th: ({ children, node, ...props }) => (
+    th: ({ children, node, isHeader, ...props }) => (
       <th {...props}>
         {children}
       </th>
     ),
-    td: ({ children, node, ...props }) => (
+    td: ({ children, node, isHeader, ...props }) => (
       <td {...props}>{children}</td>
     ),
   };

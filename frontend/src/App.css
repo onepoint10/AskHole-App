@@ -835,7 +835,7 @@
 .markdown-table {
   min-width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  /* Remove table-layout: fixed for better desktop alignment */
   width: 100%;
 }
 
@@ -843,7 +843,7 @@
 .markdown-table td {
   border: 1px solid hsl(var(--border) / 0.6);
   padding: 0.5rem;
-  text-align: left;
+  /* Let browser handle text alignment naturally on desktop */
   vertical-align: top;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -852,7 +852,6 @@
 .markdown-table th {
   background-color: hsl(var(--muted) / 0.6);
   font-weight: 600;
-  white-space: nowrap;
   color: hsl(var(--foreground));
   border-bottom: 2px solid hsl(var(--border));
 }
@@ -862,49 +861,12 @@
   background-color: hsl(var(--card));
 }
 
-/* Safari-specific fixes for table alignment */
-@supports (-webkit-touch-callout: none) {
-  .markdown-table {
-    -webkit-text-size-adjust: 100%;
-    table-layout: fixed;
-  }
-
-  .markdown-table th,
-  .markdown-table td {
-    -webkit-box-sizing: border-box;
-    box-sizing: border-box;
-    display: table-cell;
-    vertical-align: middle;
-  }
-
-  .markdown-table td {
-    text-align: left;
-    -webkit-text-align: left;
-  }
-
-  .markdown-table th {
-    text-align: left;
-    -webkit-text-align: left;
-  }
-}
-
-/* Mobile-specific table adjustments */
+/* Safari-specific fixes - MOBILE ONLY for alignment issues */
 @media (max-width: 768px) {
-
-  .markdown-table th,
-  .markdown-table td {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    min-width: 60px;
-  }
-
-  .markdown-table th {
-    font-size: 0.75rem;
-  }
-
-  /* Additional Safari mobile fixes */
   @supports (-webkit-touch-callout: none) {
     .markdown-table {
+      -webkit-text-size-adjust: 100%;
+      table-layout: fixed;
       display: table;
       width: 100%;
     }
@@ -923,8 +885,28 @@
 
     .markdown-table th,
     .markdown-table td {
+      -webkit-box-sizing: border-box;
+      box-sizing: border-box;
       display: table-cell;
+      vertical-align: middle;
+      text-align: left;
+      -webkit-text-align: left;
     }
+  }
+}
+
+/* Mobile-specific table adjustments */
+@media (max-width: 768px) {
+
+  .markdown-table th,
+  .markdown-table td {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    min-width: 60px;
+  }
+
+  .markdown-table th {
+    font-size: 0.75rem;
   }
 }
 
