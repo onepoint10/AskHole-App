@@ -368,16 +368,20 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         </table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+    thead: ({ children }) => <thead>{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
-    th: ({ children }) => (
-      <th>
+    tr: ({ children, node, ...props }) => {
+      // Remove alternating background on Safari mobile for better alignment
+      const trClassName = (isSafari && isMobileDevice) ? '' : 'even:bg-muted/20';
+      return <tr className={trClassName} {...props}>{children}</tr>;
+    },
+    th: ({ children, node, ...props }) => (
+      <th {...props}>
         {children}
       </th>
     ),
-    td: ({ children }) => (
-      <td>{children}</td>
+    td: ({ children, node, ...props }) => (
+      <td {...props}>{children}</td>
     ),
   };
 
