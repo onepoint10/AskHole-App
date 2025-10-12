@@ -8,6 +8,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import ImageViewer from './ImageViewer';
+import AuthenticatedImage from './AuthenticatedImage';
+import useAuthenticatedImage from '@/hooks/useAuthenticatedImage';
 
 const Message = ({
     message,
@@ -36,14 +38,42 @@ const Message = ({
     const [viewerOpen, setViewerOpen] = useState(false);
     const [viewerImage, setViewerImage] = useState({ url: '', name: '' });
 
-    const openImageViewer = useCallback((imageUrl, imageName) => {
-        setViewerImage({ url: imageUrl, name: imageName });
-        setViewerOpen(true);
-    }, []);
+    const openImageViewer = useCallback(async (imageUrl, imageName) => {
+        // Fetch authenticated blob URL for the viewer
+        const sessionId = localStorage.getItem('session_id');
+
+        try {
+            const response = await fetch(imageUrl, {
+                credentials: 'include',
+                mode: 'cors',
+                headers: {
+                    'Authorization': `Bearer ${sessionId}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to load image: ${response.status}`);
+            }
+
+            const blob = await response.blob();
+            const blobUrl = URL.createObjectURL(blob);
+
+            setViewerImage({ url: blobUrl, name: imageName, originalUrl: imageUrl });
+            setViewerOpen(true);
+        } catch (error) {
+            console.error('Failed to load image for viewer:', error);
+            toast.error(t('failed_to_load_image'));
+        }
+    }, [t]);
 
     const closeImageViewer = useCallback(() => {
+        // Revoke blob URL to free memory
+        if (viewerImage.url && viewerImage.url.startsWith('blob:')) {
+            URL.revokeObjectURL(viewerImage.url);
+        }
         setViewerOpen(false);
-    }, []);
+        setViewerImage({ url: '', name: '' });
+    }, [viewerImage.url]);
 
     let exaResultsContent = null;
     let summaryContent = message.content;
@@ -136,7 +166,7 @@ const Message = ({
                                                                         const imageUrl = getFileUrl(image);
                                                                         return (
                                                                             <div key={`image-${index}`} className="relative group">
-                                                                                <img
+                                                                                <AuthenticatedImage
                                                                                     src={imageUrl}
                                                                                     alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('image_alt', { index: index + 1 }))}
                                                                                     className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
@@ -302,7 +332,7 @@ const Message = ({
                                                                             const imageUrl = getFileUrl(image);
                                                                             return (
                                                                                 <div key={`image-${index}`} className="relative group">
-                                                                                    <img
+                                                                                    <AuthenticatedImage
                                                                                         src={imageUrl}
                                                                                         alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('generated_image_alt', { index: index + 1 }))}
                                                                                         className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
