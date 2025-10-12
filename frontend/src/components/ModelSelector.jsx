@@ -8,12 +8,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const ModelSelector = ({ 
-  availableModels, 
-  selectedModel, 
+const ModelSelector = ({
+  availableModels,
+  selectedModel,
   onModelChange,
-  isMobileOverlay = false, 
-  disabled = false 
+  isMobileOverlay = false,
+  disabled = false
 }) => {
   const allModels = [
     ...((availableModels.gemini || []).map(model => ({ value: model, label: `${model} (Gemini)`, type: 'gemini' }))),
@@ -28,13 +28,13 @@ const ModelSelector = ({
         onValueChange={onModelChange}
         disabled={disabled}
       >
-        <SelectTrigger className={`rounded-3xl w-64 h-8 text-xs bg-background/50 border-border/50 hover:bg-background/80 transition-colors ${isMobileOverlay ? 'w-84' : 'w-48'}`}>
+        <SelectTrigger className={`rounded-3xl w-64 h-8 text-xs bg-background/50 border-border/50 hover:bg-background/80 transition-colors model-selector-trigger ${isMobileOverlay ? 'w-84' : 'w-48'}`}>
           <SelectValue placeholder="Choose model..." />
         </SelectTrigger>
         <SelectContent align="start" side="top" className="max-h-48">
           {allModels.map((model) => (
-            <SelectItem 
-              key={model.value} 
+            <SelectItem
+              key={model.value}
               value={model.value}
               className="text-xs"
             >

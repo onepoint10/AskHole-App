@@ -290,7 +290,7 @@ const MessageInput = ({
   const shouldShowModelSelector = !currentSession || currentSession.message_count === 0;
 
   return (
-    <div className="border-border bg-background">
+    <div className="border-border bg-background message-input-container">
       <div className={`max-w-4xl mx-auto py-4`}>
         {attachedFiles.length > 0 && (
           <div className={`mb-3 space-y-2 ${isMobileDevice ? '' : 'mx-4'}`}>

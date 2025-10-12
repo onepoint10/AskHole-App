@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  Settings, 
-  Database, 
-  History, 
+import {
+  Settings,
+  Database,
+  History,
   Plus,
   BookPlus,
-  MessageCirclePlus, 
+  MessageCirclePlus,
   Search,
   Trash2,
   Edit3,
@@ -44,12 +44,12 @@ import PromptDialog from './PromptDialog';
 import PublicPromptsLibrary from './PublicPromptsLibrary';
 import { sessionsAPI, promptsAPI } from '@/services/api';
 
-const Sidebar = ({ 
+const Sidebar = ({
   sessions = [],
   prompts = [],
   currentUser,
-  onSessionSelect, 
-  onNewSession, 
+  onSessionSelect,
+  onNewSession,
   onDeleteSession,
   onRenameSession,
   onNewPrompt,
@@ -80,7 +80,7 @@ const Sidebar = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [isHoveringLogo, setIsHoveringLogo] = useState(false);
-  
+
   // Public prompts state
   const [publicPrompts, setPublicPrompts] = useState([]);
   const [publicPromptsLoading, setPublicPromptsLoading] = useState(false);
@@ -148,16 +148,16 @@ const Sidebar = ({
   // Calculate adaptive width based on content
   const calculateAdaptiveWidth = () => {
     if (isCollapsed) return 60;
-    
+
     let maxWidth = 320;
-    
+
     sessions.forEach(session => {
       if (session.model) {
         const estimatedWidth = 200 + session.model.length * 8 + 20;
         maxWidth = Math.max(maxWidth, Math.min(estimatedWidth, 500));
       }
     });
-    
+
     return maxWidth;
   };
 
@@ -212,14 +212,14 @@ const Sidebar = ({
   }, [activeTab, searchTerm, tagFilter]);
 
   // Use search results when searching, otherwise use filtered local results
-  const filteredSessions = searchTerm.trim() ? 
-    searchResults.sessions : 
+  const filteredSessions = searchTerm.trim() ?
+    searchResults.sessions :
     (Array.isArray(sessions) ? sessions.filter(session =>
       session.title.toLowerCase().includes(searchTerm.toLowerCase())
     ) : []);
 
   const filteredPrompts = (Array.isArray(prompts) ? prompts.filter(prompt =>
-    (searchTerm.trim() === '' || 
+    (searchTerm.trim() === '' ||
       prompt.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prompt.content && prompt.content.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (prompt.category && prompt.category.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -232,7 +232,7 @@ const Sidebar = ({
     const now = new Date();
     const diffTime = Math.abs(now - date);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays === 1) return t('today');
     if (diffDays === 2) return t('yesterday');
     if (diffDays <= 7) return t('days_ago', { count: diffDays - 1 });
@@ -339,7 +339,7 @@ const Sidebar = ({
   };
 
   return (
-    <div 
+    <div
       className="sidebar flex flex-col h-full border-r border-sidebar-border transition-all duration-300 ease-in-out relative"
       style={{ width: `${sidebarWidth}px` }}
     >
@@ -347,7 +347,7 @@ const Sidebar = ({
       <div className={`p-3 border-sidebar-border `}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div 
+            <div
               className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0 cursor-pointer hover:bg-primary/90 transition-colors"
               onClick={toggleCollapse}
               onMouseEnter={() => setIsHoveringLogo(true)}
@@ -355,8 +355,8 @@ const Sidebar = ({
               title={isCollapsed ? t('expand_sidebar') : t('collapse_sidebar')}
             >
               {isHoveringLogo ? (
-                isCollapsed ? 
-                  <ChevronRight className="h-4 w-4 text-primary-foreground" /> : 
+                isCollapsed ?
+                  <ChevronRight className="h-4 w-4 text-primary-foreground" /> :
                   <ChevronLeft className="h-4 w-4 text-primary-foreground" />
               ) : (
                 <CustomLogo className="h-7 w-7 text-primary-foreground" />
@@ -370,49 +370,61 @@ const Sidebar = ({
             )}
           </div>
           {!isCollapsed && (
-             <div className="flex items-center gap-1">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onNewSession}
                 className="hover:bg-sidebar-accent flex-shrink-0"
                 title={t('new_chat')}
               >
                 <MessageCirclePlus className="h-4 w-4" />
-              </Button>                  
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setIsPromptDialogOpen(true)}
                 className="hover:bg-sidebar-accent flex-shrink-0"
                 title={t('create_prompt')}
               >
                 <BookPlus className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={onOpenSettings}
                 className="hover:bg-sidebar-accent flex-shrink-0"
                 title={t('settings')}
               >
                 <Settings className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  localStorage.removeItem('askhole-tour-completed');
+                  window.location.reload();
+                }}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title={t('restart_tour')}
+              >
+                <HelpCircle className="h-4 w-4" />
+              </Button>
               {isAdmin && (
                 <Button
                   variant="ghost"
-                  size="sm" 
+                  size="sm"
                   onClick={onOpenAdmin}
                   className="hover:bg-sidebar-accent flex-shrink-0"
                   title={t('admin_dashboard')}
                 >
-                  <Shield className="h-4 w-4" />                  
+                  <Shield className="h-4 w-4" />
                 </Button>
-               )}           
+              )}
             </div>
           )}
         </div>
-        
+
         {/* Tab Navigation */}
         {!isCollapsed && (
           <div className="flex p-1 bg-sidebar-accent rounded-3xl">
@@ -480,34 +492,34 @@ const Sidebar = ({
               size="sm"
               onClick={() => {
                 setActiveTab('public');
-                setIsCollapsed(!isCollapsed);                
+                setIsCollapsed(!isCollapsed);
               }}
               className="w-8 h-8 p-0"
               title={t('public_prompts')}
             >
               <Globe className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onNewSession}
               className="w-8 h-8 p-0 hover:bg-sidebar-accent"
               title={t('new_chat')}
             >
               <MessageCirclePlus className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setIsPromptDialogOpen(true)}
               className="w-8 h-10 80 hover:bg-sidebar-accent"
               title={t('create_prompt')}
             >
               <BookPlus className="h-4 w-4" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onOpenSettings}
               className="w-8 h-8 p-0 hover:bg-sidebar-accent"
               title={t('settings')}
@@ -515,7 +527,7 @@ const Sidebar = ({
               <Settings className="h-4 w-4" />
             </Button>
           </div>
-          
+
           {/* Fixed Bottom Panel for Collapsed State */}
           <div className="border-sidebar-border p-2">
             <div className="flex flex-col items-center space-y-2">
@@ -577,9 +589,9 @@ const Sidebar = ({
               <div className="px-2 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">{t('recent_chats')}</h3>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onNewSession}
                     className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
                     title={t('new_chat')}
@@ -643,7 +655,7 @@ const Sidebar = ({
                         <Badge variant="outline" className="text-xs flex-shrink-0">
                           {session.client_type}
                         </Badge>
-                        <span 
+                        <span
                           className="text-xs text-muted-foreground truncate min-w-0"
                           title={session.model}
                         >
@@ -739,8 +751,8 @@ const Sidebar = ({
                         {searchTerm.trim() && prompt.match_type && (
                           <div className="text-xs text-primary mt-1">
                             <Badge variant="outline" className="text-xs">
-                              {prompt.match_type === 'title' ? t('title_match') : 
-                               prompt.match_type === 'content' ? t('content_match') : t('category_match')}
+                              {prompt.match_type === 'title' ? t('title_match') :
+                                prompt.match_type === 'content' ? t('content_match') : t('category_match')}
                             </Badge>
                           </div>
                         )}
@@ -753,11 +765,11 @@ const Sidebar = ({
                         {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {prompt.tags.slice(0, 3).map((tag, index) => (
-                              <Badge 
-                                key={index} 
-                                variant={tagFilter === tag ? 'default' : 'outline'} 
-                                className="text-xs cursor-pointer hover:bg-accent" 
-                                onClick={(e) => { 
+                              <Badge
+                                key={index}
+                                variant={tagFilter === tag ? 'default' : 'outline'}
+                                className="text-xs cursor-pointer hover:bg-accent"
+                                onClick={(e) => {
                                   e.stopPropagation();
                                   handleTagFilter(tag);
                                 }}
@@ -811,8 +823,8 @@ const Sidebar = ({
               <div className="px-3 py-2 space-y-2">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-sidebar-foreground">{t('public_prompts')}</h3>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     onClick={() => setIsPublicPromptsOpen(true)}
                     className="hover:bg-sidebar-accent text-sidebar-foreground flex-shrink-0"
@@ -833,14 +845,14 @@ const Sidebar = ({
                     </Button>
                   )}
                 </div>
-                
+
                 {publicPromptsLoading && (
                   <div className="text-center py-6">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
                     <p className="text-xs text-muted-foreground">{t('loading_public_prompts')}</p>
                   </div>
                 )}
-                
+
                 {publicPromptsError && (
                   <div className="text-center py-6">
                     <p className="text-xs text-red-500">{publicPromptsError}</p>
@@ -854,16 +866,16 @@ const Sidebar = ({
                     </Button>
                   </div>
                 )}
-                
+
                 {!publicPromptsLoading && !publicPromptsError && publicPrompts.length === 0 && (
                   <div className="text-center text-muted-foreground text-sm py-6">
                     <Globe className="h-8 w-8 mx-auto mb-2 opacity-50" />
                     {searchTerm || tagFilter ? t('no_matching_public_prompts_found') : t('no_public_prompts_available')}
                     {!searchTerm && (
                       <div className="mt-3">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setIsPublicPromptsOpen(true)}
                           className="text-xs"
                         >
@@ -873,7 +885,7 @@ const Sidebar = ({
                     )}
                   </div>
                 )}
-                
+
                 {!publicPromptsLoading && publicPrompts.length > 0 && (
                   <>
                     {publicPrompts.map((prompt) => (
@@ -906,11 +918,11 @@ const Sidebar = ({
                             {prompt.tags && Array.isArray(prompt.tags) && prompt.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {prompt.tags.slice(0, 2).map((tag, index) => (
-                                  <Badge 
-                                    key={index} 
-                                    variant={tagFilter === tag ? 'default' : 'outline'} 
-                                    className="text-xs cursor-pointer hover:bg-accent" 
-                                    onClick={(e) => { 
+                                  <Badge
+                                    key={index}
+                                    variant={tagFilter === tag ? 'default' : 'outline'}
+                                    className="text-xs cursor-pointer hover:bg-accent"
+                                    onClick={(e) => {
                                       e.stopPropagation();
                                       handleTagFilter(tag);
                                     }}
@@ -930,12 +942,12 @@ const Sidebar = ({
                         </div>
                       </div>
                     ))}
-                    
+
                     {publicPrompts.length >= 50 && (
                       <div className="text-center py-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setIsPublicPromptsOpen(true)}
                           className="text-xs"
                         >
@@ -991,7 +1003,7 @@ const Sidebar = ({
           </div>
         </>
       )}
-      
+
       {/* Context Menus and Dialogs */}
       <ContextMenu
         isVisible={contextMenu.isVisible}
@@ -1023,17 +1035,17 @@ const Sidebar = ({
         editMode={true}
         initialPrompt={editingPrompt}
       />
-      
+
       <Dialog open={isPublicPromptsOpen} onOpenChange={setIsPublicPromptsOpen}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
-          <PublicPromptsLibrary 
+          <PublicPromptsLibrary
             onUsePrompt={onUsePrompt}
             onClose={() => setIsPublicPromptsOpen(false)}
             initialTagFilter={tagFilter} // Pass the current tagFilter from Sidebar
           />
         </DialogContent>
       </Dialog>
-      
+
       <ContextMenu
         isVisible={promptContextMenu.isVisible}
         position={promptContextMenu.position}

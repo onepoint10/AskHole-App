@@ -9,6 +9,7 @@ import MessageInput from './components/MessageInput';
 import Sidebar from './components/Sidebar';
 import SettingsDialog from './components/SettingsDialog';
 import ErrorBoundary from './components/ErrorBoundary';
+import AppTour from './components/AppTour';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
@@ -1016,6 +1017,9 @@ function App() {
         className={`h-screen flex bg-background text-foreground ${isMobile ? 'mobile-root' : ''}`}
         {...swipeHandlers} // Apply swipe handlers here
       >
+        {/* App Tour Component */}
+        <AppTour isMobile={isMobile} />
+
         {/* Mobile toggle button */}
         {isMobile && (
           <button
@@ -1041,6 +1045,7 @@ function App() {
         {/* Desktop persistent sidebar */}
         {!isMobile && (
           <Sidebar
+            className="sidebar"
             sessions={sessions}
             prompts={prompts}
             currentUser={currentUser}
