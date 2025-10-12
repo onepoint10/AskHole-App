@@ -78,7 +78,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       try {
         // Use older remark-gfm version for Safari, newer version for other browsers
         if (safariDetected) {
-          console.log('Safari detected - loading compatible remark-gfm version 2.0.0');
+          console.log('Safari detected - loading compatible remark-gfm version 3.0.1');
           const remarkGfmSafari = await import('remark-gfm-safari');
           setRemarkPlugins([remarkGfmSafari.default]);
         } else {
