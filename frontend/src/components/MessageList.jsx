@@ -19,6 +19,18 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+
+  // Helper function to detect Safari browser
+  const detectSafari = useCallback(() => {
+    if (typeof navigator === 'undefined') return false;
+
+    const userAgent = navigator.userAgent.toLowerCase();
+    // Detect Safari but exclude Chrome/Chromium-based browsers
+    const isSafariBrowser = /safari/.test(userAgent) &&
+      !/chrome|chromium|crios|edg|brave|opera|opr/.test(userAgent);
+    return isSafariBrowser;
+  }, []);
 
   // Helper function to get file URL
   const getFileUrl = useCallback((file) => {
@@ -57,13 +69,23 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   useEffect(() => {
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
+    const safariDetected = detectSafari();
+
     setIsMobileDevice(isMobile);
+    setIsSafari(safariDetected);
 
     const loadPlugins = async () => {
       try {
-        // Enable remark-gfm on all devices for proper table rendering
-        const remarkGfm = await import('remark-gfm');
-        setRemarkPlugins([remarkGfm.default]);
+        // Use older remark-gfm version for Safari, newer version for other browsers
+        if (safariDetected) {
+          console.log('Safari detected - loading compatible remark-gfm version 2.0.0');
+          const remarkGfmSafari = await import('remark-gfm-safari');
+          setRemarkPlugins([remarkGfmSafari.default]);
+        } else {
+          console.log('Non-Safari browser detected - loading latest remark-gfm version');
+          const remarkGfm = await import('remark-gfm');
+          setRemarkPlugins([remarkGfm.default]);
+        }
       } catch (error) {
         // Silently fail - markdown will render without plugins
         console.warn(t('failed_to_load_markdown_plugins'), error);
@@ -71,7 +93,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     };
 
     loadPlugins();
-  }, [t]);
+  }, [t, detectSafari]);
 
   // Add scroll detection for tables to show/hide scroll indicators
   useEffect(() => {
