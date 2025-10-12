@@ -1,5 +1,4 @@
 ﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react'; // Add Download icon
@@ -18,6 +17,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   const [copiedCodeId, setCopiedCodeId] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
+  const [ReactMarkdownComponent, setReactMarkdownComponent] = useState(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isSafari, setIsSafari] = useState(false);
 
@@ -76,15 +76,24 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
 
     const loadPlugins = async () => {
       try {
-        // Use older remark-gfm version for Safari, newer version for other browsers
+        // Use older versions for Safari (react-markdown 8.0.7 + remark-gfm 3.0.1)
+        // Use newer versions for other browsers (react-markdown 10.1.0 + remark-gfm 4.0.0)
         if (safariDetected) {
-          console.log('Safari detected - loading compatible remark-gfm version 3.0.1');
-          const remarkGfmSafari = await import('remark-gfm-safari');
-          setRemarkPlugins([remarkGfmSafari.default]);
+          console.log('Safari detected - loading compatible versions: react-markdown 8.0.7 + remark-gfm 3.0.1');
+          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+            import('remark-gfm-safari'),
+            import('react-markdown-safari')
+          ]);
+          setRemarkPlugins([remarkGfmModule.default]);
+          setReactMarkdownComponent(() => reactMarkdownModule.default);
         } else {
-          console.log('Non-Safari browser detected - loading latest remark-gfm version');
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
+          console.log('Non-Safari browser detected - loading latest versions: react-markdown 10.1.0 + remark-gfm 4.0.0');
+          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+            import('remark-gfm'),
+            import('react-markdown')
+          ]);
+          setRemarkPlugins([remarkGfmModule.default]);
+          setReactMarkdownComponent(() => reactMarkdownModule.default);
         }
       } catch (error) {
         // Silently fail - markdown will render without plugins
@@ -410,7 +419,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
       <div className={`mx-auto px-4 py-6 space-y-6 ${isMobileDevice ? 'max-w-full w-full' : 'max-w-4xl'}`}>
-        {messages.map((message) => (
+        {ReactMarkdownComponent && messages.map((message) => (
           <Message
             key={message.id}
             message={message}
@@ -420,6 +429,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
+            ReactMarkdownComponent={ReactMarkdownComponent}
             preprocessMarkdownForMobile={preprocessMarkdownForMobile}
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}
