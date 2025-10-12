@@ -8,6 +8,7 @@ import { ContextMenu as CM, ContextMenuContent, ContextMenuItem, ContextMenuTrig
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import Message from './Message'; // Import the new Message component
+import { getBaseApiUrl } from '@/services/api'; // Import API base URL getter
 
 const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
   const { t } = useTranslation();
@@ -39,7 +40,12 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       return file;
     }
     if (file.id) {
-      return `/api/files/${file.id}/download`;
+      // Use the centralized API base URL from api.js
+      // getBaseApiUrl() returns something like "http://localhost:5000/api"
+      // So we need to remove "/api" and add it back with the full path
+      const apiBaseUrl = getBaseApiUrl(); // e.g., "http://localhost:5000/api"
+      const baseWithoutApi = apiBaseUrl.replace(/\/api$/, ''); // e.g., "http://localhost:5000"
+      return `${baseWithoutApi}/api/files/${file.id}/download`;
     }
     if (file.url || file.src) {
       return file.url || file.src;

@@ -15,6 +15,9 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Export the base URL getter for use in other components
+export const getBaseApiUrl = getApiBaseUrl;
+
 // Helper function to get cookie value
 const getCookie = (name) => {
   const value = `; ${document.cookie}`;

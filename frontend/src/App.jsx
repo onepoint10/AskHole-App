@@ -727,6 +727,11 @@ function App() {
     try {
       const response = await sessionsAPI.generateImage(activeSessionId, { prompt: prompt.trim() }, i18n.language);
 
+      // Debug logging for image generation
+      console.log('Image generation response:', response.data);
+      console.log('Assistant message:', response.data.assistant_message);
+      console.log('Assistant message files:', response.data.assistant_message?.files);
+
       setCurrentMessages(prev => {
         const withoutTemp = prev.filter(msg => msg.id !== tempUserMessageId);
         return [
