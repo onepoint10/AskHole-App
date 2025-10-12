@@ -8,6 +8,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import ImageViewer from './ImageViewer';
+import AuthenticatedImage from './AuthenticatedImage';
 
 const Message = ({
     message,
@@ -136,7 +137,7 @@ const Message = ({
                                                                         const imageUrl = getFileUrl(image);
                                                                         return (
                                                                             <div key={`image-${index}`} className="relative group">
-                                                                                <img
+                                                                                <AuthenticatedImage
                                                                                     src={imageUrl}
                                                                                     alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('image_alt', { index: index + 1 }))}
                                                                                     className={`h-auto rounded border border-primary-foreground/20 object-cover cursor-pointer hover:opacity-90 transition-opacity ${isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
@@ -302,7 +303,7 @@ const Message = ({
                                                                             const imageUrl = getFileUrl(image);
                                                                             return (
                                                                                 <div key={`image-${index}`} className="relative group">
-                                                                                    <img
+                                                                                    <AuthenticatedImage
                                                                                         src={imageUrl}
                                                                                         alt={typeof image === 'string' ? image : (image.original_filename || image.filename || image.name || t('generated_image_alt', { index: index + 1 }))}
                                                                                         className={`h-auto rounded border border-border/30 object-cover cursor-pointer hover:opacity-90 transition-opacity ${isMobileDevice ? 'w-full max-h-32' : 'max-w-full max-h-48'
