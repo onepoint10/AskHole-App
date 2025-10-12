@@ -422,7 +422,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   };
 
   return (
-    <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
+    <ScrollArea className="flex-1 custom-scrollbar message-scroll-area message-list" ref={scrollRef}>
       <div className={`mx-auto px-4 py-6 space-y-6 ${isMobileDevice ? 'max-w-full w-full' : 'max-w-4xl'}`}>
         {ReactMarkdownComponent && messages.map((message) => (
           <Message
