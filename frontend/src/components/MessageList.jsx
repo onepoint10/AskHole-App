@@ -1,5 +1,4 @@
 ﻿import React, { useEffect, useRef, useState, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check, Trash2, Database, Download } from 'lucide-react'; // Add Download icon
@@ -18,7 +17,20 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   const [copiedCodeId, setCopiedCodeId] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
+  const [ReactMarkdownComponent, setReactMarkdownComponent] = useState(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isSafari, setIsSafari] = useState(false);
+
+  // Helper function to detect Safari browser
+  const detectSafari = useCallback(() => {
+    if (typeof navigator === 'undefined') return false;
+
+    const userAgent = navigator.userAgent.toLowerCase();
+    // Detect Safari but exclude Chrome/Chromium-based browsers
+    const isSafariBrowser = /safari/.test(userAgent) &&
+      !/chrome|chromium|crios|edg|brave|opera|opr/.test(userAgent);
+    return isSafariBrowser;
+  }, []);
 
   // Helper function to get file URL
   const getFileUrl = useCallback((file) => {
@@ -57,16 +69,31 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   useEffect(() => {
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : '';
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(userAgent);
+    const safariDetected = detectSafari();
+
     setIsMobileDevice(isMobile);
+    setIsSafari(safariDetected);
 
     const loadPlugins = async () => {
       try {
-        if (!isMobile) {
-          const remarkGfm = await import('remark-gfm');
-          setRemarkPlugins([remarkGfm.default]);
+        // Use older versions for Safari (react-markdown 8.0.7 + remark-gfm 3.0.1)
+        // Use newer versions for other browsers (react-markdown 10.1.0 + remark-gfm 4.0.0)
+        if (safariDetected) {
+          console.log('Safari detected - loading compatible versions: react-markdown 8.0.7 + remark-gfm 3.0.1');
+          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+            import('remark-gfm-safari'),
+            import('react-markdown-safari')
+          ]);
+          setRemarkPlugins([remarkGfmModule.default]);
+          setReactMarkdownComponent(() => reactMarkdownModule.default);
         } else {
-          const remarkBreaks = await import('remark-breaks');
-          setRemarkPlugins([remarkBreaks.default]);
+          console.log('Non-Safari browser detected - loading latest versions: react-markdown 10.1.0 + remark-gfm 4.0.0');
+          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+            import('remark-gfm'),
+            import('react-markdown')
+          ]);
+          setRemarkPlugins([remarkGfmModule.default]);
+          setReactMarkdownComponent(() => reactMarkdownModule.default);
         }
       } catch (error) {
         // Silently fail - markdown will render without plugins
@@ -75,7 +102,50 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     };
 
     loadPlugins();
-  }, [t]);
+  }, [t, detectSafari]);
+
+  // Add scroll detection for tables to show/hide scroll indicators
+  useEffect(() => {
+    const handleTableScroll = () => {
+      const tableContainers = document.querySelectorAll('.markdown-table-container');
+      tableContainers.forEach((container) => {
+        const { scrollLeft, scrollWidth, clientWidth } = container;
+        const isScrollable = scrollWidth > clientWidth;
+
+        if (isScrollable) {
+          // Can scroll left (not at the start)
+          if (scrollLeft > 0) {
+            container.classList.add('scrollable-left');
+          } else {
+            container.classList.remove('scrollable-left');
+          }
+
+          // Can scroll right (not at the end)
+          if (scrollLeft < scrollWidth - clientWidth - 1) {
+            container.classList.add('scrollable-right');
+          } else {
+            container.classList.remove('scrollable-right');
+          }
+        }
+      });
+    };
+
+    // Run on mount and when messages change
+    setTimeout(handleTableScroll, 100);
+
+    // Add scroll listeners to all table containers
+    const tableContainers = document.querySelectorAll('.markdown-table-container');
+    tableContainers.forEach((container) => {
+      container.addEventListener('scroll', handleTableScroll);
+    });
+
+    // Cleanup
+    return () => {
+      tableContainers.forEach((container) => {
+        container.removeEventListener('scroll', handleTableScroll);
+      });
+    };
+  }, [messages]);
 
   // Dark mode detection
   useEffect(() => {
@@ -225,68 +295,14 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
     }
   }, [t]);
 
-  // Mobile table preprocessing
+  // Mobile table preprocessing - disabled, now using proper table rendering
   const preprocessMarkdownForMobile = useCallback((markdown) => {
-    if (!isMobileDevice || !markdown) return markdown;
-
-    const lines = markdown.split('\n');
-    const processedLines = [];
-    let tableData = [];
-    let inTable = false;
-
-    const convertTableForMobile = (tableData) => {
-      if (tableData.length === 0) return '';
-
-      const headers = tableData[0];
-      const rows = tableData.slice(1);
-
-      return rows.map((row, rowIndex) => {
-        const rowContent = headers.map((header, cellIndex) => {
-          if (cellIndex < row.length) {
-            return `**${header}:** ${row[cellIndex]}`;
-          }
-          return '';
-        }).filter(Boolean).join('\n\n');
-
-        return rowContent;
-      }).join('\n\n---\n\n');
-    };
-
-    for (const line of lines) {
-      const isTableRow = /^\|(.+)\|$/.test(line);
-      const isTableSeparator = /^[-|\s:]+$/.test(line);
-
-      if (isTableRow) {
-        if (!inTable) {
-          inTable = true;
-          tableData = [];
-        }
-        const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-        tableData.push(cells);
-      } else if (inTable && (line.trim() === '' || !isTableSeparator)) {
-        if (tableData.length > 0) {
-          processedLines.push(convertTableForMobile(tableData));
-          tableData = [];
-        }
-        inTable = false;
-        if (!isTableSeparator) {
-          processedLines.push(line);
-        }
-      } else if (!isTableSeparator) {
-        processedLines.push(line);
-      }
-    }
-
-    // Handle table at end
-    if (inTable && tableData.length > 0) {
-      processedLines.push(convertTableForMobile(tableData));
-    }
-
-    return processedLines.join('\n');
-  }, [isMobileDevice]);
+    // Return markdown as-is for proper table rendering
+    return markdown;
+  }, []);
 
   // Code block component with improved copy functionality
-  const CodeBlock = useCallback(({ node, inline, className, children, ...props }) => {
+  const CodeBlock = useCallback(({ inline, className, children, ...props }) => {
     const match = /language-(\w+)/.exec(className || '');
     const codeString = String(children).replace(/\n$/, '');
     // Create a more unique ID that includes content hash for better state tracking
@@ -377,30 +393,33 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
       </a>
     ),
     table: ({ children }) => (
-      <div className={`my-3 w-full ${isMobileDevice ? 'overflow-x-auto' : 'overflow-x-auto'}`}>
-        <table className={`border-collapse text-sm ${isMobileDevice ? 'min-w-full' : 'w-full'
-          }`}>{children}</table>
+      <div className="markdown-table-container my-3">
+        <table className="markdown-table">
+          {children}
+        </table>
       </div>
     ),
-    thead: ({ children }) => <thead className="bg-muted/50">{children}</thead>,
+    thead: ({ children }) => <thead>{children}</thead>,
     tbody: ({ children }) => <tbody>{children}</tbody>,
-    tr: ({ children }) => <tr className="even:bg-muted/20">{children}</tr>,
-    th: ({ children }) => (
-      <th className={`border border-border text-left font-semibold bg-muted/30 ${isMobileDevice ? 'px-2 py-1 text-xs' : 'px-3 py-2'
-        }`}>
+    tr: ({ children, node, isHeader, ...props }) => {
+      // Remove alternating background on Safari mobile for better alignment
+      const trClassName = (isSafari && isMobileDevice) ? '' : 'even:bg-muted/20';
+      return <tr className={trClassName} {...props}>{children}</tr>;
+    },
+    th: ({ children, node, isHeader, ...props }) => (
+      <th {...props}>
         {children}
       </th>
     ),
-    td: ({ children }) => (
-      <td className={`border border-border ${isMobileDevice ? 'px-2 py-1 text-sm' : 'px-3 py-2'
-        }`}>{children}</td>
+    td: ({ children, node, isHeader, ...props }) => (
+      <td {...props}>{children}</td>
     ),
   };
 
   return (
     <ScrollArea className="flex-1 custom-scrollbar message-scroll-area" ref={scrollRef}>
       <div className={`mx-auto px-4 py-6 space-y-6 ${isMobileDevice ? 'max-w-full w-full' : 'max-w-4xl'}`}>
-        {messages.map((message) => (
+        {ReactMarkdownComponent && messages.map((message) => (
           <Message
             key={message.id}
             message={message}
@@ -410,6 +429,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
+            ReactMarkdownComponent={ReactMarkdownComponent}
             preprocessMarkdownForMobile={preprocessMarkdownForMobile}
             getFileUrl={getFileUrl}
             getFileDisplayName={getFileDisplayName}

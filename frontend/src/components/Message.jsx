@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from 'react';
-import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { User, Bot, Copy, Check, Trash2, Database, Download, ChevronsUpDown } from 'lucide-react';
@@ -17,6 +16,7 @@ const Message = ({
     onDeleteMessage,
     markdownComponents,
     remarkPlugins,
+    ReactMarkdownComponent,
     preprocessMarkdownForMobile,
     getFileUrl,
     getFileDisplayName,
@@ -203,12 +203,12 @@ const Message = ({
                                             <CollapsibleContent className="space-y-2">
                                                 <div className="relative">
                                                     <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
-                                                        <ReactMarkdown
+                                                        <ReactMarkdownComponent
                                                             remarkPlugins={remarkPlugins}
                                                             components={markdownComponents}
                                                         >
                                                             {preprocessMarkdownForMobile(exaResultsContent)}
-                                                        </ReactMarkdown>
+                                                        </ReactMarkdownComponent>
                                                     </div>
                                                     <Button
                                                         variant="ghost"
@@ -237,12 +237,12 @@ const Message = ({
                                     {summaryContent && (
                                         <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''
                                             } ${isExaMessage && exaResultsContent ? 'mt-4 pt-4 border-t border-border/50' : ''}`}>
-                                            <ReactMarkdown
+                                            <ReactMarkdownComponent
                                                 remarkPlugins={remarkPlugins}
                                                 components={markdownComponents}
                                             >
                                                 {preprocessMarkdownForMobile(summaryContent)}
-                                            </ReactMarkdown>
+                                            </ReactMarkdownComponent>
                                         </div>
                                     )}
 
