@@ -6,15 +6,6 @@ from datetime import datetime, timedelta
 import re
 import uuid
 
-def debug_session():
-    """Debug session information"""
-    print(f"Session contents: {dict(session)}")
-    print(f"Session ID from cookie: {session.get('session_id')}")
-    print(f"User ID from session: {session.get('user_id')}")
-    print(f"Session permanent: {session.permanent}")
-    print(f"Request cookies: {request.cookies}")
-    return session.get('session_id')
-
 auth_bp = Blueprint('auth', __name__)
 
 def validate_email(email):
@@ -310,12 +301,12 @@ def logout():
             # Deactivate session
             UserSession.query.filter_by(id=session_id).update({'is_active': False})
             db.session.commit()
-        
+
         # Clear session
         session.clear()
-        
+
         return jsonify({'success': True, 'message': 'Logged out successfully'})
-    
+
     except Exception as e:
         return jsonify({'error': f'Logout failed: {str(e)}'}), 500
 
@@ -326,7 +317,7 @@ def get_current_user_info():
     user = get_current_user()
     if not user:
         return jsonify({'error': 'Not authenticated'}), 401
-    
+
     return jsonify({
         'user': user.to_dict(),
         'authenticated': True
@@ -341,10 +332,10 @@ def check_auth():
     print(f"Request headers: {dict(request.headers)}")
     print(f"Request cookies: {dict(request.cookies)}")
     print(f"Authorization header: {request.headers.get('Authorization', 'Not present')}")
-    
+
     current_user = get_current_user()
     print(f"Current user result: {current_user}")
-    
+
     if current_user:
         print(f"User authenticated: {current_user.username}")
         return jsonify({
@@ -358,15 +349,3 @@ def check_auth():
     else:
         print("No authenticated user found")
         return jsonify({'authenticated': False}), 401
-
-@auth_bp.route('/debug-session', methods=['GET'])
-def debug_session_info():
-    """Debug endpoint to check session status"""
-    return jsonify({
-        'session_contents': dict(session),
-        'session_id_from_session': session.get('session_id'),
-        'user_id_from_session': session.get('user_id'),
-        'session_permanent': session.permanent,
-        'request_cookies': dict(request.cookies),
-        'request_headers': dict(request.headers)
-    })

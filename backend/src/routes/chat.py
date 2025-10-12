@@ -1232,27 +1232,6 @@ def get_prompt_like_status(prompt_id):
         return jsonify({'error': 'Failed to get like status'}), 500
 
 
-@chat_bp.route('/test-auth', methods=['GET'])
-def test_auth():
-    """Test endpoint to check authentication"""
-    print("Test auth endpoint called")
-    print(f"Headers: {dict(request.headers)}")
-    print(f"Cookies: {dict(request.cookies)}")
-
-    current_user = get_current_user()
-    if current_user:
-        return jsonify({
-            'authenticated': True,
-            'user': current_user.username,
-            'user_id': current_user.id
-        })
-    else:
-        return jsonify({
-            'authenticated': False,
-            'error': 'No authenticated user found'
-        }), 401
-
-
 @chat_bp.route('/files/upload', methods=['POST'])
 def upload_file():
     """Upload a file with better Cyrillic filename support and timeout handling"""
