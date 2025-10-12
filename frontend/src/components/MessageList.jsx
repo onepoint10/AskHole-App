@@ -17,6 +17,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
   const [copiedCodeId, setCopiedCodeId] = useState(null);
   const [isDark, setIsDark] = useState(false);
   const [remarkPlugins, setRemarkPlugins] = useState([]);
+  const [rehypePlugins, setRehypePlugins] = useState([]);
   const [ReactMarkdownComponent, setReactMarkdownComponent] = useState(null);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isSafari, setIsSafari] = useState(false);
@@ -80,19 +81,23 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         // Use newer versions for other browsers (react-markdown 10.1.0 + remark-gfm 4.0.0)
         if (safariDetected) {
           console.log('Safari detected - loading compatible versions: react-markdown 8.0.7 + remark-gfm 3.0.1');
-          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+          const [remarkGfmModule, rehypeRawModule, reactMarkdownModule] = await Promise.all([
             import('remark-gfm-safari'),
+            import('rehype-raw'),
             import('react-markdown-safari')
           ]);
           setRemarkPlugins([remarkGfmModule.default]);
+          setRehypePlugins([rehypeRawModule.default]);
           setReactMarkdownComponent(() => reactMarkdownModule.default);
         } else {
           console.log('Non-Safari browser detected - loading latest versions: react-markdown 10.1.0 + remark-gfm 4.0.0');
-          const [remarkGfmModule, reactMarkdownModule] = await Promise.all([
+          const [remarkGfmModule, rehypeRawModule, reactMarkdownModule] = await Promise.all([
             import('remark-gfm'),
+            import('rehype-raw'),
             import('react-markdown')
           ]);
           setRemarkPlugins([remarkGfmModule.default]);
+          setRehypePlugins([rehypeRawModule.default]);
           setReactMarkdownComponent(() => reactMarkdownModule.default);
         }
       } catch (error) {
@@ -429,6 +434,7 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
             onDeleteMessage={onDeleteMessage}
             markdownComponents={markdownComponents}
             remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
             ReactMarkdownComponent={ReactMarkdownComponent}
             preprocessMarkdownForMobile={preprocessMarkdownForMobile}
             getFileUrl={getFileUrl}

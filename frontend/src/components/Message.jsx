@@ -16,6 +16,7 @@ const Message = ({
     onDeleteMessage,
     markdownComponents,
     remarkPlugins,
+    rehypePlugins,
     ReactMarkdownComponent,
     preprocessMarkdownForMobile,
     getFileUrl,
@@ -205,6 +206,7 @@ const Message = ({
                                                     <div className={`prose prose-sm dark:prose-invert max-w-none ${isMobileDevice ? 'overflow-x-hidden' : ''}`}>
                                                         <ReactMarkdownComponent
                                                             remarkPlugins={remarkPlugins}
+                                                            rehypePlugins={rehypePlugins}
                                                             components={markdownComponents}
                                                         >
                                                             {preprocessMarkdownForMobile(exaResultsContent)}
@@ -239,6 +241,7 @@ const Message = ({
                                             } ${isExaMessage && exaResultsContent ? 'mt-4 pt-4 border-t border-border/50' : ''}`}>
                                             <ReactMarkdownComponent
                                                 remarkPlugins={remarkPlugins}
+                                                rehypePlugins={rehypePlugins}
                                                 components={markdownComponents}
                                             >
                                                 {preprocessMarkdownForMobile(summaryContent)}
