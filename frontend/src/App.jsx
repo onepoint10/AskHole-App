@@ -489,6 +489,11 @@ function App() {
     ]);
   }, []);
 
+  // Clear uploaded file IDs after successful message sending
+  const clearUploadedFileIds = useCallback(() => {
+    setUploadedFileIds([]);
+  }, []);
+
   // Message handling with improved error handling and UX
   const sendMessage = useCallback(async (message, files = [], searchMode = false) => {
     if (!message || !message.trim()) {
@@ -499,17 +504,21 @@ function App() {
       }
     }
 
-    // Don't auto-create session here, let MessageInput handle it
+    // If no active session, generate a new session ID for backend auto-creation
+    let targetSessionId = activeSessionId;
     if (!activeSessionId) {
-      toast.error(t('no_active_session_create_new_chat'));
-      return { success: false };
+      // Generate a new UUID for the session
+      targetSessionId = crypto.randomUUID();
+      console.log('No active session, generated new session ID for auto-creation:', targetSessionId);
+
+      // Set as active immediately so UI shows it
+      setActiveSessionId(targetSessionId);
+      setOpenTabIds(prev => [targetSessionId, ...prev]);
     }
 
-    const sessionExists = sessions.find(s => s.id === activeSessionId);
-    if (!sessionExists) {
-      toast.error(t('active_session_not_found'));
-      return { success: false };
-    }
+    const sessionExists = sessions.find(s => s.id === targetSessionId);
+    // No need to check if session exists - backend will auto-create if needed
+    // This handles first login and session ID mismatch scenarios
 
     // Create temporary user message ID
     const tempUserMessageId = `temp_${Date.now()}`;
@@ -605,11 +614,15 @@ function App() {
         }
       }
 
-      // Send message to the ACTIVE session (not the current session)
-      const response = await sessionsAPI.sendMessage(activeSessionId, {
+      // Send message to the target session (could be existing or new)
+      // Include model and temperature for auto-session creation on backend
+      const currentSessionData = sessions.find(s => s.id === targetSessionId);
+      const response = await sessionsAPI.sendMessage(targetSessionId, {
         message: message.trim(),
         files: uploadedFileIds,
         search_mode: searchMode, // Pass the searchMode flag
+        model: currentSessionData?.model || settings.defaultModel, // Pass model for auto-creation
+        temperature: currentSessionData?.temperature || settings.temperature, // Pass temperature for auto-creation
       }, i18n.language);
 
       // Replace temporary message with real messages from server
@@ -625,9 +638,19 @@ function App() {
       });
 
       // Update session in list (update title, message count, etc.)
-      setSessions(prev => prev.map(s =>
-        s.id === activeSessionId ? response.data.session : s
-      ));
+      // Also handle case where backend auto-created the session
+      setSessions(prev => {
+        const existingSession = prev.find(s => s.id === targetSessionId);
+        if (existingSession) {
+          // Update existing session
+          return prev.map(s =>
+            s.id === targetSessionId ? response.data.session : s
+          );
+        } else {
+          // Session was auto-created by backend, add it to the list
+          return [response.data.session, ...prev];
+        }
+      });
 
       // Show success message for file uploads
       if (uploadedFileIds.length > 0) {
@@ -669,7 +692,7 @@ function App() {
     } finally {
       setIsLoading(false);
     }
-  }, [activeSessionId, setIsAuthenticated, t]);
+  }, [activeSessionId, sessions, settings.defaultModel, settings.temperature, setIsAuthenticated, t, clearUploadedFileIds, i18n.language]);
 
   const generateImage = useCallback(async (prompt) => {
     if (!prompt || !prompt.trim()) {
@@ -772,11 +795,6 @@ function App() {
       return () => clearInterval(interval);
     }
   }, [uploadedFileIds, checkFileStatuses]);
-
-  // Clear uploaded file IDs after successful message sending
-  const clearUploadedFileIds = useCallback(() => {
-    setUploadedFileIds([]);
-  }, []);
 
   // Delete message function
   const deleteMessage = useCallback(async (messageId) => {

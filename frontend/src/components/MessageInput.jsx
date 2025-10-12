@@ -138,17 +138,8 @@ const MessageInput = ({
         await onModelChange(currentSession.id, String(selectedModel));
       }
 
-      // If no session exists at all, create one
-      if (!currentSession) {
-        console.log(t('creating_new_session_with_model', { model: selectedModel, type: typeof selectedModel }));
-        const targetSession = await onCreateNewSession(selectedModel);
-        if (!targetSession) {
-          console.error(t('failed_to_create_new_session'));
-          return;
-        }
-        // Wait a bit to ensure session is properly created and state updated
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
+      // Note: Session creation is now handled automatically in sendMessage
+      // No need to explicitly create session here - backend will auto-create if needed
 
       // Send message to current/updated session
       let result;
