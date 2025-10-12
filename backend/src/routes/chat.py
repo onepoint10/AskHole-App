@@ -396,6 +396,7 @@ def send_message(session_id):
     """Send a message in a chat session.
 
     - Validates session and user
+    - Auto-creates session if it doesn't exist (handles first login case)
     - Resolves attached files, preferring converted PDFs
     - For Gemini/OpenRouter, rehydrates session history if needed
     - Persists user and assistant messages
@@ -404,15 +405,43 @@ def send_message(session_id):
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
 
+    # Get the request data first to access model info if needed
+    data = request.get_json()
+
     session = ChatSession.query.filter_by(
         id=session_id,
         user_id=current_user.id
     ).first()
 
+    # Auto-create session if it doesn't exist (e.g., first login, session ID mismatch)
     if not session:
-        return jsonify({'error': 'Session not found or access denied'}), 404
+        logger.info(f"Session {session_id} not found, auto-creating new session for user {current_user.id}")
 
-    data = request.get_json()
+        # Get language from request header
+        accept_language = request.headers.get('Accept-Language', 'en')
+        default_title = _get_localized_default_title(accept_language)
+
+        # Get model from request data or use default
+        model = data.get('model', 'gemini-2.5-flash')
+        temperature = data.get('temperature', 1.0)
+
+        # Auto-determine client type based on model
+        client_type = determine_client_from_model(model)
+
+        # Create the session with the provided session_id
+        session = ChatSession(
+            id=session_id,
+            user_id=current_user.id,
+            title=default_title,
+            model=model,
+            client_type=client_type,
+            temperature=temperature,
+            is_closed=False
+        )
+
+        db.session.add(session)
+        db.session.commit()
+        logger.info(f"Auto-created session {session_id} with model {model} for user {current_user.id}")
 
     message_content = data.get('message', '')
     file_ids = data.get('files', [])
@@ -599,12 +628,17 @@ def send_message(session_id):
                     history_messages = None
                     try:
                         if session_id not in getattr(gemini_client, 'chat_sessions', {}):
+                            from google.genai import types
                             prior_messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.timestamp).all()
                             history_messages = []
                             for m in prior_messages:
                                 role = 'user' if m.role == 'user' else 'model'
                                 text = m.content or ''
-                                history_messages.append({'role': role, 'parts': [text]})
+                                # Create proper Part objects for Gemini API
+                                history_messages.append({
+                                    'role': role,
+                                    'parts': [types.Part.from_text(text=text)]
+                                })
                     except Exception as hist_err:
                         logger.warning(f"History build error for session {session_id}: {hist_err}")
                     response_content = gemini_client.chat_message(
