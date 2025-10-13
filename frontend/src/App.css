@@ -886,12 +886,9 @@
   @supports (-webkit-touch-callout: none) {
     .markdown-table {
       -webkit-text-size-adjust: 100%;
-      /* Use auto layout to allow content-based column widths */
-      table-layout: auto;
+      table-layout: fixed;
       display: table;
-      /* Don't force 100% width - let it be content-based */
-      width: auto;
-      max-width: 100%;
+      width: 100%;
     }
 
     .markdown-table thead {
@@ -914,39 +911,21 @@
       vertical-align: middle;
       text-align: left;
       -webkit-text-align: left;
-      /* Limit column width on mobile Safari to prevent excessive horizontal scrolling */
-      max-width: 250px;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      word-break: break-word;
-      hyphens: auto;
-      -webkit-hyphens: auto;
-      white-space: normal;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
   }
 }
 
 /* Mobile-specific table adjustments */
 @media (max-width: 768px) {
-  .markdown-table {
-    /* Use auto layout for content-based column widths on mobile */
-    table-layout: auto;
-    width: auto;
-    max-width: 100%;
-  }
 
   .markdown-table th,
   .markdown-table td {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
-    /* Limit column width on all mobile devices to prevent excessive horizontal scrolling */
-    max-width: 250px;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    hyphens: auto;
-    -webkit-hyphens: auto;
-    white-space: normal;
+    min-width: 60px;
   }
 
   .markdown-table th {
