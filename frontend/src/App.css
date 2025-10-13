@@ -911,6 +911,16 @@
       vertical-align: middle;
       text-align: left;
       -webkit-text-align: left;
+      /* Limit column width on mobile Safari to prevent excessive horizontal scrolling */
+      max-width: 250px;
+      min-width: 80px;
+      width: auto;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      white-space: normal;
     }
   }
 }
@@ -923,6 +933,13 @@
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
     min-width: 60px;
+    /* Limit column width on all mobile devices to prevent excessive horizontal scrolling */
+    max-width: 250px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
   }
 
   .markdown-table th {
