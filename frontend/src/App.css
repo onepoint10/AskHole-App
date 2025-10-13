@@ -886,9 +886,12 @@
   @supports (-webkit-touch-callout: none) {
     .markdown-table {
       -webkit-text-size-adjust: 100%;
-      table-layout: fixed;
+      /* Use auto layout to allow content-based column widths */
+      table-layout: auto;
       display: table;
-      width: 100%;
+      /* Don't force 100% width - let it be content-based */
+      width: auto;
+      max-width: 100%;
     }
 
     .markdown-table thead {
@@ -913,8 +916,6 @@
       -webkit-text-align: left;
       /* Limit column width on mobile Safari to prevent excessive horizontal scrolling */
       max-width: 250px;
-      min-width: 80px;
-      width: auto;
       word-wrap: break-word;
       overflow-wrap: break-word;
       word-break: break-word;
@@ -927,12 +928,17 @@
 
 /* Mobile-specific table adjustments */
 @media (max-width: 768px) {
+  .markdown-table {
+    /* Use auto layout for content-based column widths on mobile */
+    table-layout: auto;
+    width: auto;
+    max-width: 100%;
+  }
 
   .markdown-table th,
   .markdown-table td {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
-    min-width: 60px;
     /* Limit column width on all mobile devices to prevent excessive horizontal scrolling */
     max-width: 250px;
     word-wrap: break-word;
@@ -940,6 +946,7 @@
     word-break: break-word;
     hyphens: auto;
     -webkit-hyphens: auto;
+    white-space: normal;
   }
 
   .markdown-table th {
