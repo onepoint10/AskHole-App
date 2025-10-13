@@ -15,6 +15,7 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **Modern UI**: Beautiful, responsive interface with dark/light theme support
 - **Syntax Highlighting**: Code blocks with proper syntax highlighting
 - **Markdown Rendering**: Full markdown support for AI responses
+- **Math Formula Rendering**: Support for inline and display TeX/LaTeX formulas using KaTeX
 
 ### Additional Features
 - **Settings Management**: Configurable API keys, models, and preferences
@@ -113,6 +114,12 @@ The frontend will be available at `http://localhost:5173`
 2. Type your message in the input field
 3. Press Enter or click Send
 4. View AI responses with full markdown and code highlighting
+
+### Math Formulas
+- AskHole supports TeX/LaTeX mathematical formulas
+- Use `$...$` for inline math: `$x^2 + y^2 = z^2$`
+- Use `$$...$$` for display math on separate lines
+- See [MATH_FORMULAS.md](MATH_FORMULAS.md) for detailed examples and syntax
 
 ### File Upload
 1. Click the paperclip icon in the message input
