@@ -115,6 +115,20 @@
   --sidebar-ring: #f97316;
 }
 
+/* Fix Typography Plugin - Bold text colors and sizing */
+@utility prose-bold-fix {
+  --tw-prose-bold: var(--color-foreground);
+  --tw-prose-invert-bold: var(--color-foreground);
+}
+
+/* Ensure bold text displays correctly in all themes */
+.prose strong,
+.prose b {
+  color: var(--color-foreground) !important;
+  font-weight: 700 !important;
+  font-size: inherit !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -286,6 +300,12 @@
 
 .prose a {
   @apply text-primary hover:text-primary/80 underline;
+}
+
+/* Fix bold text in dark mode */
+.prose strong,
+.prose b {
+  @apply text-foreground font-bold;
 }
 
 /* loading animation */
