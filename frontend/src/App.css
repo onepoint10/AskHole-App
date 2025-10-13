@@ -886,7 +886,7 @@
   @supports (-webkit-touch-callout: none) {
     .markdown-table {
       -webkit-text-size-adjust: 100%;
-      table-layout: fixed;
+      table-layout: auto;
       display: table;
       width: 100%;
     }
@@ -911,9 +911,14 @@
       vertical-align: middle;
       text-align: left;
       -webkit-text-align: left;
-      max-width: 200px;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      max-width: 40vw;
+      min-width: 80px;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      hyphens: auto;
+      -webkit-hyphens: auto;
+      white-space: normal;
     }
   }
 }
