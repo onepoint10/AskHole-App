@@ -24,7 +24,7 @@ const MessageInput = ({
   const { t } = useTranslation();
   const [message, setMessage] = useState('');
   const [attachedFiles, setAttachedFiles] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('');
+  const [selectedModel, setSelectedModel] = useState(settings?.defaultModel || 'gemini-2.5-flash');
   const [isDragOver, setIsDragOver] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isImageGenerationMode, setIsImageGenerationMode] = useState(false); // New state for image generation mode
@@ -38,10 +38,10 @@ const MessageInput = ({
   useEffect(() => {
     if (currentSession?.model) {
       setSelectedModel(currentSession.model);
-    } else if (!currentSession && settings?.defaultModel) {
-      if (!selectedModel) {
-        setSelectedModel(settings.defaultModel || 'gemini-2.5-flash');
-      }
+    } else if (!currentSession) {
+      // When there's no session, always use the default model
+      const defaultModel = settings?.defaultModel || 'gemini-2.5-flash';
+      setSelectedModel(defaultModel);
     }
   }, [currentSession, settings?.defaultModel]);
 
