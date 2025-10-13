@@ -587,3 +587,129 @@ export const exaAPI = {
     }, language);
   },
 };
+
+// Workflow API
+export const workflowAPI = {
+  // Workspace endpoints
+  getWorkspaces: async (language) => {
+    console.log('API Request: GET /workspaces');
+    return apiCall('/workspaces', {}, language);
+  },
+  createWorkspace: async (data, language) => {
+    console.log('API Request: POST /workspaces');
+    return apiCall('/workspaces', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  getWorkspace: async (workspaceId, language) => {
+    console.log('API Request: GET /workspaces/' + workspaceId);
+    return apiCall(`/workspaces/${workspaceId}`, {}, language);
+  },
+  updateWorkspace: async (workspaceId, data, language) => {
+    console.log('API Request: PUT /workspaces/' + workspaceId);
+    return apiCall(`/workspaces/${workspaceId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  deleteWorkspace: async (workspaceId, language) => {
+    console.log('API Request: DELETE /workspaces/' + workspaceId);
+    return apiCall(`/workspaces/${workspaceId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Member endpoints
+  addMember: async (workspaceId, data, language) => {
+    console.log('API Request: POST /workspaces/' + workspaceId + '/members');
+    return apiCall(`/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  removeMember: async (workspaceId, memberId, language) => {
+    console.log('API Request: DELETE /workspaces/' + workspaceId + '/members/' + memberId);
+    return apiCall(`/workspaces/${workspaceId}/members/${memberId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Prompt endpoints
+  addPromptToWorkspace: async (workspaceId, data, language) => {
+    console.log('API Request: POST /workspaces/' + workspaceId + '/prompts');
+    return apiCall(`/workspaces/${workspaceId}/prompts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  removePromptFromWorkspace: async (workspaceId, associationId, language) => {
+    console.log('API Request: DELETE /workspaces/' + workspaceId + '/prompts/' + associationId);
+    return apiCall(`/workspaces/${workspaceId}/prompts/${associationId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Version endpoints
+  getPromptVersions: async (promptId, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/versions');
+    return apiCall(`/prompts/${promptId}/versions`, {}, language);
+  },
+  createPromptVersion: async (promptId, data, language) => {
+    console.log('API Request: POST /prompts/' + promptId + '/versions');
+    return apiCall(`/prompts/${promptId}/versions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  restorePromptVersion: async (promptId, versionId, language) => {
+    console.log('API Request: POST /prompts/' + promptId + '/versions/' + versionId + '/restore');
+    return apiCall(`/prompts/${promptId}/versions/${versionId}/restore`, {
+      method: 'POST',
+    }, language);
+  },
+
+  // Workflow endpoints
+  getWorkflows: async (workspaceId, language) => {
+    console.log('API Request: GET /workspaces/' + workspaceId + '/workflows');
+    return apiCall(`/workspaces/${workspaceId}/workflows`, {}, language);
+  },
+  createWorkflow: async (workspaceId, data, language) => {
+    console.log('API Request: POST /workspaces/' + workspaceId + '/workflows');
+    return apiCall(`/workspaces/${workspaceId}/workflows`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  getWorkflow: async (workflowId, language) => {
+    console.log('API Request: GET /workflows/' + workflowId);
+    return apiCall(`/workflows/${workflowId}`, {}, language);
+  },
+  updateWorkflow: async (workflowId, data, language) => {
+    console.log('API Request: PUT /workflows/' + workflowId);
+    return apiCall(`/workflows/${workflowId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  deleteWorkflow: async (workflowId, language) => {
+    console.log('API Request: DELETE /workflows/' + workflowId);
+    return apiCall(`/workflows/${workflowId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+  executeWorkflow: async (workflowId, data, language) => {
+    console.log('API Request: POST /workflows/' + workflowId + '/execute');
+    return apiCall(`/workflows/${workflowId}/execute`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+  getWorkflowExecutions: async (workflowId, language) => {
+    console.log('API Request: GET /workflows/' + workflowId + '/executions');
+    return apiCall(`/workflows/${workflowId}/executions`, {}, language);
+  },
+};
+    }, language);
+  },
+};
