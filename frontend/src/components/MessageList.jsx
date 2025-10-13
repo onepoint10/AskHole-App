@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import Message from './Message'; // Import the new Message component
 import { getBaseApiUrl } from '@/services/api'; // Import API base URL getter
+import 'katex/dist/katex.min.css'; // Import KaTeX CSS
 
 const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage }) => {
   const { t } = useTranslation();
@@ -87,23 +88,27 @@ const MessageList = ({ messages = [], isLoading, onAddToPrompt, onDeleteMessage 
         // Use newer versions for other browsers (react-markdown 10.1.0 + remark-gfm 4.0.0)
         if (safariDetected) {
           console.log('Safari detected - loading compatible versions: react-markdown 8.0.7 + remark-gfm 3.0.1');
-          const [remarkGfmModule, rehypeRawModule, reactMarkdownModule] = await Promise.all([
+          const [remarkGfmModule, remarkMathModule, rehypeRawModule, rehypeKatexModule, reactMarkdownModule] = await Promise.all([
             import('remark-gfm-safari'),
+            import('remark-math'),
             import('rehype-raw'),
+            import('rehype-katex'),
             import('react-markdown-safari')
           ]);
-          setRemarkPlugins([remarkGfmModule.default]);
-          setRehypePlugins([rehypeRawModule.default]);
+          setRemarkPlugins([remarkGfmModule.default, remarkMathModule.default]);
+          setRehypePlugins([rehypeRawModule.default, rehypeKatexModule.default]);
           setReactMarkdownComponent(() => reactMarkdownModule.default);
         } else {
           console.log('Non-Safari browser detected - loading latest versions: react-markdown 10.1.0 + remark-gfm 4.0.0');
-          const [remarkGfmModule, rehypeRawModule, reactMarkdownModule] = await Promise.all([
+          const [remarkGfmModule, remarkMathModule, rehypeRawModule, rehypeKatexModule, reactMarkdownModule] = await Promise.all([
             import('remark-gfm'),
+            import('remark-math'),
             import('rehype-raw'),
+            import('rehype-katex'),
             import('react-markdown')
           ]);
-          setRemarkPlugins([remarkGfmModule.default]);
-          setRehypePlugins([rehypeRawModule.default]);
+          setRemarkPlugins([remarkGfmModule.default, remarkMathModule.default]);
+          setRehypePlugins([rehypeRawModule.default, rehypeKatexModule.default]);
           setReactMarkdownComponent(() => reactMarkdownModule.default);
         }
       } catch (error) {
