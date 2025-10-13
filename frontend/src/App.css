@@ -884,11 +884,17 @@
 /* Safari-specific fixes - MOBILE ONLY for alignment issues */
 @media (max-width: 768px) {
   @supports (-webkit-touch-callout: none) {
+    .markdown-table-container {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .markdown-table {
       -webkit-text-size-adjust: 100%;
-      table-layout: auto;
+      table-layout: fixed;
       display: table;
-      width: 100%;
+      width: auto;
+      min-width: 100%;
     }
 
     .markdown-table thead {
@@ -911,13 +917,11 @@
       vertical-align: middle;
       text-align: left;
       -webkit-text-align: left;
-      max-width: 40vw;
-      min-width: 80px;
+      max-width: 200px;
+      width: 200px;
       word-wrap: break-word;
       overflow-wrap: break-word;
       word-break: break-word;
-      hyphens: auto;
-      -webkit-hyphens: auto;
       white-space: normal;
     }
   }
