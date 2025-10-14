@@ -14,7 +14,8 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 import PromptDialog from './components/PromptDialog';
-import { Menu, MessageCirclePlus, Shield } from 'lucide-react';
+import WorkflowSpaces from './components/WorkflowSpaces';
+import { Menu, MessageCirclePlus, Shield, FolderKanban } from 'lucide-react';
 import { useSwipeGesture } from './hooks/useSwipeGesture';
 import { useTranslation } from 'react-i18next';
 
@@ -28,6 +29,9 @@ function App() {
 
   // Admin view state
   const [showAdminDashboard, setShowAdminDashboard] = useState(false);
+
+  // Workflow view state
+  const [showWorkflowSpaces, setShowWorkflowSpaces] = useState(false);
 
   // Core state management
   const [sessions, setSessions] = useState([]);
@@ -1029,6 +1033,35 @@ function App() {
     );
   }
 
+  // Show workflow spaces if workflow mode is active
+  if (showWorkflowSpaces) {
+    return (
+      <div className="h-screen bg-background">
+        {/* Workflow Spaces Header */}
+        <div className="border-b bg-white dark:bg-gray-800 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-3">
+              <div className="flex items-center">
+                <FolderKanban className="h-6 w-6 text-purple-600 dark:text-purple-400 mr-2" />
+                <h1 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Workflow Spaces</h1>
+              </div>
+              <button
+                onClick={() => setShowWorkflowSpaces(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                {t('back_to_chat')}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[calc(100vh-64px)] overflow-auto">
+          <WorkflowSpaces />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <div
@@ -1079,6 +1112,7 @@ function App() {
             onLogout={handleLogout}
             isAdmin={isAdmin}
             onOpenAdmin={() => setShowAdminDashboard(true)}
+            onOpenWorkflows={() => setShowWorkflowSpaces(true)}
           />
         )}
 
@@ -1106,6 +1140,10 @@ function App() {
                 isAdmin={isAdmin}
                 onOpenAdmin={() => {
                   setShowAdminDashboard(true);
+                  setIsSidebarOpen(false);
+                }}
+                onOpenWorkflows={() => {
+                  setShowWorkflowSpaces(true);
                   setIsSidebarOpen(false);
                 }}
               />

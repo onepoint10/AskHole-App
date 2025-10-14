@@ -710,6 +710,3 @@ export const workflowAPI = {
     return apiCall(`/workflows/${workflowId}/executions`, {}, language);
   },
 };
-    }, language);
-  },
-};

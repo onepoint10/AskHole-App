@@ -22,6 +22,7 @@ import {
   Heart,
   Github,
   Shield,
+  FolderKanban,
   X // Import X icon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -61,7 +62,8 @@ const Sidebar = ({
   isMobileOverlay = false,
   onRequestClose,
   isAdmin,
-  onOpenAdmin
+  onOpenAdmin,
+  onOpenWorkflows
 }) => {
   const { t } = useTranslation();
   const [contextMenu, setContextMenu] = useState({ isVisible: false, position: { x: 0, y: 0 }, sessionId: null });
@@ -409,6 +411,15 @@ const Sidebar = ({
                 title={t('restart_tour')}
               >
                 <HelpCircle className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onOpenWorkflows}
+                className="hover:bg-sidebar-accent flex-shrink-0"
+                title={t('workflows') || 'Workflows'}
+              >
+                <FolderKanban className="h-4 w-4" />
               </Button>
               {isAdmin && (
                 <Button

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { workflowAPI } from '../services/api';
+import WorkflowBuilder from './WorkflowBuilder';
 import { 
   Folder, 
   Plus, 
@@ -9,7 +10,9 @@ import {
   Trash2, 
   Users,
   GitBranch,
-  Play
+  Play,
+  ArrowLeft,
+  FileText
 } from 'lucide-react';
 import {
   Dialog,
@@ -29,6 +32,13 @@ const WorkflowSpaces = () => {
   const [loading, setLoading] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState(null);
+  const [selectedWorkflow, setSelectedWorkflow] = useState(null);
+  const [workflows, setWorkflows] = useState([]);
+  const [showCreateWorkflowDialog, setShowCreateWorkflowDialog] = useState(false);
+  const [workflowFormData, setWorkflowFormData] = useState({
+    name: '',
+    description: ''
+  });
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -85,10 +95,226 @@ const WorkflowSpaces = () => {
     }
   };
 
-  const handleWorkspaceClick = (workspace) => {
+  const handleWorkspaceClick = async (workspace) => {
     setSelectedWorkspace(workspace);
-    // TODO: Navigate to workspace detail view
+    // Load workflows for this workspace
+    try {
+      const response = await workflowAPI.getWorkflows(workspace.id, i18n.language);
+      setWorkflows(response.data || []);
+    } catch (error) {
+      console.error('Failed to load workflows:', error);
+      toast.error(t('failed_to_load_workflows') || 'Failed to load workflows');
+    }
   };
+
+  const handleBackToWorkspaces = () => {
+    setSelectedWorkspace(null);
+    setSelectedWorkflow(null);
+    setWorkflows([]);
+  };
+
+  const handleWorkflowClick = (workflow) => {
+    setSelectedWorkflow(workflow);
+  };
+
+  const handleBackToWorkspace = () => {
+    setSelectedWorkflow(null);
+  };
+
+  const handleCreateWorkflow = async () => {
+    if (!workflowFormData.name.trim()) {
+      toast.error(t('workflow_name_required') || 'Workflow name is required');
+      return;
+    }
+
+    try {
+      const response = await workflowAPI.createWorkflow(
+        selectedWorkspace.id,
+        workflowFormData,
+        i18n.language
+      );
+      setWorkflows([...workflows, response.data]);
+      setShowCreateWorkflowDialog(false);
+      setWorkflowFormData({ name: '', description: '' });
+      toast.success(t('workflow_created') || 'Workflow created successfully');
+    } catch (error) {
+      console.error('Failed to create workflow:', error);
+      toast.error(t('failed_to_create_workflow') || 'Failed to create workflow');
+    }
+  };
+
+  const handleDeleteWorkflow = async (workflowId) => {
+    if (!confirm(t('confirm_delete_workflow') || 'Are you sure you want to delete this workflow?')) {
+      return;
+    }
+
+    try {
+      await workflowAPI.deleteWorkflow(workflowId, i18n.language);
+      setWorkflows(workflows.filter(w => w.id !== workflowId));
+      toast.success(t('workflow_deleted') || 'Workflow deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete workflow:', error);
+      toast.error(t('failed_to_delete_workflow') || 'Failed to delete workflow');
+    }
+  };
+
+  // If viewing a specific workflow, show the workflow builder
+  if (selectedWorkflow) {
+    return (
+      <WorkflowBuilder
+        workspaceId={selectedWorkspace.id}
+        workflowId={selectedWorkflow.id}
+        onBack={handleBackToWorkspace}
+      />
+    );
+  }
+
+  // If viewing a specific workspace, show its workflows
+  if (selectedWorkspace) {
+    return (
+      <div className="h-full flex flex-col bg-background">
+        {/* Header */}
+        <div className="border-b bg-white p-4">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={handleBackToWorkspaces}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Folder className="h-5 w-5 text-blue-600" />
+              <div>
+                <h1 className="text-lg font-semibold text-gray-700">
+                  {selectedWorkspace.name}
+                </h1>
+                {selectedWorkspace.description && (
+                  <p className="text-xs text-gray-500">
+                    {selectedWorkspace.description}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowCreateWorkflowDialog(true)}
+              size="sm"
+              className="gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              {t('new_workflow') || 'New Workflow'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Workflows List */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {workflows.length === 0 ? (
+            <div className="text-center py-12">
+              <GitBranch className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-4">
+                {t('no_workflows') || 'No workflows yet'}
+              </p>
+              <Button
+                onClick={() => setShowCreateWorkflowDialog(true)}
+                variant="outline"
+                className="gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                {t('create_first_workflow') || 'Create your first workflow'}
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {workflows.map((workflow) => (
+                <div
+                  key={workflow.id}
+                  className="border rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer bg-white"
+                  onClick={() => handleWorkflowClick(workflow)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-5 w-5 text-green-600" />
+                      <h3 className="font-semibold">{workflow.name}</h3>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteWorkflow(workflow.id);
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                  
+                  {workflow.description && (
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+                      {workflow.description}
+                    </p>
+                  )}
+                  
+                  <div className="flex gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      <span>{workflow.node_count || 0} nodes</span>
+                    </div>
+                    {workflow.created_at && (
+                      <div className="flex items-center gap-1">
+                        <span>Created {new Date(workflow.created_at).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Create Workflow Dialog */}
+        <Dialog open={showCreateWorkflowDialog} onOpenChange={setShowCreateWorkflowDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('create_workflow') || 'Create Workflow'}</DialogTitle>
+              <DialogDescription>
+                {t('create_workflow_description') || 'Create a new workflow in this workspace'}
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  {t('name') || 'Name'}
+                </label>
+                <Input
+                  value={workflowFormData.name}
+                  onChange={(e) => setWorkflowFormData({ ...workflowFormData, name: e.target.value })}
+                  placeholder={t('workflow_name_placeholder') || 'Enter workflow name'}
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium mb-2 block">
+                  {t('description') || 'Description'}
+                </label>
+                <Textarea
+                  value={workflowFormData.description}
+                  onChange={(e) => setWorkflowFormData({ ...workflowFormData, description: e.target.value })}
+                  placeholder={t('workflow_description_placeholder') || 'Enter workflow description'}
+                  rows={3}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateWorkflowDialog(false)}>
+                {t('cancel') || 'Cancel'}
+              </Button>
+              <Button onClick={handleCreateWorkflow}>
+                {t('create') || 'Create'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full flex flex-col bg-background">
