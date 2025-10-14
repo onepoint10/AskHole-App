@@ -21,10 +21,15 @@ from flask_cors import CORS, cross_origin
 from src.database import db
 from src.models.chat import ChatSession, ChatMessage, PromptTemplate, FileUpload, PromptLike
 from src.models.user import User, UserSession
+from src.models.workflow import (
+    WorkflowSpace, WorkflowSpaceMember, WorkflowPromptAssociation,
+    PromptVersion, Workflow, WorkflowNode, WorkflowEdge, WorkflowExecution
+)
 from src.routes.user import user_bp
 from src.routes.chat import chat_bp
 from src.routes.auth import auth_bp
 from src.routes.admin import admin_bp
+from src.routes.workflow import workflow_bp
 from src.exa_client import ExaClient
 from datetime import timedelta
 
@@ -86,6 +91,7 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(workflow_bp, url_prefix='/api')
 
     # Exa routes
     # These are defined directly on the app, so no blueprint registration needed for them

@@ -23,6 +23,9 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **Cross-platform**: Web-based interface that works on desktop and mobile
 - **Real-time Updates**: Live chat interface with typing indicators
 - **File Management**: Upload and manage files for AI analysis
+- **Workflow Spaces**: Organize prompts into projects/workspaces with team collaboration
+- **Git-style Versioning**: Version control for prompt templates with commit history
+- **DFG (Directed Flow Graph)**: Build and execute complex prompt workflows
 
 ## Architecture
 
@@ -236,6 +239,9 @@ Set these environment variables for production:
 2. **File Upload Fails**: Check file size limits and supported formats
 3. **Database Errors**: Ensure SQLite database is writable
 4. **CORS Issues**: Verify CORS is enabled in Flask configuration
+
+### Workflow Features
+For details on Workflow Spaces, Git versioning, and DFG execution features, see [WORKFLOW_FEATURES.md](WORKFLOW_FEATURES.md).
 
 ### Development Tips
 - Use browser developer tools to debug API calls
