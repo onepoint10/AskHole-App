@@ -1,0 +1,61 @@
+/* Theme-aware customization for react-diff-view */
+
+/* Light theme - keep default react-diff-view colors */
+:root {
+    --diff-text-color: #24292e;
+    --diff-background-color: #ffffff;
+}
+
+/* Dark theme - customize for readability */
+.dark {
+    /* Base colors for dark theme */
+    --diff-text-color: #e6edf3;
+    --diff-background-color: #0d1117;
+
+    /* Gutter (line numbers) */
+    --diff-gutter-insert-background-color: rgba(46, 160, 67, 0.15);
+    --diff-gutter-insert-text-color: #e6edf3;
+    --diff-gutter-delete-background-color: rgba(248, 81, 73, 0.15);
+    --diff-gutter-delete-text-color: #e6edf3;
+
+    /* Code backgrounds - darker versions for dark theme */
+    --diff-code-insert-background-color: rgba(46, 160, 67, 0.15);
+    --diff-code-insert-text-color: #e6edf3;
+    --diff-code-delete-background-color: rgba(248, 81, 73, 0.15);
+    --diff-code-delete-text-color: #e6edf3;
+
+    /* Inline edits (word-level changes) */
+    --diff-code-insert-edit-background-color: rgba(46, 160, 67, 0.4);
+    --diff-code-insert-edit-text-color: #e6edf3;
+    --diff-code-delete-edit-background-color: rgba(248, 81, 73, 0.4);
+    --diff-code-delete-edit-text-color: #e6edf3;
+
+    /* Selected lines */
+    --diff-code-selected-background-color: rgba(56, 139, 253, 0.15);
+    --diff-code-selected-text-color: #e6edf3;
+    --diff-gutter-selected-background-color: rgba(56, 139, 253, 0.15);
+    --diff-gutter-selected-text-color: #e6edf3;
+
+    /* Selection highlight */
+    --diff-selection-background-color: rgba(56, 139, 253, 0.3);
+    --diff-selection-text-color: #e6edf3;
+}
+
+/* Ensure proper text color inheritance */
+.dark .diff-code,
+.dark .diff-gutter {
+    color: var(--diff-text-color);
+}
+
+/* Make sure font is monospace and readable size */
+.diff {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* Ensure horizontal scrolling works */
+.diff-code {
+    overflow-x: auto;
+    white-space: pre;
+}
