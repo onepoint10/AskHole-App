@@ -1,0 +1,211 @@
+/* Custom styling for react-diff-view to match app theme */
+
+.diff-container {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Diff view wrapper */
+.diff-view {
+    border: 1px solid hsl(var(--border));
+    border-radius: 0.5rem;
+    overflow: hidden;
+}
+
+/* Gutter (line numbers) */
+.diff-gutter {
+    background-color: hsl(var(--muted) / 0.3);
+    color: hsl(var(--muted-foreground));
+    text-align: right;
+    padding: 0 8px;
+    user-select: none;
+    min-width: 50px;
+    border-right: 1px solid hsl(var(--border));
+}
+
+.diff-gutter-normal {
+    background-color: hsl(var(--muted) / 0.1);
+}
+
+.diff-gutter-insert {
+    background-color: hsl(142 76% 36% / 0.1);
+}
+
+.diff-gutter-delete {
+    background-color: hsl(0 84% 60% / 0.1);
+}
+
+/* Code lines */
+.diff-code {
+    padding: 0 12px;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* Normal lines */
+.diff-line {
+    display: table-row;
+}
+
+.diff-line-normal {
+    background-color: transparent;
+}
+
+.diff-line-normal:hover {
+    background-color: hsl(var(--muted) / 0.1);
+}
+
+/* Inserted lines (additions) */
+.diff-line-insert {
+    background-color: hsl(142 76% 36% / 0.1);
+}
+
+.diff-line-insert .diff-code {
+    background-color: hsl(142 76% 36% / 0.15);
+}
+
+.diff-line-insert:hover {
+    background-color: hsl(142 76% 36% / 0.2);
+}
+
+/* Deleted lines */
+.diff-line-delete {
+    background-color: hsl(0 84% 60% / 0.1);
+}
+
+.diff-line-delete .diff-code {
+    background-color: hsl(0 84% 60% / 0.15);
+}
+
+.diff-line-delete:hover {
+    background-color: hsl(0 84% 60% / 0.2);
+}
+
+/* Hunk headers */
+.diff-hunk-header {
+    background-color: hsl(var(--muted));
+    color: hsl(var(--muted-foreground));
+    font-weight: 600;
+    padding: 4px 12px;
+    border-top: 1px solid hsl(var(--border));
+    border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Diff widget (for omitted lines) */
+.diff-widget {
+    background-color: hsl(var(--muted) / 0.5);
+    padding: 8px 12px;
+    text-align: center;
+    color: hsl(var(--muted-foreground));
+    font-size: 12px;
+    border-top: 1px dashed hsl(var(--border));
+    border-bottom: 1px dashed hsl(var(--border));
+}
+
+/* Split view specific */
+.diff-split {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.diff-split .diff-gutter {
+    width: 50px;
+}
+
+.diff-split .diff-code {
+    width: 50%;
+}
+
+/* Unified view specific */
+.diff-unified {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.diff-unified .diff-gutter {
+    width: 80px;
+}
+
+/* Tokens (syntax highlighting additions) */
+.diff-code-insert {
+    background-color: hsl(142 76% 36% / 0.3);
+    font-weight: 600;
+}
+
+.diff-code-delete {
+    background-color: hsl(0 84% 60% / 0.3);
+    font-weight: 600;
+    text-decoration: line-through;
+}
+
+/* Dark theme overrides */
+.dark .diff-gutter {
+    background-color: hsl(var(--muted) / 0.2);
+}
+
+.dark .diff-line-insert {
+    background-color: hsl(142 76% 36% / 0.15);
+}
+
+.dark .diff-line-insert .diff-code {
+    background-color: hsl(142 76% 36% / 0.2);
+}
+
+.dark .diff-line-delete {
+    background-color: hsl(0 84% 60% / 0.15);
+}
+
+.dark .diff-line-delete .diff-code {
+    background-color: hsl(0 84% 60% / 0.2);
+}
+
+.dark .diff-code-insert {
+    background-color: hsl(142 76% 36% / 0.4);
+}
+
+.dark .diff-code-delete {
+    background-color: hsl(0 84% 60% / 0.4);
+}
+
+/* Scrollbar styling for diff content */
+.diff-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.diff-container::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.1);
+    border-radius: 4px;
+}
+
+.diff-container::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+}
+
+.diff-container::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .diff-container {
+        font-size: 11px;
+    }
+
+    .diff-gutter {
+        min-width: 40px;
+        padding: 0 4px;
+    }
+
+    .diff-code {
+        padding: 0 8px;
+    }
+
+    .diff-split .diff-gutter {
+        width: 40px;
+    }
+}

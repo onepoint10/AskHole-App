@@ -394,6 +394,41 @@ export const promptsAPI = {
     }, language);
   },
 
+  // Version control methods
+  getVersionHistory: async (promptId, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/versions');
+    return apiCall(`/prompts/${promptId}/versions`, {}, language);
+  },
+
+  getVersionContent: async (promptId, commitHash, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/versions/' + commitHash);
+    return apiCall(`/prompts/${promptId}/versions/${commitHash}`, {}, language);
+  },
+
+  getDiff: async (promptId, fromCommit, toCommit, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/diff', { fromCommit, toCommit });
+    return apiCall(`/prompts/${promptId}/diff?from_commit=${fromCommit}&to_commit=${toCommit}`, {}, language);
+  },
+
+  rollbackPrompt: async (promptId, data, language) => {
+    console.log('API Request: POST /prompts/' + promptId + '/rollback', data);
+
+    // Validate required fields
+    if (!data.target_commit) {
+      throw new Error('target_commit is required');
+    }
+
+    const cleanData = {
+      target_commit: data.target_commit,
+      commit_message: data.commit_message || `Rolled back to version ${data.target_commit.substring(0, 7)}`
+    };
+
+    return apiCall(`/prompts/${promptId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify(cleanData),
+    }, language);
+  },
+
   getPublicPrompts: async (params = {}, language) => {
     console.log('API Request: GET /public-prompts', params);
 
@@ -584,6 +619,118 @@ export const exaAPI = {
     return apiCall('/exa/search_and_contents', {
       method: 'POST',
       body: JSON.stringify({ ...options, query, api_key: apiKey }),
+    }, language);
+  },
+};
+
+// Workflow Spaces API
+export const workflowSpacesAPI = {
+  // Workspace Management
+  getWorkspaces: async (language) => {
+    console.log('API Request: GET /workflow_spaces');
+    return apiCall('/workflow_spaces', {}, language);
+  },
+
+  getWorkspace: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {}, language);
+  },
+
+  createWorkspace: async (data, language) => {
+    console.log('API Request: POST /workflow_spaces');
+    return apiCall('/workflow_spaces', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updateWorkspace: async (id, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  deleteWorkspace: async (id, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Member Management
+  getMembers: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/members');
+    return apiCall(`/workflow_spaces/${id}/members`, {}, language);
+  },
+
+  addMember: async (id, data, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/members');
+    return apiCall(`/workflow_spaces/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updateMemberRole: async (id, userId, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/members/' + userId);
+    return apiCall(`/workflow_spaces/${id}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  removeMember: async (id, userId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/members/' + userId);
+    return apiCall(`/workflow_spaces/${id}/members/${userId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Prompt Management
+  getPrompts: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/prompts');
+    return apiCall(`/workflow_spaces/${id}/prompts`, {}, language);
+  },
+
+  addPrompt: async (id, data, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/prompts');
+    return apiCall(`/workflow_spaces/${id}/prompts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updatePromptAssociation: async (id, promptId, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/prompts/' + promptId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  removePrompt: async (id, promptId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/prompts/' + promptId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  reorderPrompts: async (id, promptIds, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/prompts/reorder');
+    return apiCall(`/workflow_spaces/${id}/prompts/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ prompt_ids: promptIds }),
+    }, language);
+  },
+
+  // Workflow Execution (for future DFG feature)
+  runWorkflow: async (id, config, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/execute');
+    return apiCall(`/workflow_spaces/${id}/execute`, {
+      method: 'POST',
+      body: JSON.stringify(config),
     }, language);
   },
 };
