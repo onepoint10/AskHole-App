@@ -164,15 +164,15 @@ const DiffViewerDialog = ({
 
                         {/* Diff Display */}
                         <ScrollArea className="flex-1 h-0">
-                            <div className="py-4">
+                            <div className="py-4" style={{ fontSize: '12px' }}>
                                 {parsedDiff.map((file, idx) => (
                                     <div key={idx} className="mb-4 border rounded-lg overflow-hidden">
                                         {/* File header */}
-                                        <div className="bg-muted px-3 py-2 text-sm font-mono border-b">
+                                        <div className="bg-muted px-3 py-2 text-xs font-mono border-b">
                                             {file.oldPath}
                                         </div>
 
-                                        {/* Diff content */}
+                                        {/* Diff content - using standard react-diff-view styles */}
                                         <Diff
                                             viewType={viewType}
                                             diffType={file.type}

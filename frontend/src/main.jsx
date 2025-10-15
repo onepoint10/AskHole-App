@@ -2,7 +2,6 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import 'react-diff-view/style/index.css'
-import './styles/diff-viewer.css'
 import App from './App.jsx'
 import i18n from './i18n'; // Import i18n configuration
 import { I18nextProvider } from 'react-i18next';
