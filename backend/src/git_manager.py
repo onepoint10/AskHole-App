@@ -175,19 +175,39 @@ class PromptGitManager:
                 # Read from specific commit using git show command
                 try:
                     import subprocess
+
+                    # First, let's check what files exist in this commit
+                    ls_result = subprocess.run(
+                        ['git', 'ls-tree', '-r', '--name-only', commit_hash],
+                        cwd=self.repo_path,
+                        capture_output=True,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace',
+                        check=True
+                    )
+                    logger.info(f"Files in commit {commit_hash[:7]}: {ls_result.stdout}")
+
                     result = subprocess.run(
                         ['git', 'show', f'{commit_hash}:{relative_path}'],
                         cwd=self.repo_path,
                         capture_output=True,
                         text=True,
                         encoding='utf-8',
+                        errors='replace',  # Replace invalid chars instead of failing
                         check=True
                     )
                     content = result.stdout
                 except subprocess.CalledProcessError as e:
-                    if 'does not exist' in e.stderr or 'exists on disk, but not in' in e.stderr:
+                    error_msg = e.stderr if e.stderr else str(e)
+                    logger.error(f"Git show failed for {prompt_id} at {commit_hash}: {error_msg}")
+                    logger.error(f"Command: git show {commit_hash}:{relative_path}")
+                    logger.error(f"Working directory: {self.repo_path}")
+                    logger.error(f"Relative path attempted: {relative_path}")
+
+                    if 'does not exist' in error_msg or 'exists on disk, but not in' in error_msg or 'Path' in error_msg:
                         raise FileNotFoundError(f"Prompt {prompt_id} not found in commit {commit_hash[:7]}")
-                    raise Exception(f"Git show failed: {e.stderr}")
+                    raise Exception(f"Git show failed: {error_msg}")
             else:
                 # Read from current file (HEAD)
                 if not file_path.exists():
