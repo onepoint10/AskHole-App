@@ -85,8 +85,10 @@ class PromptGitManager:
         return self.prompts_dir / f"{prompt_id}.md"
 
     def _get_relative_path(self, file_path: Path) -> str:
-        """Get path relative to repo root."""
-        return str(file_path.relative_to(self.repo_path))
+        """Get path relative to repo root, using forward slashes for Git compatibility."""
+        relative = file_path.relative_to(self.repo_path)
+        # Git always uses forward slashes, even on Windows
+        return str(relative).replace('\\', '/')
 
     def save_prompt(
         self,
