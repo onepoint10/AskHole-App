@@ -74,6 +74,12 @@ class PromptGitManager:
             )
             logger.info("Created initial commit")
 
+        # Configure Git to handle UTF-8 properly
+        with self.repo.config_writer() as config:
+            config.set_value("i18n", "commitEncoding", "utf-8")
+            config.set_value("i18n", "logOutputEncoding", "utf-8")
+        logger.info("Configured Git for UTF-8 encoding")
+
     def _get_prompt_file_path(self, prompt_id: int) -> Path:
         """Get the file path for a prompt."""
         return self.prompts_dir / f"{prompt_id}.md"
@@ -174,6 +180,7 @@ class PromptGitManager:
                         cwd=self.repo_path,
                         capture_output=True,
                         text=True,
+                        encoding='utf-8',
                         check=True
                     )
                     content = result.stdout
@@ -235,6 +242,7 @@ class PromptGitManager:
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
                 check=True
             )
 
@@ -299,6 +307,7 @@ class PromptGitManager:
                 cwd=self.repo_path,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
                 check=False  # Don't raise on non-zero exit (empty diff returns 0 anyway)
             )
 
