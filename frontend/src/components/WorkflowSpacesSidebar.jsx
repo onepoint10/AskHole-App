@@ -94,10 +94,10 @@ export default function WorkflowSpacesSidebar({ isOpen, onClose }) {
 
     return (
         <Sheet open={isOpen} onOpenChange={handleClose}>
-            <SheetContent side="right" className="w-full sm:w-[500px] md:w-[600px] p-0 flex flex-col">
-                <div className="flex flex-col h-full min-h-0">
+            <SheetContent side="right" className="w-full sm:w-[500px] md:w-[600px] p-0">
+                <div className="flex flex-col h-full">
                     {/* Header */}
-                    <SheetHeader className="px-6 py-4 border-b shrink-0">
+                    <SheetHeader className="px-6 py-4 border-b">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Folders className="h-5 w-5" />
@@ -120,7 +120,7 @@ export default function WorkflowSpacesSidebar({ isOpen, onClose }) {
                     </SheetHeader>
 
                     {/* Content */}
-                    <div className="flex-1 min-h-0 overflow-hidden">
+                    <div className="flex-1 overflow-y-auto">
                         {activeView === 'list' && (
                             <WorkspaceList
                                 workspaces={workspaces}

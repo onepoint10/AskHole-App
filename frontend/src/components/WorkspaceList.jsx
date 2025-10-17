@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Search, RefreshCw, Users, FileText, Globe, Lock, Folders } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -58,9 +59,9 @@ export default function WorkspaceList({
     }
 
     return (
-        <div className="flex flex-col h-full min-h-0">
+        <div className="flex flex-col h-full">
             {/* Search and Actions */}
-            <div className="p-4 border-b space-y-3 shrink-0">
+            <div className="p-4 border-b space-y-3">
                 <div className="flex gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -91,7 +92,7 @@ export default function WorkspaceList({
             </div>
 
             {/* Workspace List */}
-            <div className="flex-1 min-h-0 overflow-y-auto">
+            <ScrollArea className="flex-1 h-0">
                 <div className="p-4 space-y-3">
                     {sortedWorkspaces.length === 0 && (
                         <div className="text-center py-12 text-muted-foreground">
@@ -160,7 +161,7 @@ export default function WorkspaceList({
                         </Card>
                     ))}
                 </div>
-            </div>
+            </ScrollArea>
         </div>
     );
 }

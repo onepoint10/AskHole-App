@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     ArrowLeft,
     Edit,
@@ -64,9 +65,9 @@ export default function WorkspaceDetail({
     const isOwner = true; // Placeholder - implement proper ownership check
 
     return (
-        <div className="flex flex-col h-full min-h-0">
+        <div className="flex flex-col h-full">
             {/* Header */}
-            <div className="p-6 border-b space-y-4 shrink-0">
+            <div className="p-6 border-b space-y-4">
                 <div className="flex items-center gap-2">
                     <Button
                         variant="ghost"
@@ -137,8 +138,8 @@ export default function WorkspaceDetail({
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="prompts" className="flex-1 min-h-0 flex flex-col">
-                <TabsList className="w-full justify-start rounded-none border-b px-6 shrink-0">
+            <Tabs defaultValue="prompts" className="flex-1 flex flex-col">
+                <TabsList className="w-full justify-start rounded-none border-b px-6">
                     <TabsTrigger value="prompts" className="gap-2">
                         <FileText className="h-4 w-4" />
                         {t('Prompts')}
@@ -153,7 +154,7 @@ export default function WorkspaceDetail({
                     </TabsTrigger>
                 </TabsList>
 
-                <div className="flex-1 min-h-0 overflow-y-auto">
+                <ScrollArea className="flex-1 h-0">
                     <TabsContent value="prompts" className="m-0 p-6">
                         <WorkspacePromptsTab
                             workspace={workspace}
@@ -177,7 +178,7 @@ export default function WorkspaceDetail({
                             onDelete={() => setShowDeleteDialog(true)}
                         />
                     </TabsContent>
-                </div>
+                </ScrollArea>
             </Tabs>
 
             {/* Delete Confirmation Dialog */}
