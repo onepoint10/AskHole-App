@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
     ArrowLeft,
     Edit,
@@ -138,7 +137,7 @@ export default function WorkspaceDetail({
             </div>
 
             {/* Tabs */}
-            <Tabs defaultValue="prompts" className="flex-1 flex flex-col">
+            <Tabs defaultValue="prompts" className="flex-1 flex flex-col overflow-hidden">
                 <TabsList className="w-full justify-start rounded-none border-b px-6">
                     <TabsTrigger value="prompts" className="gap-2">
                         <FileText className="h-4 w-4" />
@@ -154,7 +153,7 @@ export default function WorkspaceDetail({
                     </TabsTrigger>
                 </TabsList>
 
-                <ScrollArea className="flex-1 h-0 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
                     <TabsContent value="prompts" className="m-0 p-6">
                         <WorkspacePromptsTab
                             workspace={workspace}
@@ -178,7 +177,7 @@ export default function WorkspaceDetail({
                             onDelete={() => setShowDeleteDialog(true)}
                         />
                     </TabsContent>
-                </ScrollArea>
+                </div>
             </Tabs>
 
             {/* Delete Confirmation Dialog */}
