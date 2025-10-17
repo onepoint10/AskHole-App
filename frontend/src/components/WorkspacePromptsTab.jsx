@@ -17,6 +17,7 @@ import {
 import { workflowSpacesAPI, promptsAPI } from '@/services/api';
 import { toast } from 'sonner';
 import WorkspacePromptSelector from './WorkspacePromptSelector';
+import { WorkflowExecutionDialog } from './WorkflowExecutionDialog';
 import {
     DndContext,
     closestCenter,
@@ -152,6 +153,7 @@ export default function WorkspacePromptsTab({ workspace, onUpdate }) {
     const [prompts, setPrompts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showSelector, setShowSelector] = useState(false);
+    const [showExecutionDialog, setShowExecutionDialog] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -291,12 +293,13 @@ export default function WorkspacePromptsTab({ workspace, onUpdate }) {
                             className="w-full"
                             size="lg"
                             disabled={prompts.length === 0}
+                            onClick={() => setShowExecutionDialog(true)}
                         >
                             <Play className="h-5 w-5 mr-2" />
                             {t('Run Workflow')} ({prompts.length} {t('steps')})
                         </Button>
                         <p className="text-xs text-muted-foreground text-center mt-2">
-                            {t('Workflow execution coming in Phase 3')}
+                            {t('Execute prompts in sequence with output chaining')}
                         </p>
                     </div>
                 </>
@@ -309,6 +312,15 @@ export default function WorkspacePromptsTab({ workspace, onUpdate }) {
                 isOpen={showSelector}
                 onClose={() => setShowSelector(false)}
                 onPromptsAdded={handlePromptsAdded}
+            />
+
+            {/* Workflow Execution Dialog */}
+            <WorkflowExecutionDialog
+                workspaceId={workspace.id}
+                workspaceName={workspace.name}
+                prompts={prompts.map(p => p.prompt || {})}
+                isOpen={showExecutionDialog}
+                onClose={() => setShowExecutionDialog(false)}
             />
         </div>
     );

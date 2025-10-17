@@ -725,12 +725,26 @@ export const workflowSpacesAPI = {
     }, language);
   },
 
-  // Workflow Execution (for future DFG feature)
-  runWorkflow: async (id, config, language) => {
+  // Workflow Execution (DFG)
+  executeWorkflow: async (id, config, language) => {
     console.log('API Request: POST /workflow_spaces/' + id + '/execute');
+
+    // Get API keys from localStorage - IMPORTANT: key is 'askhole-settings' not 'settings'
+    const settingsStr = localStorage.getItem('askhole-settings');
+    const settings = settingsStr ? JSON.parse(settingsStr) : {};
+
+    // Build request body with config AND API keys (same pattern as /config endpoint)
+    const requestBody = {
+      ...config,
+      // Add API keys to body (not headers) - same pattern as chat /config endpoint
+      gemini_api_key: settings.geminiApiKey,
+      openrouter_api_key: settings.openrouterApiKey,
+      custom_providers: settings.customProviders || []
+    };
+
     return apiCall(`/workflow_spaces/${id}/execute`, {
       method: 'POST',
-      body: JSON.stringify(config),
+      body: JSON.stringify(requestBody),
     }, language);
   },
 };

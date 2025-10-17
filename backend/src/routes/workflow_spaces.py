@@ -493,6 +493,22 @@ def add_prompt_to_workspace(workspace_id):
             added_by=current_user.id
         )
         db.session.add(association)
+
+        # Update prompt_sequence to include the new prompt
+        try:
+            if workspace.prompt_sequence:
+                prompt_ids = json.loads(workspace.prompt_sequence)
+            else:
+                prompt_ids = []
+
+            # Add new prompt ID if not already in sequence
+            if prompt_id not in prompt_ids:
+                prompt_ids.append(prompt_id)
+                workspace.prompt_sequence = json.dumps(prompt_ids)
+        except (json.JSONDecodeError, ValueError):
+            # Initialize with just this prompt
+            workspace.prompt_sequence = json.dumps([prompt_id])
+
         workspace.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -565,6 +581,17 @@ def remove_prompt_from_workspace(workspace_id, prompt_id):
 
     try:
         db.session.delete(association)
+
+        # Update prompt_sequence to remove the deleted prompt ID
+        if workspace.prompt_sequence:
+            try:
+                prompt_ids = json.loads(workspace.prompt_sequence)
+                if prompt_id in prompt_ids:
+                    prompt_ids.remove(prompt_id)
+                    workspace.prompt_sequence = json.dumps(prompt_ids)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
         workspace.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -620,3 +647,160 @@ def reorder_prompts(workspace_id):
         db.session.rollback()
         logger.error(f"Error reordering prompts in workspace {workspace_id}: {e}")
         return jsonify({'error': 'Failed to reorder prompts'}), 500
+
+
+# ============================================================================
+# Workflow Execution Endpoint (DFG)
+# ============================================================================
+
+@workflow_spaces_bp.route('/<int:workspace_id>/execute', methods=['POST'])
+def execute_workflow(workspace_id):
+    """
+    Execute the prompt sequence in a workflow space (DFG execution).
+
+    Body:
+    {
+        "initial_input": "optional starting text",
+        "model": "gemini-2.5-flash",
+        "temperature": 1.0,
+        "stop_on_error": true
+    }
+
+    Returns:
+    {
+        "success": true,
+        "results": [...],
+        "final_output": "...",
+        "total_time": 12.5,
+        "workspace_name": "My Workflow"
+    }
+    """
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check access (viewer is enough to execute, no modification)
+    workspace = check_workspace_access(workspace_id, current_user.id, 'viewer')
+    if not workspace:
+        return jsonify({'error': 'Workspace not found or access denied'}), 404
+
+    # Get request data
+    data = request.get_json()
+    initial_input = data.get('initial_input', '')
+    model = data.get('model', 'gemini-2.5-flash')
+    temperature = data.get('temperature', 1.0)
+    stop_on_error = data.get('stop_on_error', True)
+
+    # Get API keys from request body (same pattern as /config endpoint)
+    gemini_api_key = data.get('gemini_api_key')
+    openrouter_api_key = data.get('openrouter_api_key')
+    custom_providers_data = data.get('custom_providers', [])
+
+    # Validate temperature
+    try:
+        temperature = float(temperature)
+        if not (0.0 <= temperature <= 2.0):
+            temperature = 1.0
+    except (ValueError, TypeError):
+        temperature = 1.0
+
+    logger.info(f"Starting workflow execution for workspace {workspace_id} "
+                f"by user {current_user.id}, model={model}")
+    logger.info(f"API keys provided - Gemini: {bool(gemini_api_key)}, "
+                f"OpenRouter: {bool(openrouter_api_key)}, "
+                f"Custom providers: {len(custom_providers_data)}")
+
+    try:
+        # Import clients and executor
+        from src.workflow_executor import WorkflowExecutor
+        from src.gemini_client import GeminiClient
+        from src.openrouter_client import OpenRouterClient
+        from src.custom_client import CustomClient
+        from src.git_manager import PromptGitManager
+        import os
+        from flask import current_app
+
+        gemini_client = None
+        openrouter_client = None
+        custom_clients = {}
+
+        # Initialize Gemini client if API key provided
+        if gemini_api_key:
+            try:
+                gemini_client = GeminiClient(api_key=gemini_api_key)
+                logger.info("Initialized Gemini client for workflow execution")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini client: {e}")
+
+        # Initialize OpenRouter client if API key provided
+        if openrouter_api_key:
+            try:
+                openrouter_client = OpenRouterClient(api_key=openrouter_api_key)
+                logger.info("Initialized OpenRouter client for workflow execution")
+            except Exception as e:
+                logger.warning(f"Failed to initialize OpenRouter client: {e}")
+
+        # Initialize custom clients if provided
+        if custom_providers_data:
+            try:
+                for provider in custom_providers_data:
+                    name = provider.get('name')
+                    api_key = provider.get('apiKey') or provider.get('api_key')
+                    base_url = provider.get('baseUrl') or provider.get('base_url')
+                    if name and api_key and base_url:
+                        custom_clients[name] = CustomClient(
+                            api_key=api_key,
+                            base_url=base_url,
+                            provider_name=name
+                        )
+                logger.info(f"Initialized {len(custom_clients)} custom clients for workflow execution")
+            except Exception as e:
+                logger.warning(f"Failed to initialize custom clients: {e}")
+
+        # Initialize Git manager
+        git_manager = None
+        try:
+            repo_path = os.getenv('PROMPTS_REPO_PATH',
+                                os.path.join(current_app.root_path, 'prompts_repo'))
+            git_manager = PromptGitManager(repo_path=repo_path)
+        except Exception as e:
+            logger.warning(f"Failed to initialize Git manager: {e}")
+
+        # Create executor
+        executor = WorkflowExecutor(
+            workflow_space=workspace,
+            gemini_client=gemini_client,
+            openrouter_client=openrouter_client,
+            custom_clients=custom_clients,
+            git_manager=git_manager
+        )
+
+        # Execute workflow
+        results = executor.execute(
+            initial_input=initial_input,
+            model=model,
+            temperature=temperature,
+            stop_on_error=stop_on_error
+        )
+
+        logger.info(f"Workflow execution completed for workspace {workspace_id}. "
+                   f"Success: {results['success']}, Steps: {results.get('completed_steps', 0)}/{results.get('total_steps', 0)}")
+
+        return jsonify({
+            'success': results['success'],
+            'results': results['results'],
+            'final_output': results.get('final_output', ''),
+            'total_time': results.get('total_time', 0),
+            'workspace_name': workspace.name,
+            'completed_steps': results.get('completed_steps', 0),
+            'total_steps': results.get('total_steps', 0),
+            'error': results.get('error')
+        })
+
+    except Exception as e:
+        logger.exception(f"Workflow execution error for workspace {workspace_id}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'results': []
+        }), 500

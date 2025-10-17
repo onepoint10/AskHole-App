@@ -10,7 +10,9 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **Chat History**: Persistent storage of all chat sessions
 - **Tab-based Sessions**: Chrome-style tabs for managing multiple conversations
 - **Prompt Database**: Save, organize, and reuse prompt templates
-- **Public Prompt Library**: Share prompt, search, like and use prompt by other users
+- **Public Prompt Library**: Share prompts, search, like and use prompts by other users
+- **Workflow Spaces**: Organize prompts into collaborative workspaces with team management
+- **Git Versioning for Prompts**: Full version control with history, diffs, and rollback
 - **File Upload**: Support for various file types (PDF, images, text files)
 - **Modern UI**: Beautiful, responsive interface with dark/light theme support
 - **Syntax Highlighting**: Code blocks with proper syntax highlighting
@@ -139,6 +141,75 @@ The frontend will be available at `http://localhost:5173`
 4. Click on any prompt to use it in the current session
 5. Manage prompts with edit and delete options
 
+### Workflow Spaces
+Organize your prompts into collaborative workspaces for better project management:
+
+1. **Create a Workspace**:
+   - Click the Workflow Spaces toggle button (folder icon) in the header
+   - Click "Create New Workspace"
+   - Enter name, description, and set visibility (public/private)
+   - Click "Create"
+
+2. **Manage Workspace Prompts**:
+   - Open a workspace to see the "Prompts" tab
+   - Click "Add Prompt" to select prompts to include
+   - Drag and drop to reorder prompts
+   - Add workspace-specific notes to each prompt
+   - Remove prompts when no longer needed
+
+3. **Manage Team Members**:
+   - Navigate to the "Members" tab
+   - Add members by user ID
+   - Assign roles: Owner, Editor, or Viewer
+   - Owners: Full control including deletion
+   - Editors: Can modify workspace and manage prompts
+   - Viewers: Read-only access
+
+4. **Workspace Settings**:
+   - Edit workspace name, description, and visibility
+   - Delete workspace (owner only)
+   - View creation and update timestamps
+
+5. **Features**:
+   - Drag-and-drop prompt reordering (@dnd-kit)
+   - Role-based access control
+   - Search and filter workspaces
+   - Responsive sidebar design
+   - Dark/light theme support
+
+### Prompt Version Control
+AskHole includes full Git-based version control for prompts:
+
+1. **View Version History**:
+   - Open any prompt in the dialog
+   - Navigate to the "Version History" tab
+   - See a timeline of all changes with commit messages
+   - Each version shows author, date, and message
+
+2. **View Previous Versions**:
+   - Click "View" button on any version
+   - See the prompt content at that point in time
+   - Toast notification shows the content preview
+
+3. **Compare Versions**:
+   - Click "Compare" button on any version
+   - View side-by-side or unified diff
+   - See line-by-line changes (additions/deletions)
+   - Works in both light and dark themes
+   - Copy diff to clipboard
+
+4. **Rollback to Previous Version**:
+   - Click "Rollback" button on any version
+   - Confirm the action
+   - Creates a new commit (preserves history)
+   - Automatically updates the prompt
+
+5. **Features**:
+   - Full UTF-8 support (works with Cyrillic/Russian text)
+   - Cross-platform (Windows, macOS, Linux)
+   - Responsive design for mobile
+   - Theme-aware diff viewer
+
 ## File Structure
 
 ### Backend (`askhole-backend/`)
@@ -146,15 +217,24 @@ The frontend will be available at `http://localhost:5173`
 src/
 ├── models/
 │   ├── user.py          # User model (template)
-│   └── chat.py          # Chat, message, prompt, and file models
+│   ├── chat.py          # Chat, message, prompt, and file models
+│   └── workflow_space.py # Workflow spaces, members, and prompt associations
 ├── routes/
 │   ├── user.py          # User routes (template)
-│   └── chat.py          # Main API routes
+│   ├── auth.py          # Authentication routes
+│   ├── admin.py         # Admin dashboard routes
+│   ├── chat.py          # Main API routes
+│   └── workflow_spaces.py # Workflow spaces API
 ├── database/
 │   └── app.db           # SQLite database
 ├── uploads/             # File upload directory
+├── prompts_repo/        # Git repository for prompt versioning
 ├── gemini_client.py     # Gemini API client
 ├── openrouter_client.py # OpenRouter API client
+├── custom_client.py     # Custom provider client
+├── exa_client.py        # Exa search client
+├── git_manager.py       # Git version control manager
+├── file_converter.py    # File processing utilities
 └── main.py              # Flask application entry point
 ```
 
@@ -167,11 +247,30 @@ src/
 │   ├── MessageList.jsx  # Chat message display
 │   ├── MessageInput.jsx # Message input with file upload
 │   ├── Sidebar.jsx      # History and prompts sidebar
-│   └── SettingsDialog.jsx # Settings configuration
+│   ├── SettingsDialog.jsx # Settings configuration
+│   ├── PromptDialog.jsx # Prompt creation/editing with version history
+│   ├── VersionHistoryPanel.jsx # Git version history timeline
+│   ├── DiffViewerDialog.jsx # Side-by-side diff viewer
+│   ├── RollbackConfirmationDialog.jsx # Rollback confirmation
+│   ├── WorkflowSpacesSidebar.jsx # Workflow spaces right sidebar
+│   ├── WorkspaceList.jsx # Workspace cards display
+│   ├── WorkspaceDetail.jsx # Workspace detail view with tabs
+│   ├── WorkspacePromptsTab.jsx # Prompts management with drag-and-drop
+│   ├── WorkspaceMembersTab.jsx # Member management
+│   ├── WorkspaceSettingsTab.jsx # Workspace settings
+│   ├── WorkspaceForm.jsx # Create/edit workspace dialog
+│   ├── WorkspacePromptSelector.jsx # Prompt selection dialog
+│   ├── AdminDashboard.jsx # Admin interface
+│   ├── PublicPromptsLibrary.jsx # Shared prompts
+│   └── AppTour.jsx      # User onboarding
 ├── services/
 │   └── api.js           # API client and endpoints
 ├── hooks/
-│   └── useLocalStorage.js # Local storage hook
+│   ├── useLocalStorage.js # Local storage hook
+│   ├── useAuthenticatedImage.js # Image loading with auth
+│   └── use-mobile.js    # Mobile detection
+├── styles/
+│   └── diff-theme.css   # Theme-aware diff viewer styles
 ├── App.jsx              # Main application component
 └── main.jsx             # React entry point
 ```
@@ -194,9 +293,36 @@ src/
 ### Prompts
 - `GET /api/prompts` - List all prompts
 - `POST /api/prompts` - Create new prompt
-- `PUT /api/prompts/{id}` - Update prompt
+- `PUT /api/prompts/{id}` - Update prompt (creates Git commit)
 - `DELETE /api/prompts/{id}` - Delete prompt
 - `POST /api/prompts/{id}/use` - Increment usage count
+- `GET /api/prompts/{id}/versions` - Get version history
+- `GET /api/prompts/{id}/versions/{commit_hash}` - Get specific version content
+- `GET /api/prompts/{id}/diff` - Get diff between two versions
+- `POST /api/prompts/{id}/rollback` - Rollback to previous version
+
+### Workflow Spaces
+**Workspace Management:**
+- `GET /api/workflow_spaces` - List user's workspaces
+- `POST /api/workflow_spaces` - Create new workspace
+- `GET /api/workflow_spaces/{id}` - Get workspace details
+- `PUT /api/workflow_spaces/{id}` - Update workspace
+- `DELETE /api/workflow_spaces/{id}` - Delete workspace
+
+**Member Management:**
+- `GET /api/workflow_spaces/{id}/members` - List workspace members
+- `POST /api/workflow_spaces/{id}/members` - Add member to workspace
+- `PUT /api/workflow_spaces/{id}/members/{user_id}` - Update member role
+- `DELETE /api/workflow_spaces/{id}/members/{user_id}` - Remove member
+
+**Prompt Management:**
+- `GET /api/workflow_spaces/{id}/prompts` - List workspace prompts
+- `POST /api/workflow_spaces/{id}/prompts` - Add prompt to workspace
+- `PUT /api/workflow_spaces/{id}/prompts/{prompt_id}` - Update prompt association
+- `DELETE /api/workflow_spaces/{id}/prompts/{prompt_id}` - Remove prompt
+- `PUT /api/workflow_spaces/{id}/prompts/reorder` - Reorder prompts
+- `GET /api/prompts/{id}/diff?from_commit=X&to_commit=Y` - Get diff between versions
+- `POST /api/prompts/{id}/rollback` - Rollback to previous version
 
 ### Files
 - `POST /api/files/upload` - Upload file

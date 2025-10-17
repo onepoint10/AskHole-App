@@ -76,17 +76,41 @@ class WorkflowSpace(db.Model):
         Returns:
             List of prompt dictionaries in sequence order
         """
-        if not self.prompt_sequence:
-            return []
-
-        try:
-            prompt_ids = json.loads(self.prompt_sequence)
-        except (json.JSONDecodeError, TypeError):
-            return []
-
         from src.models.chat import PromptTemplate
+
+        # Get all associations ordered by order_index
+        associations = sorted(self.prompt_associations, key=lambda a: a.order_index)
+        valid_prompt_ids = {assoc.prompt_id for assoc in associations}
+
+        # Check if prompt_sequence is empty or invalid
+        prompt_ids = []
+        if self.prompt_sequence:
+            try:
+                prompt_ids = json.loads(self.prompt_sequence)
+            except (json.JSONDecodeError, TypeError):
+                prompt_ids = []
+
+        # FALLBACK: If prompt_sequence is empty but we have associations, use associations
+        if not prompt_ids and associations:
+            prompt_ids = [assoc.prompt_id for assoc in associations]
+
+            # Auto-fix: Update prompt_sequence in database for future use
+            try:
+                self.prompt_sequence = json.dumps(prompt_ids)
+                from src.database import db
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+        if not prompt_ids:
+            return []
+
         prompts = []
         for prompt_id in prompt_ids:
+            # Only include prompts that are still associated with the workspace
+            if prompt_id not in valid_prompt_ids:
+                continue
+
             prompt = PromptTemplate.query.get(prompt_id)
             if prompt:
                 prompts.append({
@@ -95,6 +119,7 @@ class WorkflowSpace(db.Model):
                     'content': prompt.content,
                     'category': prompt.category
                 })
+
         return prompts
 
 
