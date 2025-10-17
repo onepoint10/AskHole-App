@@ -221,6 +221,32 @@
   background: #6b7280;
 }
 
+/* Apply custom scrollbar to ScrollArea viewport */
+.custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.dark .custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb {
+  background: #4b5563;
+}
+
+.dark .custom-scrollbar [data-slot="scroll-area-viewport"]::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
 /* animations */
 .fade-in {
   animation: fadeIn 0.2s ease-in-out;

@@ -154,7 +154,7 @@ export default function WorkspaceDetail({
                     </TabsTrigger>
                 </TabsList>
 
-                <ScrollArea className="flex-1 h-0">
+                <ScrollArea className="flex-1 h-0 custom-scrollbar">
                     <TabsContent value="prompts" className="m-0 p-6">
                         <WorkspacePromptsTab
                             workspace={workspace}
