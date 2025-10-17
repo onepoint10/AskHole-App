@@ -92,7 +92,7 @@ export default function WorkspacePromptSelector({
                 );
             }
 
-            toast.success(t(`${selectedPromptIds.length} prompt(s) added to workspace`));
+            toast.success(t('{{count}} prompt(s) added to workspace', { count: selectedPromptIds.length }));
 
             onPromptsAdded();
         } catch (error) {
