@@ -104,7 +104,26 @@ def get_workspaces():
         # Sort by updated_at descending
         workspaces.sort(key=lambda x: x.updated_at or x.created_at, reverse=True)
 
-        return jsonify([w.to_dict() for w in workspaces])
+        # Add role information for each workspace
+        result = []
+        for workspace in workspaces:
+            workspace_dict = workspace.to_dict()
+
+            # Determine user's role
+            if workspace.owner_id == current_user.id:
+                workspace_dict['role'] = 'owner'
+                workspace_dict['is_owner'] = True
+            else:
+                member = WorkflowSpaceMember.query.filter_by(
+                    workflow_space_id=workspace.id,
+                    user_id=current_user.id
+                ).first()
+                workspace_dict['role'] = member.role if member else 'viewer'
+                workspace_dict['is_owner'] = False
+
+            result.append(workspace_dict)
+
+        return jsonify(result)
 
     except Exception as e:
         logger.error(f"Error getting workspaces: {e}")
@@ -167,7 +186,22 @@ def get_workspace(workspace_id):
         return jsonify({'error': 'Workspace not found or access denied'}), 404
 
     try:
-        return jsonify(workspace.to_dict(include_members=True, include_prompts=True))
+        result = workspace.to_dict(include_members=True, include_prompts=True)
+
+        # Add current user's role in this workspace
+        if workspace.owner_id == current_user.id:
+            result['role'] = 'owner'
+            result['is_owner'] = True
+        else:
+            # Find user's role in members
+            member = WorkflowSpaceMember.query.filter_by(
+                workflow_space_id=workspace_id,
+                user_id=current_user.id
+            ).first()
+            result['role'] = member.role if member else 'viewer'
+            result['is_owner'] = False
+
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error getting workspace {workspace_id}: {e}")
         return jsonify({'error': 'Failed to load workspace'}), 500

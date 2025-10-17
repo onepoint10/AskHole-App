@@ -59,9 +59,19 @@ export default function WorkspaceDetail({
         }
     };
 
-    // Check if current user is owner (for permission-based UI)
-    // This would need to be enhanced with actual user ID comparison
-    const isOwner = true; // Placeholder - implement proper ownership check
+    // Check if current user is owner
+    // Look for owner role in members array or check if user created the workspace
+    const isOwner = workspace.members?.some(m => m.role === 'owner') ||
+        workspace.role === 'owner' ||
+        workspace.is_owner === true;
+
+    console.log('WorkspaceDetail - isOwner check:', {
+        workspace_id: workspace.id,
+        workspace_name: workspace.name,
+        owner_id: workspace.owner_id,
+        members: workspace.members,
+        calculated_isOwner: isOwner
+    });
 
     return (
         <div className="flex flex-col h-full">
