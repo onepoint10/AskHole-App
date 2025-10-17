@@ -535,6 +535,11 @@ export const filesAPI = {
 
 // Users API
 export const usersAPI = {
+  searchUsers: async (query, language) => {
+    console.log('API Request: GET /users/search?q=' + query);
+    return apiCall(`/users/search?q=${encodeURIComponent(query)}`, {}, language);
+  },
+
   getUsers: async (language) => {
     console.log('API Request: GET /users');
     return apiCall('/users', {}, language);
