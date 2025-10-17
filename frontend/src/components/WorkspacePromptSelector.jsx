@@ -105,7 +105,7 @@ export default function WorkspacePromptSelector({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
                 <DialogHeader>
                     <DialogTitle>{t('Add Prompts to Workspace')}</DialogTitle>
                     <DialogDescription>
@@ -125,7 +125,7 @@ export default function WorkspacePromptSelector({
                 </div>
 
                 {/* Prompt List */}
-                <ScrollArea className="flex-1 -mx-6 px-6">
+                <ScrollArea className="h-[400px] -mx-6 px-6">
                     {loading ? (
                         <div className="text-center py-8 text-muted-foreground">
                             <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
@@ -140,7 +140,7 @@ export default function WorkspacePromptSelector({
                             )}
                         </div>
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-2 pr-4">
                             {filteredPrompts.map((prompt) => (
                                 <div
                                     key={prompt.id}
@@ -168,7 +168,7 @@ export default function WorkspacePromptSelector({
                     )}
                 </ScrollArea>
 
-                <DialogFooter>
+                <DialogFooter className="flex-shrink-0">
                     <div className="flex items-center justify-between w-full">
                         <span className="text-sm text-muted-foreground">
                             {selectedPromptIds.length} {t('selected')}
