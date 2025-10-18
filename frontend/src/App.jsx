@@ -1064,7 +1064,7 @@ function App() {
             <button
               variant="ghost"
               aria-label={t('Workflow Spaces')}
-              className="fixed top-4 right-16 z-50 p-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+              className="mobile-workflows-button"
               onClick={() => setIsWorkflowSidebarOpen(true)}
             >
               <Folders className="h-5 w-5" />

@@ -108,14 +108,14 @@ export default function WorkflowSpacesSidebar({ isOpen, onClose }) {
                                     {activeView === 'detail' && (selectedWorkspace?.name || t('Workspace Details'))}
                                 </SheetTitle>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleClose}
-                                className="h-8 w-8"
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
+{/*                             <Button */}
+{/*                                 variant="ghost" */}
+{/*                                 size="icon" */}
+{/*                                 onClick={handleClose} */}
+{/*                                 className="h-8 w-8" */}
+{/*                             > */}
+{/*                                 <X className="h-4 w-4" /> */}
+{/*                             </Button> */}
                         </div>
                     </SheetHeader>
 
