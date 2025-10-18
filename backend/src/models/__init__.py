@@ -15,7 +15,8 @@ from src.models.chat import (
 from src.models.workflow_space import (
     WorkflowSpace,
     WorkflowSpaceMember,
-    WorkflowPromptAssociation
+    WorkflowPromptAssociation,
+    WorkflowPromptAttachment
 )
 
 __all__ = [
@@ -27,5 +28,6 @@ __all__ = [
     'PromptLike',
     'WorkflowSpace',
     'WorkflowSpaceMember',
-    'WorkflowPromptAssociation'
+    'WorkflowPromptAssociation',
+    'WorkflowPromptAttachment'
 ]

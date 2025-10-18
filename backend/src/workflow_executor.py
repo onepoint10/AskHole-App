@@ -7,9 +7,10 @@ in workflow spaces, chaining outputs from one prompt as inputs to the next.
 
 import time
 import logging
+import os
 from typing import List, Dict, Optional, Any
-from src.models.workflow_space import WorkflowSpace
-from src.models.chat import PromptTemplate
+from src.models.workflow_space import WorkflowSpace, WorkflowPromptAssociation, WorkflowPromptAttachment
+from src.models.chat import PromptTemplate, FileUpload
 from src.git_manager import PromptGitManager
 from src.gemini_client import GeminiClient
 from src.openrouter_client import OpenRouterClient
@@ -143,17 +144,23 @@ class WorkflowExecutor:
                             break
                         continue
 
+                    # Fetch attachments for this prompt
+                    attachment_files = self._get_prompt_attachments(prompt_info['id'])
+                    if attachment_files:
+                        logger.info(f"Step {step_number}: Using {len(attachment_files)} attachment(s)")
+
                     # Format prompt with current input
                     formatted_prompt = self._format_prompt_with_input(prompt_content, current_input)
 
                     logger.debug(f"Step {step_number}: Executing prompt {prompt_info['id']} "
                                f"({prompt_info['title']})")
 
-                    # Execute the prompt
+                    # Execute the prompt with attachments
                     output = self._execute_single_prompt(
                         formatted_prompt,
                         model,
-                        temperature
+                        temperature,
+                        files=attachment_files
                     )
 
                     execution_time = time.time() - step_start_time
@@ -268,6 +275,56 @@ class WorkflowExecutor:
             logger.error(f"Error getting prompt content for {prompt_id}: {e}")
             return None
 
+    def _get_prompt_attachments(self, prompt_id: int) -> List[str]:
+        """
+        Get file paths for all attachments associated with a prompt in this workspace.
+
+        Args:
+            prompt_id: ID of the prompt
+
+        Returns:
+            List of file paths for attached files
+        """
+        file_paths = []
+
+        try:
+            # Find the association between this workspace and the prompt
+            association = WorkflowPromptAssociation.query.filter_by(
+                workflow_space_id=self.workspace.id,
+                prompt_id=prompt_id
+            ).first()
+
+            if not association:
+                logger.debug(f"No association found for prompt {prompt_id} in workspace {self.workspace.id}")
+                return file_paths
+
+            # Get all attachments for this association
+            attachments = WorkflowPromptAttachment.query.filter_by(
+                workflow_prompt_association_id=association.id
+            ).all()
+
+            if not attachments:
+                logger.debug(f"No attachments found for prompt {prompt_id} in workspace {self.workspace.id}")
+                return file_paths
+
+            # Resolve file paths
+            for attachment in attachments:
+                if attachment.file_upload:
+                    file_path = attachment.file_upload.file_path
+                    if os.path.exists(file_path):
+                        file_paths.append(file_path)
+                        logger.debug(f"Added attachment: {file_path}")
+                    else:
+                        logger.warning(f"Attachment file not found: {file_path}")
+
+            if file_paths:
+                logger.info(f"Found {len(file_paths)} attachment(s) for prompt {prompt_id}")
+
+        except Exception as e:
+            logger.error(f"Error getting attachments for prompt {prompt_id}: {e}")
+
+        return file_paths
+
     def _format_prompt_with_input(self, prompt_content: str, input_text: str) -> str:
         """
         Replace placeholder variables in prompt with input text.
@@ -324,7 +381,8 @@ Current task:
         self,
         prompt_content: str,
         model: str,
-        temperature: float
+        temperature: float,
+        files: List[str] = None
     ) -> str:
         """
         Execute a single prompt with the specified model.
@@ -333,6 +391,7 @@ Current task:
             prompt_content: The formatted prompt content
             model: Model name/identifier
             temperature: Temperature setting
+            files: Optional list of file paths to attach
 
         Returns:
             Generated output text
@@ -346,19 +405,19 @@ Current task:
         if client_type == 'gemini':
             if not self.gemini_client:
                 raise Exception("Gemini client not available. Please configure API key.")
-            return self._execute_with_gemini(prompt_content, model, temperature)
+            return self._execute_with_gemini(prompt_content, model, temperature, files)
 
         elif client_type == 'openrouter':
             if not self.openrouter_client:
                 raise Exception("OpenRouter client not available. Please configure API key.")
-            return self._execute_with_openrouter(prompt_content, model, temperature)
+            return self._execute_with_openrouter(prompt_content, model, temperature, files)
 
         elif client_type == 'custom':
             # Find the appropriate custom client
             for provider_name, client in self.custom_clients.items():
                 try:
                     if model in client.get_available_models():
-                        return self._execute_with_custom(client, prompt_content, model, temperature)
+                        return self._execute_with_custom(client, prompt_content, model, temperature, files)
                 except Exception as e:
                     logger.debug(f"Model {model} not found in provider {provider_name}: {e}")
                     continue
@@ -399,28 +458,30 @@ Current task:
         # Default to OpenRouter
         return 'openrouter'
 
-    def _execute_with_gemini(self, prompt: str, model: str, temperature: float) -> str:
+    def _execute_with_gemini(self, prompt: str, model: str, temperature: float, files: List[str] = None) -> str:
         """Execute prompt with Gemini client."""
         try:
             # Use generate_text for stateless prompt execution
             response = self.gemini_client.generate_text(
                 prompt=prompt,
                 model=model,
-                temperature=temperature
+                temperature=temperature,
+                files=files
             )
             return response
         except Exception as e:
             logger.error(f"Gemini execution failed: {e}")
             raise Exception(f"Gemini API error: {str(e)}")
 
-    def _execute_with_openrouter(self, prompt: str, model: str, temperature: float) -> str:
+    def _execute_with_openrouter(self, prompt: str, model: str, temperature: float, files: List[str] = None) -> str:
         """Execute prompt with OpenRouter client."""
         try:
             # Use generate_text for stateless prompt execution
             response = self.openrouter_client.generate_text(
                 prompt=prompt,
                 model=model,
-                temperature=temperature
+                temperature=temperature,
+                files=files
             )
             return response
         except Exception as e:
@@ -432,7 +493,8 @@ Current task:
         client: CustomClient,
         prompt: str,
         model: str,
-        temperature: float
+        temperature: float,
+        files: List[str] = None
     ) -> str:
         """Execute prompt with custom client."""
         try:
@@ -441,7 +503,8 @@ Current task:
                 session_id='workflow_temp',  # Temporary session for workflow
                 message=prompt,
                 model=model,
-                temperature=temperature
+                temperature=temperature,
+                files=files
             )
             # Extract the response text from the result dict
             if isinstance(result, dict) and 'response' in result:

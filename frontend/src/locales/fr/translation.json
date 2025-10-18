@@ -443,5 +443,16 @@
   "Add Selected": "Ajouter la sélection",
   "Please select at least one prompt to add": "Veuillez sélectionner au moins une invite à ajouter",
   "Failed to add prompts": "Échec de l'ajout des invites",
-  "{{count}} prompt(s) added to workspace": "{{count}} invite(s) ajoutée(s) à l'espace de travail"
+  "{{count}} prompt(s) added to workspace": "{{count}} invite(s) ajoutée(s) à l'espace de travail",
+  "Attach file": "Joindre un fichier",
+  "Attach File to Step": "Joindre un fichier à l'étape",
+  "Upload a file to attach to this workflow step": "Téléchargez un fichier à joindre à cette étape du flux de travail",
+  "Click to upload file": "Cliquez pour télécharger un fichier",
+  "Choose File": "Choisir un fichier",
+  "PDF, DOCX, PPTX, XLSX, images, audio, and code files supported": "Fichiers PDF, DOCX, PPTX, XLSX, images, audio et code pris en charge",
+  "Uploading...": "Téléchargement en cours...",
+  "File attached successfully": "Fichier joint avec succès",
+  "Failed to attach file": "Échec de la jointure du fichier",
+  "Attachment removed": "Pièce jointe supprimée",
+  "Failed to remove attachment": "Échec de la suppression de la pièce jointe"
 }

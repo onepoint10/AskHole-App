@@ -443,5 +443,16 @@
   "Add Selected": "Добавить выбранные",
   "Please select at least one prompt to add": "Пожалуйста, выберите хотя бы один промпт для добавления",
   "Failed to add prompts": "Не удалось добавить промпты",
-  "{{count}} prompt(s) added to workspace": "{{count}} промпт(ов) добавлено в рабочее пространство"
+  "{{count}} prompt(s) added to workspace": "{{count}} промпт(ов) добавлено в рабочее пространство",
+  "Attach file": "Прикрепить файл",
+  "Attach File to Step": "Прикрепить файл к шагу",
+  "Upload a file to attach to this workflow step": "Загрузите файл для прикрепления к этому шагу рабочего процесса",
+  "Click to upload file": "Нажмите, чтобы загрузить файл",
+  "Choose File": "Выбрать файл",
+  "PDF, DOCX, PPTX, XLSX, images, audio, and code files supported": "Поддерживаются файлы PDF, DOCX, PPTX, XLSX, изображения, аудио и код",
+  "Uploading...": "Загрузка...",
+  "File attached successfully": "Файл успешно прикреплен",
+  "Failed to attach file": "Не удалось прикрепить файл",
+  "Attachment removed": "Вложение удалено",
+  "Failed to remove attachment": "Не удалось удалить вложение"
 }

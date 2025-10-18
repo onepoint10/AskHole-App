@@ -443,5 +443,16 @@
   "Add Selected": "Add Selected",
   "Please select at least one prompt to add": "Please select at least one prompt to add",
   "Failed to add prompts": "Failed to add prompts",
-  "{{count}} prompt(s) added to workspace": "{{count}} prompt(s) added to workspace"
+  "{{count}} prompt(s) added to workspace": "{{count}} prompt(s) added to workspace",
+  "Attach file": "Attach file",
+  "Attach File to Step": "Attach File to Step",
+  "Upload a file to attach to this workflow step": "Upload a file to attach to this workflow step",
+  "Click to upload file": "Click to upload file",
+  "Choose File": "Choose File",
+  "PDF, DOCX, PPTX, XLSX, images, audio, and code files supported": "PDF, DOCX, PPTX, XLSX, images, audio, and code files supported",
+  "Uploading...": "Uploading...",
+  "File attached successfully": "File attached successfully",
+  "Failed to attach file": "Failed to attach file",
+  "Attachment removed": "Attachment removed",
+  "Failed to remove attachment": "Failed to remove attachment"
 }

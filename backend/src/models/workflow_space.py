@@ -5,6 +5,7 @@ This module defines:
 - WorkflowSpace: Project/workspace for organizing prompts
 - WorkflowSpaceMember: User membership and roles within workspaces
 - WorkflowPromptAssociation: Many-to-many relationship between workspaces and prompts
+- WorkflowPromptAttachment: File attachments for workflow prompt steps
 """
 
 from src.database import db
@@ -198,7 +199,10 @@ class WorkflowPromptAssociation(db.Model):
         db.Index('idx_workspace_order', 'workflow_space_id', 'order_index'),
     )
 
-    def to_dict(self, include_prompt=False):
+    # Relationship to attachments
+    attachments = db.relationship('WorkflowPromptAttachment', backref='prompt_association', lazy=True, cascade='all, delete-orphan')
+
+    def to_dict(self, include_prompt=False, include_attachments=False):
         """
         Convert association to dictionary.
 
@@ -223,5 +227,55 @@ class WorkflowPromptAssociation(db.Model):
             prompt = PromptTemplate.query.get(self.prompt_id)
             if prompt:
                 result['prompt'] = prompt.to_dict()
+
+        if include_attachments:
+            result['attachments'] = [att.to_dict() for att in self.attachments]
+
+        return result
+
+
+class WorkflowPromptAttachment(db.Model):
+    """
+    File attachments for workflow prompt steps.
+
+    Links file uploads to specific prompts in a workflow space,
+    allowing documents to be attached to each step in the workflow.
+    """
+    __tablename__ = 'workflow_prompt_attachments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    workflow_prompt_association_id = db.Column(db.Integer, db.ForeignKey('workflow_prompt_associations.id'), nullable=False)
+    file_upload_id = db.Column(db.Integer, db.ForeignKey('file_uploads.id'), nullable=False)
+    uploaded_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    file_upload = db.relationship('FileUpload', backref='workflow_attachments', lazy=True)
+
+    # Ensure a file can only be attached to a prompt once
+    __table_args__ = (
+        db.UniqueConstraint('workflow_prompt_association_id', 'file_upload_id', name='unique_prompt_file'),
+    )
+
+    def to_dict(self, include_file=True):
+        """
+        Convert attachment to dictionary.
+
+        Args:
+            include_file: Whether to include file upload details
+
+        Returns:
+            Dictionary representation of the attachment
+        """
+        result = {
+            'id': self.id,
+            'workflow_prompt_association_id': self.workflow_prompt_association_id,
+            'file_upload_id': self.file_upload_id,
+            'uploaded_by': self.uploaded_by,
+            'uploaded_at': self.uploaded_at.isoformat() if self.uploaded_at else None
+        }
+
+        if include_file and self.file_upload:
+            result['file'] = self.file_upload.to_dict()
 
         return result

@@ -730,6 +730,27 @@ export const workflowSpacesAPI = {
     }, language);
   },
 
+  // Prompt Attachments
+  addAttachment: async (id, promptId, fileUploadId, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments');
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify({ file_upload_id: fileUploadId }),
+    }, language);
+  },
+
+  getAttachments: async (id, promptId, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments');
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments`, {}, language);
+  },
+
+  removeAttachment: async (id, promptId, attachmentId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments/' + attachmentId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
   // Workflow Execution (DFG)
   executeWorkflow: async (id, config, language) => {
     console.log('API Request: POST /workflow_spaces/' + id + '/execute');

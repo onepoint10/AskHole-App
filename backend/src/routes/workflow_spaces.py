@@ -8,19 +8,23 @@ This module provides REST API endpoints for managing workflow spaces:
 - Prompt sequencing for DFG execution
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from src.database import db
 from src.models.workflow_space import (
     WorkflowSpace,
     WorkflowSpaceMember,
-    WorkflowPromptAssociation
+    WorkflowPromptAssociation,
+    WorkflowPromptAttachment
 )
-from src.models.chat import PromptTemplate
+from src.models.chat import PromptTemplate, FileUpload
 from src.models.user import User
 from src.routes.auth import get_current_user
 from datetime import datetime
 import json
 import logging
+import os
+from werkzeug.utils import secure_filename
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -684,6 +688,149 @@ def reorder_prompts(workspace_id):
 
 
 # ============================================================================
+# Prompt Attachment Endpoints
+# ============================================================================
+
+@workflow_spaces_bp.route('/<int:workspace_id>/prompts/<int:prompt_id>/attachments', methods=['POST'])
+def add_attachment(workspace_id, prompt_id):
+    """Add a file attachment to a workflow prompt step (editor or owner)."""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    workspace = check_workspace_access(workspace_id, current_user.id, 'editor')
+    if not workspace:
+        return jsonify({'error': 'Workspace not found or insufficient permissions'}), 403
+
+    # Check if prompt is in workspace
+    association = WorkflowPromptAssociation.query.filter_by(
+        workflow_space_id=workspace_id,
+        prompt_id=prompt_id
+    ).first()
+
+    if not association:
+        return jsonify({'error': 'Prompt not in workspace'}), 404
+
+    # Get file_upload_id from request body
+    data = request.get_json()
+    file_upload_id = data.get('file_upload_id')
+
+    if not file_upload_id:
+        return jsonify({'error': 'file_upload_id is required'}), 400
+
+    # Verify file upload exists and belongs to current user
+    file_upload = FileUpload.query.filter_by(
+        id=file_upload_id,
+        user_id=current_user.id
+    ).first()
+
+    if not file_upload:
+        return jsonify({'error': 'File not found or access denied'}), 404
+
+    # Check if file is already attached to this prompt
+    existing = WorkflowPromptAttachment.query.filter_by(
+        workflow_prompt_association_id=association.id,
+        file_upload_id=file_upload_id
+    ).first()
+
+    if existing:
+        return jsonify({'error': 'File already attached to this prompt'}), 400
+
+    try:
+        attachment = WorkflowPromptAttachment(
+            workflow_prompt_association_id=association.id,
+            file_upload_id=file_upload_id,
+            uploaded_by=current_user.id
+        )
+        db.session.add(attachment)
+        workspace.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Added attachment {file_upload_id} to prompt {prompt_id} in workspace {workspace_id}")
+        return jsonify(attachment.to_dict(include_file=True)), 201
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error adding attachment to prompt {prompt_id} in workspace {workspace_id}: {e}")
+        return jsonify({'error': 'Failed to add attachment'}), 500
+
+
+@workflow_spaces_bp.route('/<int:workspace_id>/prompts/<int:prompt_id>/attachments', methods=['GET'])
+def get_attachments(workspace_id, prompt_id):
+    """Get all file attachments for a workflow prompt step."""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    workspace = check_workspace_access(workspace_id, current_user.id, 'viewer')
+    if not workspace:
+        return jsonify({'error': 'Workspace not found or access denied'}), 404
+
+    # Check if prompt is in workspace
+    association = WorkflowPromptAssociation.query.filter_by(
+        workflow_space_id=workspace_id,
+        prompt_id=prompt_id
+    ).first()
+
+    if not association:
+        return jsonify({'error': 'Prompt not in workspace'}), 404
+
+    try:
+        attachments = WorkflowPromptAttachment.query.filter_by(
+            workflow_prompt_association_id=association.id
+        ).all()
+
+        return jsonify([att.to_dict(include_file=True) for att in attachments])
+
+    except Exception as e:
+        logger.error(f"Error getting attachments for prompt {prompt_id} in workspace {workspace_id}: {e}")
+        return jsonify({'error': 'Failed to load attachments'}), 500
+
+
+@workflow_spaces_bp.route('/<int:workspace_id>/prompts/<int:prompt_id>/attachments/<int:attachment_id>', methods=['DELETE'])
+def remove_attachment(workspace_id, prompt_id, attachment_id):
+    """Remove a file attachment from a workflow prompt step (editor or owner)."""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    workspace = check_workspace_access(workspace_id, current_user.id, 'editor')
+    if not workspace:
+        return jsonify({'error': 'Workspace not found or insufficient permissions'}), 403
+
+    # Check if prompt is in workspace
+    association = WorkflowPromptAssociation.query.filter_by(
+        workflow_space_id=workspace_id,
+        prompt_id=prompt_id
+    ).first()
+
+    if not association:
+        return jsonify({'error': 'Prompt not in workspace'}), 404
+
+    # Get attachment
+    attachment = WorkflowPromptAttachment.query.filter_by(
+        id=attachment_id,
+        workflow_prompt_association_id=association.id
+    ).first()
+
+    if not attachment:
+        return jsonify({'error': 'Attachment not found'}), 404
+
+    try:
+        db.session.delete(attachment)
+        workspace.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Removed attachment {attachment_id} from prompt {prompt_id} in workspace {workspace_id}")
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error removing attachment {attachment_id} from prompt {prompt_id} in workspace {workspace_id}: {e}")
+        return jsonify({'error': 'Failed to remove attachment'}), 500
+
+
+# ============================================================================
 # Workflow Execution Endpoint (DFG)
 # ============================================================================
 
@@ -1016,9 +1163,14 @@ def execute_workflow_stream(workspace_id):
                     if not prompt_content:
                         raise Exception(f"Prompt {prompt_info['id']} content not found")
 
+                    # Fetch attachments for this prompt
+                    attachment_files = executor._get_prompt_attachments(prompt_info['id'])
+                    if attachment_files:
+                        logger.info(f"SSE Step {step_number}: Using {len(attachment_files)} attachment(s)")
+
                     # Format and execute
                     formatted_prompt = executor._format_prompt_with_input(prompt_content, current_input)
-                    output = executor._execute_single_prompt(formatted_prompt, model, temperature)
+                    output = executor._execute_single_prompt(formatted_prompt, model, temperature, files=attachment_files)
 
                     execution_time = time_module.time() - step_start
 
