@@ -101,8 +101,13 @@ def get_workspaces():
             WorkflowSpace.id.in_(member_workspace_ids)
         ).all() if member_workspace_ids else []
 
-        # Combine and deduplicate
-        all_workspaces = {w.id: w for w in owned_workspaces + member_workspaces}
+        # Get all public workspaces (visible to all users)
+        public_workspaces = WorkflowSpace.query.filter_by(
+            is_public=True
+        ).all()
+
+        # Combine and deduplicate (some public workspaces might be owned by user)
+        all_workspaces = {w.id: w for w in owned_workspaces + member_workspaces + public_workspaces}
         workspaces = list(all_workspaces.values())
 
         # Sort by updated_at descending
@@ -122,8 +127,17 @@ def get_workspaces():
                     workflow_space_id=workspace.id,
                     user_id=current_user.id
                 ).first()
-                workspace_dict['role'] = member.role if member else 'viewer'
-                workspace_dict['is_owner'] = False
+                if member:
+                    workspace_dict['role'] = member.role
+                    workspace_dict['is_owner'] = False
+                elif workspace.is_public:
+                    # Public workspace but user is not a member
+                    workspace_dict['role'] = 'viewer'
+                    workspace_dict['is_owner'] = False
+                else:
+                    # Shouldn't reach here, but default to viewer
+                    workspace_dict['role'] = 'viewer'
+                    workspace_dict['is_owner'] = False
 
             result.append(workspace_dict)
 
