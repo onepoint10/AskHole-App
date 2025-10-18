@@ -346,7 +346,7 @@ function SortablePromptItem({ prompt, workspace, onRemove, onUpdateNotes, onAtta
 /**
  * WorkspacePromptsTab - Manage prompts with drag-and-drop reordering
  */
-export default function WorkspacePromptsTab({ workspace, onUpdate }) {
+export default function WorkspacePromptsTab({ workspace, onUpdate, availableModels }) {
     const { t, i18n } = useTranslation();
     const [prompts, setPrompts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -521,6 +521,7 @@ export default function WorkspacePromptsTab({ workspace, onUpdate }) {
                 prompts={prompts.map(p => p.prompt || {})}
                 isOpen={showExecutionDialog}
                 onClose={() => setShowExecutionDialog(false)}
+                availableModels={availableModels}
             />
         </div>
     );

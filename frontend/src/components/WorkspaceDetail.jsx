@@ -38,7 +38,8 @@ export default function WorkspaceDetail({
     onBack,
     onEdit,
     onDelete,
-    onUpdate
+    onUpdate,
+    availableModels
 }) {
     const { t, i18n } = useTranslation();
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -168,6 +169,7 @@ export default function WorkspaceDetail({
                         <WorkspacePromptsTab
                             workspace={workspace}
                             onUpdate={onUpdate}
+                            availableModels={availableModels}
                         />
                     </TabsContent>
 

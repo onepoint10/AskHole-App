@@ -27,15 +27,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { workflowSpacesAPI } from '@/services/api';
 import { toast } from 'sonner';
+import ModelSelector from './ModelSelector';
 import {
     Play,
     Loader2,
@@ -62,6 +56,7 @@ export function WorkflowExecutionDialog({
     prompts,
     isOpen,
     onClose,
+    availableModels = { gemini: [], openrouter: [], custom: [] }, // Default value for safety
 }) {
     const { t, i18n } = useTranslation();
 
@@ -292,23 +287,14 @@ export function WorkflowExecutionDialog({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label className="text-sm font-medium">{t('Model')}</Label>
-                                    <Select
-                                        value={config.model}
-                                        onValueChange={(model) => setConfig({ ...config, model })}
-                                    >
-                                        <SelectTrigger className="mt-1">
-                                            <SelectValue placeholder={t('Select a model')} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="gemini-2.5-flash">gemini-2.5-flash (Gemini)</SelectItem>
-                                            <SelectItem value="gemini-2.5-pro">gemini-2.5-pro (Gemini)</SelectItem>
-                                            <SelectItem value="gemini-2.0-flash">gemini-2.0-flash (Gemini)</SelectItem>
-                                            <SelectItem value="anthropic/claude-3.5-sonnet">claude-3.5-sonnet (OpenRouter)</SelectItem>
-                                            <SelectItem value="openai/gpt-4o">gpt-4o (OpenRouter)</SelectItem>
-                                            <SelectItem value="openai/gpt-4o-mini">gpt-4o-mini (OpenRouter)</SelectItem>
-                                            <SelectItem value="google/gemini-pro-1.5">gemini-pro-1.5 (OpenRouter)</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                    <div className="mt-1">
+                                        <ModelSelector
+                                            availableModels={availableModels}
+                                            selectedModel={config.model}
+                                            onModelChange={(model) => setConfig({ ...config, model })}
+                                            disabled={false}
+                                        />
+                                    </div>
                                     <p className="text-xs text-muted-foreground mt-1">
                                         {t('Select the AI model to use for all prompts')}
                                     </p>

@@ -1193,6 +1193,7 @@ function App() {
         <WorkflowSpacesSidebar
           isOpen={isWorkflowSidebarOpen}
           onClose={() => setIsWorkflowSidebarOpen(false)}
+          availableModels={availableModels}
         />
 
         <Toaster position="top-right" />
