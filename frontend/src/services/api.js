@@ -752,4 +752,94 @@ export const workflowSpacesAPI = {
       body: JSON.stringify(requestBody),
     }, language);
   },
+
+  // Workflow Execution with SSE Streaming (Real-time Progress)
+  executeWorkflowStream: async (id, config, onEvent, language = 'en') => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/execute-stream (SSE)');
+
+    // Get API keys from localStorage
+    const settingsStr = localStorage.getItem('askhole-settings');
+    const settings = settingsStr ? JSON.parse(settingsStr) : {};
+
+    // Get session ID for authentication
+    const sessionIdFromStorage = localStorage.getItem('session_id');
+    const sessionIdFromCookie = getCookie('session');
+    const sessionId = sessionIdFromStorage || sessionIdFromCookie;
+
+    // Build request body with config AND API keys
+    const requestBody = {
+      ...config,
+      gemini_api_key: settings.geminiApiKey,
+      openrouter_api_key: settings.openrouterApiKey,
+      custom_providers: settings.customProviders || []
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflow_spaces/${id}/execute-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Accept-Language': language,
+          ...(sessionId && { 'Authorization': `Bearer ${sessionId}` }),
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages (ending with \n\n)
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+              onEvent(eventData);
+            } catch (error) {
+              console.error('Failed to parse SSE event:', error, line);
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffered data
+      if (buffer.trim() && buffer.startsWith('data: ')) {
+        try {
+          const eventData = JSON.parse(buffer.slice(6));
+          onEvent(eventData);
+        } catch (error) {
+          console.error('Failed to parse final SSE event:', error);
+        }
+      }
+
+    } catch (error) {
+      console.error('SSE stream error:', error);
+      // Emit error event to callback
+      onEvent({
+        event_type: 'error',
+        error: error.message || 'Failed to connect to stream'
+      });
+      throw error;
+    }
+  },
 };

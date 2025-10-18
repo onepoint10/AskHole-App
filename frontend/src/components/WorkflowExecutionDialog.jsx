@@ -107,37 +107,96 @@ export function WorkflowExecutionDialog({
         setActiveTab('results');
 
         try {
-            const response = await workflowSpacesAPI.executeWorkflow(
+            // Use SSE streaming for real-time progress updates
+            await workflowSpacesAPI.executeWorkflowStream(
                 workspaceId,
                 config,
+                (eventData) => {
+                    // Handle different event types
+                    switch (eventData.event_type) {
+                        case 'init':
+                            // Workflow initialized
+                            console.log('Workflow initialized:', eventData.workspace_name);
+                            break;
+
+                        case 'start':
+                            // Step started - update current step
+                            setCurrentStep(eventData.step - 1); // Convert to 0-based index
+                            console.log(`Step ${eventData.step} started:`, eventData.prompt_title);
+                            break;
+
+                        case 'complete':
+                            // Step completed successfully - add result
+                            setResults(prev => [...prev, {
+                                step: eventData.step,
+                                prompt_id: eventData.prompt_id,
+                                prompt_title: eventData.prompt_title,
+                                input: eventData.input,
+                                output: eventData.output,
+                                execution_time: eventData.execution_time,
+                                error: null
+                            }]);
+                            console.log(`Step ${eventData.step} completed`);
+                            break;
+
+                        case 'step_error':
+                            // Step failed - add error result
+                            setResults(prev => [...prev, {
+                                step: eventData.step,
+                                prompt_id: eventData.prompt_id,
+                                prompt_title: eventData.prompt_title,
+                                input: eventData.input || '(no input)',
+                                output: null,
+                                execution_time: eventData.execution_time,
+                                error: eventData.error
+                            }]);
+                            console.error(`Step ${eventData.step} failed:`, eventData.error);
+                            break;
+
+                        case 'workflow_complete':
+                            // Entire workflow completed
+                            setFinalOutput(eventData.final_output || '');
+                            setIsExecuting(false);
+
+                            if (eventData.success) {
+                                toast.success(
+                                    t('Workflow completed: {{completed}}/{{total}} steps', {
+                                        completed: eventData.completed_steps || 0,
+                                        total: eventData.total_steps || prompts.length,
+                                    })
+                                );
+                            } else {
+                                toast.warning(
+                                    t('Workflow completed with errors: {{completed}}/{{total}} steps', {
+                                        completed: eventData.completed_steps || 0,
+                                        total: eventData.total_steps || prompts.length,
+                                    })
+                                );
+                            }
+                            console.log('Workflow completed:', eventData);
+                            break;
+
+                        case 'error':
+                            // Fatal error occurred
+                            setError(eventData.error || 'Unknown error');
+                            setIsExecuting(false);
+                            toast.error(t('Workflow error: {{error}}', { error: eventData.error }));
+                            console.error('Workflow error:', eventData.error);
+                            break;
+
+                        default:
+                            console.log('Unknown event type:', eventData.event_type, eventData);
+                    }
+                },
                 i18n.language
             );
 
-            // Handle response - API might return response.data or direct response
-            const data = response.data || response;
-
-            if (data.success) {
-                setResults(data.results || []);
-                setFinalOutput(data.final_output || '');
-
-                toast.success(
-                    t('Workflow completed: {{completed}}/{{total}} steps', {
-                        completed: data.completed_steps || 0,
-                        total: data.total_steps || prompts.length,
-                    })
-                );
-            } else {
-                setError(data.error || 'Workflow execution failed');
-                setResults(data.results || []);
-                toast.error(t('Workflow failed: {{error}}', { error: data.error || 'Unknown error' }));
-            }
         } catch (err) {
             console.error('Workflow execution error:', err);
             const errorMessage = err.response?.data?.error || err.message || 'Failed to execute workflow';
             setError(errorMessage);
-            toast.error(t('Execution error: {{error}}', { error: errorMessage }));
-        } finally {
             setIsExecuting(false);
+            toast.error(t('Execution error: {{error}}', { error: errorMessage }));
         }
     };
 

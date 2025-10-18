@@ -57,7 +57,8 @@ class WorkflowExecutor:
         initial_input: str = "",
         model: str = "gemini-2.5-flash",
         temperature: float = 1.0,
-        stop_on_error: bool = True
+        stop_on_error: bool = True,
+        progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
         Execute the prompt sequence.
@@ -67,6 +68,11 @@ class WorkflowExecutor:
             model: AI model to use for all prompts (e.g., "gemini-2.5-flash")
             temperature: Temperature setting for AI generation (0.0 to 2.0)
             stop_on_error: Whether to stop execution if a step fails
+            progress_callback: Optional callback function that receives progress events.
+                              Called with (event_type, step_number, data) where:
+                              - event_type: 'start', 'complete', or 'error'
+                              - step_number: current step index (1-based)
+                              - data: dict with relevant event data
 
         Returns:
             Dictionary containing:
@@ -101,6 +107,14 @@ class WorkflowExecutor:
             for step_number, prompt_info in enumerate(prompt_sequence, start=1):
                 step_start_time = time.time()
 
+                # Emit 'start' event
+                if progress_callback:
+                    progress_callback('start', step_number, {
+                        'prompt_id': prompt_info['id'],
+                        'prompt_title': prompt_info['title'],
+                        'total_steps': len(prompt_sequence)
+                    })
+
                 try:
                     # Fetch prompt content from Git if available
                     prompt_content = self._get_prompt_content(prompt_info['id'])
@@ -115,6 +129,16 @@ class WorkflowExecutor:
                             error_msg,
                             time.time() - step_start_time
                         )
+
+                        # Emit 'error' event
+                        if progress_callback:
+                            progress_callback('error', step_number, {
+                                'prompt_id': prompt_info['id'],
+                                'prompt_title': prompt_info['title'],
+                                'error': error_msg,
+                                'execution_time': time.time() - step_start_time
+                            })
+
                         if stop_on_error:
                             break
                         continue
@@ -135,7 +159,7 @@ class WorkflowExecutor:
                     execution_time = time.time() - step_start_time
 
                     # Store successful result
-                    self.results.append({
+                    result = {
                         'step': step_number,
                         'prompt_id': prompt_info['id'],
                         'prompt_title': prompt_info['title'],
@@ -143,7 +167,12 @@ class WorkflowExecutor:
                         'output': output,
                         'execution_time': execution_time,
                         'error': None
-                    })
+                    }
+                    self.results.append(result)
+
+                    # Emit 'complete' event
+                    if progress_callback:
+                        progress_callback('complete', step_number, result)
 
                     # Update current_input for next iteration
                     current_input = output
@@ -162,6 +191,15 @@ class WorkflowExecutor:
                         error_msg,
                         execution_time
                     )
+
+                    # Emit 'error' event
+                    if progress_callback:
+                        progress_callback('error', step_number, {
+                            'prompt_id': prompt_info['id'],
+                            'prompt_title': prompt_info['title'],
+                            'error': error_msg,
+                            'execution_time': execution_time
+                        })
 
                     if stop_on_error:
                         logger.info("Stopping execution due to error (stop_on_error=True)")

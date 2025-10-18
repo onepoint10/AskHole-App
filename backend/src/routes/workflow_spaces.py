@@ -838,3 +838,273 @@ def execute_workflow(workspace_id):
             'error': str(e),
             'results': []
         }), 500
+
+
+# ============================================================================
+# Workflow Execution Endpoint with SSE Streaming (DFG)
+# ============================================================================
+
+@workflow_spaces_bp.route('/<int:workspace_id>/execute-stream', methods=['POST'])
+def execute_workflow_stream(workspace_id):
+    """
+    Execute the prompt sequence in a workflow space with Server-Sent Events streaming.
+
+    This endpoint streams real-time progress updates for each step in the workflow,
+    allowing clients to show live progress indicators.
+
+    Body:
+    {
+        "initial_input": "optional starting text",
+        "model": "gemini-2.5-flash",
+        "temperature": 1.0,
+        "stop_on_error": true
+    }
+
+    Returns SSE stream with events:
+    - event: start - Step execution started
+    - event: progress - Step completed or errored
+    - event: complete - Entire workflow completed
+    - event: error - Fatal error occurred
+    """
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check access (viewer is enough to execute, no modification)
+    workspace = check_workspace_access(workspace_id, current_user.id, 'viewer')
+    if not workspace:
+        return jsonify({'error': 'Workspace not found or access denied'}), 404
+
+    # Get request data
+    data = request.get_json()
+    initial_input = data.get('initial_input', '')
+    model = data.get('model', 'gemini-2.5-flash')
+    temperature = data.get('temperature', 1.0)
+    stop_on_error = data.get('stop_on_error', True)
+
+    # Get API keys from request body
+    gemini_api_key = data.get('gemini_api_key')
+    openrouter_api_key = data.get('openrouter_api_key')
+    custom_providers_data = data.get('custom_providers', [])
+
+    # Validate temperature
+    try:
+        temperature = float(temperature)
+        if not (0.0 <= temperature <= 2.0):
+            temperature = 1.0
+    except (ValueError, TypeError):
+        temperature = 1.0
+
+    logger.info(f"Starting SSE workflow execution for workspace {workspace_id} "
+                f"by user {current_user.id}, model={model}")
+
+    def generate():
+        """Generator function for SSE stream"""
+        try:
+            # Import clients and executor
+            from src.workflow_executor import WorkflowExecutor
+            from src.gemini_client import GeminiClient
+            from src.openrouter_client import OpenRouterClient
+            from src.custom_client import CustomClient
+            from src.git_manager import PromptGitManager
+            import os
+            from flask import current_app
+
+            gemini_client = None
+            openrouter_client = None
+            custom_clients = {}
+
+            # Initialize Gemini client if API key provided
+            if gemini_api_key:
+                try:
+                    gemini_client = GeminiClient(api_key=gemini_api_key)
+                    logger.info("Initialized Gemini client for workflow execution")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Gemini client: {e}")
+
+            # Initialize OpenRouter client if API key provided
+            if openrouter_api_key:
+                try:
+                    openrouter_client = OpenRouterClient(api_key=openrouter_api_key)
+                    logger.info("Initialized OpenRouter client for workflow execution")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize OpenRouter client: {e}")
+
+            # Initialize custom clients if provided
+            if custom_providers_data:
+                try:
+                    for provider in custom_providers_data:
+                        name = provider.get('name')
+                        api_key = provider.get('apiKey') or provider.get('api_key')
+                        base_url = provider.get('baseUrl') or provider.get('base_url')
+                        if name and api_key and base_url:
+                            custom_clients[name] = CustomClient(
+                                api_key=api_key,
+                                base_url=base_url,
+                                provider_name=name
+                            )
+                    logger.info(f"Initialized {len(custom_clients)} custom clients for workflow execution")
+                except Exception as e:
+                    logger.warning(f"Failed to initialize custom clients: {e}")
+
+            # Initialize Git manager
+            git_manager = None
+            try:
+                repo_path = os.getenv('PROMPTS_REPO_PATH',
+                                    os.path.join(current_app.root_path, 'prompts_repo'))
+                git_manager = PromptGitManager(repo_path=repo_path)
+            except Exception as e:
+                logger.warning(f"Failed to initialize Git manager: {e}")
+
+            # Progress callback to emit SSE events
+            events_queue = []
+
+            def progress_callback(event_type, step_number, data):
+                """Callback to emit progress events as SSE"""
+                event_data = {
+                    'event_type': event_type,
+                    'step': step_number,
+                    **data
+                }
+                # Store event in queue to be yielded
+                events_queue.append(event_data)
+
+            # Create executor
+            executor = WorkflowExecutor(
+                workflow_space=workspace,
+                gemini_client=gemini_client,
+                openrouter_client=openrouter_client,
+                custom_clients=custom_clients,
+                git_manager=git_manager
+            )
+
+            # Emit initial event
+            yield f"data: {json.dumps({'event_type': 'init', 'workspace_name': workspace.name})}\n\n"
+
+            # Execute workflow with progress callback
+            # Note: Since execute() is synchronous and progress_callback is called during execution,
+            # we need to rethink the approach. Let's use a different strategy.
+
+            # Get prompt sequence first
+            prompt_sequence = workspace.get_prompt_sequence_details()
+            if not prompt_sequence:
+                error_data = {'event_type': 'error', 'error': 'No prompts in sequence'}
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+
+            # Execute each step and yield progress
+            current_input = initial_input
+            results_list = []
+
+            for step_number, prompt_info in enumerate(prompt_sequence, start=1):
+                # Emit start event
+                start_event = {
+                    'event_type': 'start',
+                    'step': step_number,
+                    'prompt_id': prompt_info['id'],
+                    'prompt_title': prompt_info['title'],
+                    'total_steps': len(prompt_sequence)
+                }
+                yield f"data: {json.dumps(start_event)}\n\n"
+
+                try:
+                    import time as time_module
+                    step_start = time_module.time()
+
+                    # Get prompt content
+                    prompt_content = executor._get_prompt_content(prompt_info['id'])
+                    if not prompt_content:
+                        raise Exception(f"Prompt {prompt_info['id']} content not found")
+
+                    # Format and execute
+                    formatted_prompt = executor._format_prompt_with_input(prompt_content, current_input)
+                    output = executor._execute_single_prompt(formatted_prompt, model, temperature)
+
+                    execution_time = time_module.time() - step_start
+
+                    # Store result
+                    result = {
+                        'step': step_number,
+                        'prompt_id': prompt_info['id'],
+                        'prompt_title': prompt_info['title'],
+                        'input': current_input if current_input else '(no input)',
+                        'output': output,
+                        'execution_time': execution_time,
+                        'error': None
+                    }
+                    results_list.append(result)
+
+                    # Emit complete event
+                    complete_event = {
+                        'event_type': 'complete',
+                        'step': step_number,
+                        **result
+                    }
+                    yield f"data: {json.dumps(complete_event)}\n\n"
+
+                    # Update input for next step
+                    current_input = output
+
+                except Exception as e:
+                    execution_time = time_module.time() - step_start
+                    error_result = {
+                        'step': step_number,
+                        'prompt_id': prompt_info['id'],
+                        'prompt_title': prompt_info['title'],
+                        'input': current_input if current_input else '(no input)',
+                        'output': None,
+                        'execution_time': execution_time,
+                        'error': str(e)
+                    }
+                    results_list.append(error_result)
+
+                    # Emit error event
+                    error_event = {
+                        'event_type': 'step_error',
+                        'step': step_number,
+                        'prompt_id': prompt_info['id'],
+                        'prompt_title': prompt_info['title'],
+                        'error': str(e),
+                        'execution_time': execution_time
+                    }
+                    yield f"data: {json.dumps(error_event)}\n\n"
+
+                    if stop_on_error:
+                        break
+
+            # Emit final completion event
+            successful_results = [r for r in results_list if r['error'] is None]
+            final_output = successful_results[-1]['output'] if successful_results else ''
+
+            completion_data = {
+                'event_type': 'workflow_complete',
+                'success': len(successful_results) == len(prompt_sequence),
+                'results': results_list,
+                'final_output': final_output,
+                'completed_steps': len(successful_results),
+                'total_steps': len(prompt_sequence)
+            }
+            yield f"data: {json.dumps(completion_data)}\n\n"
+
+            logger.info(f"SSE workflow execution completed for workspace {workspace_id}")
+
+        except Exception as e:
+            logger.exception(f"SSE workflow execution error for workspace {workspace_id}: {e}")
+            error_data = {
+                'event_type': 'error',
+                'error': str(e)
+            }
+            yield f"data: {json.dumps(error_data)}\n\n"
+
+    from flask import Response, stream_with_context
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',  # Disable nginx buffering
+            'Connection': 'keep-alive'
+        }
+    )
+
