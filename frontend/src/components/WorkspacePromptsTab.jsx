@@ -15,12 +15,14 @@ import {
     FileText,
     Paperclip,
     Upload,
-    File
+    File,
+    FilePlus
 } from 'lucide-react';
 import { workflowSpacesAPI, promptsAPI, filesAPI } from '@/services/api';
 import { toast } from 'sonner';
 import WorkspacePromptSelector from './WorkspacePromptSelector';
 import { WorkflowExecutionDialog } from './WorkflowExecutionDialog';
+import PromptDialog from './PromptDialog';
 import {
     Dialog,
     DialogContent,
@@ -46,7 +48,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Sortable Prompt Item Component
-function SortablePromptItem({ prompt, workspace, onRemove, onUpdateNotes, onAttachmentsChange }) {
+function SortablePromptItem({ prompt, workspace, onRemove, onUpdateNotes, onAttachmentsChange, onEditPrompt }) {
     const { t, i18n } = useTranslation();
     const [editingNotes, setEditingNotes] = useState(false);
     const [notes, setNotes] = useState(prompt.notes || '');
@@ -172,6 +174,15 @@ function SortablePromptItem({ prompt, workspace, onRemove, onUpdateNotes, onAtta
                         <div className="flex items-start justify-between gap-2 mb-2">
                             <h4 className="font-medium">{prompt.prompt?.title}</h4>
                             <div className="flex gap-1 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => onEditPrompt(prompt.prompt)}
+                                    title={t('edit_prompt')}
+                                >
+                                    <Edit2 className="h-4 w-4" />
+                                </Button>
                                 <Button
                                     variant="ghost"
                                     size="icon"
@@ -352,6 +363,8 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
     const [loading, setLoading] = useState(true);
     const [showSelector, setShowSelector] = useState(false);
     const [showExecutionDialog, setShowExecutionDialog] = useState(false);
+    const [editingPrompt, setEditingPrompt] = useState(null);
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -436,6 +449,53 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
         setShowSelector(false);
     };
 
+    const handleEditPrompt = (promptData) => {
+        setEditingPrompt(promptData);
+    };
+
+    const handleUpdatePrompt = async (updatedData) => {
+        if (!editingPrompt?.id) return;
+
+        try {
+            await promptsAPI.updatePrompt(editingPrompt.id, updatedData, i18n.language);
+            toast.success(t('prompt_updated_successfully_message'));
+            setEditingPrompt(null);
+            loadPrompts();
+            onUpdate();
+        } catch (error) {
+            console.error('Error updating prompt:', error);
+            toast.error(error.message || t('Failed to update prompt'));
+        }
+    };
+
+    const handleCreateAndAdd = async (promptData) => {
+        try {
+            // Step 1: Create the new prompt
+            const createResponse = await promptsAPI.createPrompt(promptData, i18n.language);
+            const newPromptId = createResponse.data.id;
+
+            if (!newPromptId) {
+                throw new Error('Failed to get new prompt ID');
+            }
+
+            // Step 2: Add the prompt to the workflow space
+            await workflowSpacesAPI.addPrompt(
+                workspace.id,
+                { prompt_id: newPromptId },
+                i18n.language
+            );
+
+            // Success feedback and UI update
+            toast.success(t('Prompt created and added to workflow'));
+            setShowCreateDialog(false);
+            loadPrompts();
+            onUpdate();
+        } catch (error) {
+            console.error('Error creating and adding prompt:', error);
+            toast.error(error.message || t('Failed to create prompt'));
+        }
+    };
+
     if (loading) {
         return <div className="text-center py-8 text-muted-foreground">{t('Loading...')}</div>;
     }
@@ -446,10 +506,16 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
                 <p className="text-sm text-muted-foreground">
                     {t('Drag to reorder prompts for workflow execution')}
                 </p>
-                <Button onClick={() => setShowSelector(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t('Add Prompts')}
-                </Button>
+                <div className="flex flex-col gap-2">
+                    <Button onClick={() => setShowCreateDialog(true)} variant="outline" className="w-full">
+                        <FilePlus className="h-4 w-4 mr-2" />
+                        {t('create_prompt')}
+                    </Button>
+                    <Button onClick={() => setShowSelector(true)} variant="outline" className="w-full">
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('Add Prompts')}
+                    </Button>
+                </div>
             </div>
 
             {prompts.length === 0 ? (
@@ -481,6 +547,7 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
                                         onRemove={handleRemovePrompt}
                                         onUpdateNotes={handleUpdateNotes}
                                         onAttachmentsChange={onUpdate}
+                                        onEditPrompt={handleEditPrompt}
                                     />
                                 ))}
                             </div>
@@ -522,6 +589,23 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
                 isOpen={showExecutionDialog}
                 onClose={() => setShowExecutionDialog(false)}
                 availableModels={availableModels}
+            />
+
+            {/* Prompt Edit Dialog */}
+            <PromptDialog
+                isOpen={!!editingPrompt}
+                onClose={() => setEditingPrompt(null)}
+                editMode={true}
+                initialPrompt={editingPrompt}
+                onCreate={handleUpdatePrompt}
+            />
+
+            {/* Prompt Create Dialog */}
+            <PromptDialog
+                isOpen={showCreateDialog}
+                onClose={() => setShowCreateDialog(false)}
+                editMode={false}
+                onCreate={handleCreateAndAdd}
             />
         </div>
     );
