@@ -1269,8 +1269,7 @@ def execute_workflow_stream(workspace_id):
         mimetype='text/event-stream',
         headers={
             'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',  # Disable nginx buffering
-            'Connection': 'keep-alive'
+            'X-Accel-Buffering': 'no'  # Disable nginx buffering
         }
     )
 
