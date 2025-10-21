@@ -885,6 +885,7 @@ def execute_workflow(workspace_id):
     model = data.get('model', 'gemini-2.5-flash')
     temperature = data.get('temperature', 1.0)
     stop_on_error = data.get('stop_on_error', True)
+    enabled_steps = data.get('enabled_steps')  # Optional list of booleans
 
     # Get API keys from request body (same pattern as /config endpoint)
     gemini_api_key = data.get('gemini_api_key')
@@ -975,7 +976,8 @@ def execute_workflow(workspace_id):
             initial_input=initial_input,
             model=model,
             temperature=temperature,
-            stop_on_error=stop_on_error
+            stop_on_error=stop_on_error,
+            enabled_steps=enabled_steps
         )
 
         logger.info(f"Workflow execution completed for workspace {workspace_id}. "
@@ -1042,6 +1044,7 @@ def execute_workflow_stream(workspace_id):
     model = data.get('model', 'gemini-2.5-flash')
     temperature = data.get('temperature', 1.0)
     stop_on_error = data.get('stop_on_error', True)
+    enabled_steps_param = data.get('enabled_steps')  # Optional list of booleans
 
     # Get API keys from request body
     gemini_api_key = data.get('gemini_api_key')
@@ -1153,11 +1156,42 @@ def execute_workflow_stream(workspace_id):
                 yield f"data: {json.dumps(error_data)}\n\n"
                 return
 
+            # Use enabled_steps from outer scope
+            enabled_steps = enabled_steps_param
+
+            # Validate enabled_steps if provided
+            if enabled_steps is not None:
+                if len(enabled_steps) != len(prompt_sequence):
+                    error_data = {
+                        'event_type': 'error',
+                        'error': f'enabled_steps length ({len(enabled_steps)}) does not match prompt sequence length ({len(prompt_sequence)})'
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    return
+                if not any(enabled_steps):
+                    error_data = {
+                        'event_type': 'error',
+                        'error': 'No steps enabled for execution'
+                    }
+                    yield f"data: {json.dumps(error_data)}\n\n"
+                    return
+                enabled_count = sum(1 for enabled in enabled_steps if enabled)
+                logger.info(f"SSE execution: {enabled_count} of {len(prompt_sequence)} steps enabled")
+            else:
+                # All steps enabled by default
+                enabled_steps = [True] * len(prompt_sequence)
+
             # Execute each step and yield progress
             current_input = initial_input
             results_list = []
 
             for step_number, prompt_info in enumerate(prompt_sequence, start=1):
+                # Skip if step is disabled
+                step_index = step_number - 1  # Convert to 0-based index
+                if not enabled_steps[step_index]:
+                    logger.info(f"SSE Step {step_number}: Skipping (disabled by user)")
+                    continue
+
                 # Emit start event
                 start_event = {
                     'event_type': 'start',

@@ -454,5 +454,10 @@
   "File attached successfully": "File attached successfully",
   "Failed to attach file": "Failed to attach file",
   "Attachment removed": "Attachment removed",
-  "Failed to remove attachment": "Failed to remove attachment"
+  "Failed to remove attachment": "Failed to remove attachment",
+  "Select Steps to Execute": "Select Steps to Execute",
+  "Enable All": "Enable All",
+  "Disable All": "Disable All",
+  "{{count}} of {{total}} steps enabled": "{{count}} of {{total}} steps enabled",
+  "Please enable at least one step to execute": "Please enable at least one step to execute"
 }

@@ -59,6 +59,7 @@ class WorkflowExecutor:
         model: str = "gemini-2.5-flash",
         temperature: float = 1.0,
         stop_on_error: bool = True,
+        enabled_steps: Optional[List[bool]] = None,
         progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
@@ -69,6 +70,9 @@ class WorkflowExecutor:
             model: AI model to use for all prompts (e.g., "gemini-2.5-flash")
             temperature: Temperature setting for AI generation (0.0 to 2.0)
             stop_on_error: Whether to stop execution if a step fails
+            enabled_steps: Optional list of booleans indicating which steps to execute.
+                          If None, all steps are executed. If provided, must match
+                          the length of the prompt sequence.
             progress_callback: Optional callback function that receives progress events.
                               Called with (event_type, step_number, data) where:
                               - event_type: 'start', 'complete', or 'error'
@@ -101,11 +105,42 @@ class WorkflowExecutor:
             logger.info(f"Starting workflow execution for workspace {self.workspace.id} "
                        f"with {len(prompt_sequence)} prompts, model={model}")
 
+            # If enabled_steps provided, validate length
+            if enabled_steps is not None:
+                if len(enabled_steps) != len(prompt_sequence):
+                    return {
+                        'success': False,
+                        'error': f'enabled_steps length ({len(enabled_steps)}) does not match prompt sequence length ({len(prompt_sequence)})',
+                        'results': [],
+                        'final_output': '',
+                        'total_time': 0
+                    }
+                # Check if at least one step is enabled
+                if not any(enabled_steps):
+                    return {
+                        'success': False,
+                        'error': 'No steps enabled for execution',
+                        'results': [],
+                        'final_output': '',
+                        'total_time': 0
+                    }
+                enabled_count = sum(1 for enabled in enabled_steps if enabled)
+                logger.info(f"Selective execution: {enabled_count} of {len(prompt_sequence)} steps enabled")
+            else:
+                # All steps enabled by default
+                enabled_steps = [True] * len(prompt_sequence)
+
             # Track the current input (starts with initial_input, then becomes previous output)
             current_input = initial_input
 
             # Execute each prompt in sequence
             for step_number, prompt_info in enumerate(prompt_sequence, start=1):
+                # Skip if step is disabled
+                step_index = step_number - 1  # Convert to 0-based index
+                if not enabled_steps[step_index]:
+                    logger.info(f"Step {step_number}: Skipping (disabled by user)")
+                    continue
+
                 step_start_time = time.time()
 
                 # Emit 'start' event

@@ -68,6 +68,9 @@ export function WorkflowExecutionDialog({
         stop_on_error: true,
     });
 
+    // Step selection state - track which steps are enabled (all enabled by default)
+    const [enabledSteps, setEnabledSteps] = useState([]);
+
     // Execution state
     const [isExecuting, setIsExecuting] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
@@ -75,6 +78,14 @@ export function WorkflowExecutionDialog({
     const [finalOutput, setFinalOutput] = useState('');
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('configure');
+
+    // Initialize enabled steps when prompts change
+    useEffect(() => {
+        if (prompts && prompts.length > 0) {
+            // All steps enabled by default
+            setEnabledSteps(new Array(prompts.length).fill(true));
+        }
+    }, [prompts]);
 
     // Reset state when dialog opens
     useEffect(() => {
@@ -84,13 +95,24 @@ export function WorkflowExecutionDialog({
             setError(null);
             setCurrentStep(0);
             setActiveTab('configure');
+            // Reset enabled steps to all true
+            if (prompts && prompts.length > 0) {
+                setEnabledSteps(new Array(prompts.length).fill(true));
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, prompts]);
 
     // Handle workflow execution
     const handleExecute = async () => {
         if (!prompts || prompts.length === 0) {
             toast.error(t('No prompts in workflow'));
+            return;
+        }
+
+        // Check if at least one step is enabled
+        const hasEnabledSteps = enabledSteps.some(enabled => enabled);
+        if (!hasEnabledSteps) {
+            toast.error(t('Please enable at least one step to execute'));
             return;
         }
 
@@ -102,10 +124,16 @@ export function WorkflowExecutionDialog({
         setActiveTab('results');
 
         try {
+            // Create config with enabled steps
+            const executionConfig = {
+                ...config,
+                enabled_steps: enabledSteps, // Pass enabled steps to backend
+            };
+
             // Use SSE streaming for real-time progress updates
             await workflowSpacesAPI.executeWorkflowStream(
                 workspaceId,
-                config,
+                executionConfig,
                 (eventData) => {
                     // Handle different event types
                     switch (eventData.event_type) {
@@ -205,6 +233,23 @@ export function WorkflowExecutionDialog({
         });
     };
 
+    // Toggle step enabled/disabled
+    const toggleStep = (index) => {
+        const newEnabledSteps = [...enabledSteps];
+        newEnabledSteps[index] = !newEnabledSteps[index];
+        setEnabledSteps(newEnabledSteps);
+    };
+
+    // Enable all steps
+    const enableAllSteps = () => {
+        setEnabledSteps(new Array(prompts.length).fill(true));
+    };
+
+    // Disable all steps
+    const disableAllSteps = () => {
+        setEnabledSteps(new Array(prompts.length).fill(false));
+    };
+
     // Download results as JSON
     const downloadResults = () => {
         const data = {
@@ -263,8 +308,73 @@ export function WorkflowExecutionDialog({
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="configure" className="flex-1 overflow-y-auto custom-scrollbar mt-4 space-y-6">
+                    <TabsContent value="configure" className="flex-1 overflow-y-auto mt-4 space-y-6">
                         <div className="space-y-4">
+                            {/* Step Selection */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <Label className="text-sm font-medium">
+                                        {t('Select Steps to Execute')}
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={enableAllSteps}
+                                            className="h-7 text-xs"
+                                        >
+                                            {t('Enable All')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={disableAllSteps}
+                                            className="h-7 text-xs"
+                                        >
+                                            {t('Disable All')}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="border rounded-lg p-3 space-y-2 max-h-[300px] overflow-y-auto">
+                                    {prompts.map((prompt, index) => (
+                                        <div
+                                            key={prompt.id || index}
+                                            className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 transition-colors"
+                                        >
+                                            <Checkbox
+                                                id={`step-${index}`}
+                                                checked={enabledSteps[index] || false}
+                                                onCheckedChange={() => toggleStep(index)}
+                                            />
+                                            <Label
+                                                htmlFor={`step-${index}`}
+                                                className="flex-1 flex items-center gap-2 cursor-pointer"
+                                            >
+                                                <span className="text-xs font-medium text-muted-foreground w-6">
+                                                    {index + 1}.
+                                                </span>
+                                                <span className="text-sm font-medium flex-1">
+                                                    {prompt.title}
+                                                </span>
+                                                {prompt.category && (
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {prompt.category}
+                                                    </Badge>
+                                                )}
+                                            </Label>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    {t('{{count}} of {{total}} steps enabled', {
+                                        count: enabledSteps.filter(Boolean).length,
+                                        total: prompts.length,
+                                    })}
+                                </p>
+                            </div>
+
                             {/* Initial Input */}
                             <div>
                                 <Label htmlFor="initial-input" className="text-sm font-medium">

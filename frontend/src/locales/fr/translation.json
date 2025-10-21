@@ -454,5 +454,10 @@
   "File attached successfully": "Fichier joint avec succès",
   "Failed to attach file": "Échec de la jointure du fichier",
   "Attachment removed": "Pièce jointe supprimée",
-  "Failed to remove attachment": "Échec de la suppression de la pièce jointe"
+  "Failed to remove attachment": "Échec de la suppression de la pièce jointe",
+  "Select Steps to Execute": "Sélectionner les étapes à exécuter",
+  "Enable All": "Tout activer",
+  "Disable All": "Tout désactiver",
+  "{{count}} of {{total}} steps enabled": "{{count}} sur {{total}} étapes activées",
+  "Please enable at least one step to execute": "Veuillez activer au moins une étape pour exécuter"
 }

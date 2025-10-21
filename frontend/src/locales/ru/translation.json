@@ -454,5 +454,10 @@
   "File attached successfully": "Файл успешно прикреплен",
   "Failed to attach file": "Не удалось прикрепить файл",
   "Attachment removed": "Вложение удалено",
-  "Failed to remove attachment": "Не удалось удалить вложение"
+  "Failed to remove attachment": "Не удалось удалить вложение",
+  "Select Steps to Execute": "Выберите шаги для выполнения",
+  "Enable All": "Включить все",
+  "Disable All": "Отключить все",
+  "{{count}} of {{total}} steps enabled": "{{count}} из {{total}} шагов включено",
+  "Please enable at least one step to execute": "Пожалуйста, включите хотя бы один шаг для выполнения"
 }
