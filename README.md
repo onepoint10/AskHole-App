@@ -177,6 +177,79 @@ Organize your prompts into collaborative workspaces for better project managemen
    - Responsive sidebar design
    - Dark/light theme support
 
+### Workflow Execution (DFG - Data Flow Graph)
+Execute workflows as sequential prompt chains where each step's output becomes the next step's input:
+
+1. **Configure Execution**:
+   - Click "Run Workflow" button in workspace
+   - Set initial input (optional starting text)
+   - Select AI model from your configured providers
+   - Adjust temperature (0.0-2.0) for creativity control
+   - Enable/disable "Stop on error" behavior
+   - **Select which steps to execute** (✅ NEW):
+     - All steps enabled by default
+     - Uncheck steps you want to skip
+     - Use "Enable All" / "Disable All" for quick selection
+     - See live counter showing enabled steps
+     - At least one step must be enabled
+
+2. **Attach Files to Steps**:
+   - Click the paperclip icon (📎) on any prompt card
+   - Upload files that will be included when that step executes
+   - Supports: PDF, DOCX, PPTX, XLSX, images, audio, code files
+   - Multiple files per step allowed
+   - All workspace members can see attachments
+
+3. **Execute and Monitor**:
+   - Real-time progress indicator shows current step
+   - Server-Sent Events (SSE) stream live updates
+   - View step-by-step execution details
+   - Copy individual outputs or download full results
+   - See execution time for each step
+
+4. **Output Chaining**:
+   - Use `{{input}}` or `{{previous_output}}` placeholders in prompts
+   - First prompt receives optional initial input
+   - Each subsequent prompt receives previous output
+   - Final output available from last successful step
+   - **Skipped steps don't break the chain** - output flows from last executed step to next enabled step
+
+5. **Error Handling**:
+   - **Stop on error** (default): Stops at first failure
+   - **Continue on error**: Skips failed steps, continues with available output
+   - Detailed error messages per step
+   - Partial results always available
+
+6. **Collaboration Features**:
+   - **User Search**: Find users by username or email
+   - **Invite Members**: Add collaborators with specific roles
+   - **Role Management**: Assign Owner, Editor, or Viewer permissions
+   - **Public Workspaces**: Share workflows with all users
+   - **Private Workspaces**: Limit access to invited members only
+
+7. **Execution Results**:
+   - Step-by-step breakdown with inputs/outputs
+   - Execution time per step and total time
+   - Success/failure status for each step
+   - Copy to clipboard functionality
+   - Download as JSON for record-keeping
+
+**Example Workflow**:
+```
+Step 1: "Generate a creative story idea" → Output: "A time traveler meets their past self"
+Step 2: "Write a short story about: {{input}}" → Output: [Full story text]
+Step 3: "Summarize this in one sentence: {{input}}" → Output: "A tale of self-discovery across time"
+```
+
+**Selective Execution Example**:
+```
+Steps: [1✅ Research, 2❌ Analysis (skipped), 3✅ Write, 4❌ Review (skipped), 5✅ Format]
+Flow: Step 1 → Step 3 → Step 5
+- Step 1 receives initial input
+- Step 3 receives output from Step 1 (Step 2 skipped)
+- Step 5 receives output from Step 3 (Step 4 skipped)
+```
+
 ### Prompt Version Control
 AskHole includes full Git-based version control for prompts:
 
@@ -234,6 +307,7 @@ src/
 ├── custom_client.py     # Custom provider client
 ├── exa_client.py        # Exa search client
 ├── git_manager.py       # Git version control manager
+├── workflow_executor.py # Workflow execution engine (DFG)
 ├── file_converter.py    # File processing utilities
 └── main.py              # Flask application entry point
 ```
@@ -260,6 +334,8 @@ src/
 │   ├── WorkspaceSettingsTab.jsx # Workspace settings
 │   ├── WorkspaceForm.jsx # Create/edit workspace dialog
 │   ├── WorkspacePromptSelector.jsx # Prompt selection dialog
+│   ├── WorkflowExecutionDialog.jsx # Workflow execution UI with SSE
+│   ├── InviteMemberDialog.jsx # Member invitation dialog
 │   ├── AdminDashboard.jsx # Admin interface
 │   ├── PublicPromptsLibrary.jsx # Shared prompts
 │   └── AppTour.jsx      # User onboarding
@@ -321,8 +397,18 @@ src/
 - `PUT /api/workflow_spaces/{id}/prompts/{prompt_id}` - Update prompt association
 - `DELETE /api/workflow_spaces/{id}/prompts/{prompt_id}` - Remove prompt
 - `PUT /api/workflow_spaces/{id}/prompts/reorder` - Reorder prompts
-- `GET /api/prompts/{id}/diff?from_commit=X&to_commit=Y` - Get diff between versions
-- `POST /api/prompts/{id}/rollback` - Rollback to previous version
+
+**File Attachments:**
+- `POST /api/workflow_spaces/{id}/prompts/{prompt_id}/attachments` - Add file to step
+- `GET /api/workflow_spaces/{id}/prompts/{prompt_id}/attachments` - List step attachments
+- `DELETE /api/workflow_spaces/{id}/prompts/{prompt_id}/attachments/{attachment_id}` - Remove attachment
+
+**Workflow Execution:**
+- `POST /api/workflow_spaces/{id}/execute` - Execute workflow (JSON response)
+- `POST /api/workflow_spaces/{id}/execute-stream` - Execute with SSE streaming
+
+**User Search:**
+- `GET /api/users/search?q={query}` - Search users by username/email
 
 ### Files
 - `POST /api/files/upload` - Upload file
