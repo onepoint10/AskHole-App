@@ -10,11 +10,12 @@ import Sidebar from './components/Sidebar';
 import SettingsDialog from './components/SettingsDialog';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppTour from './components/AppTour';
+import WorkflowSpacesSidebar from './components/WorkflowSpacesSidebar';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { configAPI, sessionsAPI, promptsAPI, filesAPI, authAPI } from './services/api';
 import './App.css';
 import PromptDialog from './components/PromptDialog';
-import { Menu, MessageCirclePlus, Shield } from 'lucide-react';
+import { Menu, MessageCirclePlus, Shield, Folders } from 'lucide-react';
 import { useSwipeGesture } from './hooks/useSwipeGesture';
 import { useTranslation } from 'react-i18next';
 
@@ -50,6 +51,7 @@ function App() {
   // Mobile detection and sidebar state
   const [isMobile, setIsMobile] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isWorkflowSidebarOpen, setIsWorkflowSidebarOpen] = useState(false);
 
   // Integrate swipe gesture hook
   const swipeHandlers = useSwipeGesture(isMobile, isSidebarOpen, setIsSidebarOpen);
@@ -1050,14 +1052,24 @@ function App() {
         )}
         {/* Mobile new chat button */}
         {isMobile && !isSidebarOpen && (
-          <button
-            variant="ghost"
-            aria-label={t('new_chat')}
-            className="mobile-newchat-button"
-            onClick={() => createNewSession()}
-          >
-            <MessageCirclePlus className="h-5 w-5" />
-          </button>
+          <>
+            <button
+              variant="ghost"
+              aria-label={t('new_chat')}
+              className="mobile-newchat-button"
+              onClick={() => createNewSession()}
+            >
+              <MessageCirclePlus className="h-5 w-5" />
+            </button>
+            <button
+              variant="ghost"
+              aria-label={t('Workflow Spaces')}
+              className="mobile-workflows-button"
+              onClick={() => setIsWorkflowSidebarOpen(true)}
+            >
+              <Folders className="h-5 w-5" />
+            </button>
+          </>
         )}
 
         {/* Desktop persistent sidebar */}
@@ -1115,14 +1127,26 @@ function App() {
 
         <div className="flex-1 flex flex-col main-content">
           {!isMobile && (
-            <ChatTabs
-              sessions={openTabSessions}
-              activeSessionId={activeSessionId}
-              onSessionSelect={selectSession}
-              onNewSession={createNewSession}
-              onCloseTab={closeTabOnly}
-              onRenameSession={renameSession}
-            />
+            <>
+              <ChatTabs
+                sessions={openTabSessions}
+                activeSessionId={activeSessionId}
+                onSessionSelect={selectSession}
+                onNewSession={createNewSession}
+                onCloseTab={closeTabOnly}
+                onRenameSession={renameSession}
+              />
+              {/* Desktop Workflow Spaces Toggle Button */}
+              <button
+                variant="ghost"
+                aria-label={t('Workflow Spaces')}
+                className="fixed top-4 right-4 z-50 p-3 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+                onClick={() => setIsWorkflowSidebarOpen(true)}
+                title={t('Workflow Spaces')}
+              >
+                <Folders className="h-5 w-5" />
+              </button>
+            </>
           )}
 
           <MessageList
@@ -1164,6 +1188,12 @@ function App() {
             await createPrompt(data);
             setIsPromptDialogOpen(false);
           }}
+        />
+
+        <WorkflowSpacesSidebar
+          isOpen={isWorkflowSidebarOpen}
+          onClose={() => setIsWorkflowSidebarOpen(false)}
+          availableModels={availableModels}
         />
 
         <Toaster position="top-right" />

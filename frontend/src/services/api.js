@@ -394,6 +394,41 @@ export const promptsAPI = {
     }, language);
   },
 
+  // Version control methods
+  getVersionHistory: async (promptId, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/versions');
+    return apiCall(`/prompts/${promptId}/versions`, {}, language);
+  },
+
+  getVersionContent: async (promptId, commitHash, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/versions/' + commitHash);
+    return apiCall(`/prompts/${promptId}/versions/${commitHash}`, {}, language);
+  },
+
+  getDiff: async (promptId, fromCommit, toCommit, language) => {
+    console.log('API Request: GET /prompts/' + promptId + '/diff', { fromCommit, toCommit });
+    return apiCall(`/prompts/${promptId}/diff?from_commit=${fromCommit}&to_commit=${toCommit}`, {}, language);
+  },
+
+  rollbackPrompt: async (promptId, data, language) => {
+    console.log('API Request: POST /prompts/' + promptId + '/rollback', data);
+
+    // Validate required fields
+    if (!data.target_commit) {
+      throw new Error('target_commit is required');
+    }
+
+    const cleanData = {
+      target_commit: data.target_commit,
+      commit_message: data.commit_message || `Rolled back to version ${data.target_commit.substring(0, 7)}`
+    };
+
+    return apiCall(`/prompts/${promptId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify(cleanData),
+    }, language);
+  },
+
   getPublicPrompts: async (params = {}, language) => {
     console.log('API Request: GET /public-prompts', params);
 
@@ -500,6 +535,11 @@ export const filesAPI = {
 
 // Users API
 export const usersAPI = {
+  searchUsers: async (query, language) => {
+    console.log('API Request: GET /users/search?q=' + query);
+    return apiCall(`/users/search?q=${encodeURIComponent(query)}`, {}, language);
+  },
+
   getUsers: async (language) => {
     console.log('API Request: GET /users');
     return apiCall('/users', {}, language);
@@ -585,5 +625,242 @@ export const exaAPI = {
       method: 'POST',
       body: JSON.stringify({ ...options, query, api_key: apiKey }),
     }, language);
+  },
+};
+
+// Workflow Spaces API
+export const workflowSpacesAPI = {
+  // Workspace Management
+  getWorkspaces: async (language) => {
+    console.log('API Request: GET /workflow_spaces');
+    return apiCall('/workflow_spaces', {}, language);
+  },
+
+  getWorkspace: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {}, language);
+  },
+
+  createWorkspace: async (data, language) => {
+    console.log('API Request: POST /workflow_spaces');
+    return apiCall('/workflow_spaces', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updateWorkspace: async (id, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  deleteWorkspace: async (id, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id);
+    return apiCall(`/workflow_spaces/${id}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Member Management
+  getMembers: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/members');
+    return apiCall(`/workflow_spaces/${id}/members`, {}, language);
+  },
+
+  addMember: async (id, data, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/members');
+    return apiCall(`/workflow_spaces/${id}/members`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updateMemberRole: async (id, userId, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/members/' + userId);
+    return apiCall(`/workflow_spaces/${id}/members/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  removeMember: async (id, userId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/members/' + userId);
+    return apiCall(`/workflow_spaces/${id}/members/${userId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Prompt Management
+  getPrompts: async (id, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/prompts');
+    return apiCall(`/workflow_spaces/${id}/prompts`, {}, language);
+  },
+
+  addPrompt: async (id, data, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/prompts');
+    return apiCall(`/workflow_spaces/${id}/prompts`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  updatePromptAssociation: async (id, promptId, data, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/prompts/' + promptId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }, language);
+  },
+
+  removePrompt: async (id, promptId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/prompts/' + promptId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  reorderPrompts: async (id, promptIds, language) => {
+    console.log('API Request: PUT /workflow_spaces/' + id + '/prompts/reorder');
+    return apiCall(`/workflow_spaces/${id}/prompts/reorder`, {
+      method: 'PUT',
+      body: JSON.stringify({ prompt_ids: promptIds }),
+    }, language);
+  },
+
+  // Prompt Attachments
+  addAttachment: async (id, promptId, fileUploadId, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments');
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments`, {
+      method: 'POST',
+      body: JSON.stringify({ file_upload_id: fileUploadId }),
+    }, language);
+  },
+
+  getAttachments: async (id, promptId, language) => {
+    console.log('API Request: GET /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments');
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments`, {}, language);
+  },
+
+  removeAttachment: async (id, promptId, attachmentId, language) => {
+    console.log('API Request: DELETE /workflow_spaces/' + id + '/prompts/' + promptId + '/attachments/' + attachmentId);
+    return apiCall(`/workflow_spaces/${id}/prompts/${promptId}/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  // Workflow Execution (DFG)
+  executeWorkflow: async (id, config, language) => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/execute');
+
+    // Get API keys from localStorage - IMPORTANT: key is 'askhole-settings' not 'settings'
+    const settingsStr = localStorage.getItem('askhole-settings');
+    const settings = settingsStr ? JSON.parse(settingsStr) : {};
+
+    // Build request body with config AND API keys (same pattern as /config endpoint)
+    const requestBody = {
+      ...config,
+      // Add API keys to body (not headers) - same pattern as chat /config endpoint
+      gemini_api_key: settings.geminiApiKey,
+      openrouter_api_key: settings.openrouterApiKey,
+      custom_providers: settings.customProviders || []
+    };
+
+    return apiCall(`/workflow_spaces/${id}/execute`, {
+      method: 'POST',
+      body: JSON.stringify(requestBody),
+    }, language);
+  },
+
+  // Workflow Execution with SSE Streaming (Real-time Progress)
+  executeWorkflowStream: async (id, config, onEvent, language = 'en') => {
+    console.log('API Request: POST /workflow_spaces/' + id + '/execute-stream (SSE)');
+
+    // Get API keys from localStorage
+    const settingsStr = localStorage.getItem('askhole-settings');
+    const settings = settingsStr ? JSON.parse(settingsStr) : {};
+
+    // Get session ID for authentication
+    const sessionIdFromStorage = localStorage.getItem('session_id');
+    const sessionIdFromCookie = getCookie('session');
+    const sessionId = sessionIdFromStorage || sessionIdFromCookie;
+
+    // Build request body with config AND API keys
+    const requestBody = {
+      ...config,
+      gemini_api_key: settings.geminiApiKey,
+      openrouter_api_key: settings.openrouterApiKey,
+      custom_providers: settings.customProviders || []
+    };
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/workflow_spaces/${id}/execute-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
+          'Accept-Language': language,
+          ...(sessionId && { 'Authorization': `Bearer ${sessionId}` }),
+        },
+        credentials: 'include',
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Read SSE stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          break;
+        }
+
+        // Decode chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete SSE messages (ending with \n\n)
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const eventData = JSON.parse(line.slice(6)); // Remove 'data: ' prefix
+              onEvent(eventData);
+            } catch (error) {
+              console.error('Failed to parse SSE event:', error, line);
+            }
+          }
+        }
+      }
+
+      // Process any remaining buffered data
+      if (buffer.trim() && buffer.startsWith('data: ')) {
+        try {
+          const eventData = JSON.parse(buffer.slice(6));
+          onEvent(eventData);
+        } catch (error) {
+          console.error('Failed to parse final SSE event:', error);
+        }
+      }
+
+    } catch (error) {
+      console.error('SSE stream error:', error);
+      // Emit error event to callback
+      onEvent({
+        event_type: 'error',
+        error: error.message || 'Failed to connect to stream'
+      });
+      throw error;
+    }
   },
 };
