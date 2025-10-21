@@ -263,7 +263,7 @@ export function WorkflowExecutionDialog({
                         </TabsTrigger>
                     </TabsList>
 
-                    <TabsContent value="configure" className="flex-1 overflow-y-auto mt-4 space-y-6">
+                    <TabsContent value="configure" className="flex-1 overflow-y-auto custom-scrollbar mt-4 space-y-6">
                         <div className="space-y-4">
                             {/* Initial Input */}
                             <div>
@@ -357,7 +357,7 @@ export function WorkflowExecutionDialog({
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="results" className="flex-1 overflow-y-auto mt-4">
+                    <TabsContent value="results" className="flex-1 overflow-y-auto mt-4 custom-scrollbar">
                         <div className="space-y-6">
                             {/* Progress Stepper */}
                             <div className="space-y-2">

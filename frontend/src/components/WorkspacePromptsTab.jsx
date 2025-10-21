@@ -502,20 +502,20 @@ export default function WorkspacePromptsTab({ workspace, onUpdate, availableMode
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                    {t('Drag to reorder prompts for workflow execution')}
-                </p>
-                <div className="flex flex-col gap-2">
-                    <Button onClick={() => setShowCreateDialog(true)} variant="outline" className="w-full">
+            <div className="flex flex-col gap-4">
+                <div className="flex justify-between gap-2 w-full">
+                    <Button onClick={() => setShowCreateDialog(true)} variant="outline">
                         <FilePlus className="h-4 w-4 mr-2" />
                         {t('create_prompt')}
                     </Button>
-                    <Button onClick={() => setShowSelector(true)} variant="outline" className="w-full">
+                    <Button onClick={() => setShowSelector(true)} variant="outline">
                         <Plus className="h-4 w-4 mr-2" />
                         {t('Add Prompts')}
                     </Button>
                 </div>
+                <p className="text-sm text-muted-foreground w-full">
+                    {t('Drag to reorder prompts for workflow execution')}
+                </p>
             </div>
 
             {prompts.length === 0 ? (
