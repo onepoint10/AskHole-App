@@ -25,6 +25,7 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **Cross-platform**: Web-based interface that works on desktop and mobile
 - **Real-time Updates**: Live chat interface with typing indicators
 - **File Management**: Upload and manage files for AI analysis
+- **Automatic Error Retry**: Transparent retry mechanism for transient API errors (503, 429, 500)
 
 ## Architecture
 
@@ -42,6 +43,38 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **API Integration**: Axios-based API client with error handling
 - **Responsive Design**: Mobile-first design with Tailwind CSS
 - **Code Highlighting**: react-syntax-highlighter for code blocks
+
+## Error Handling & Reliability
+
+### Automatic Retry Mechanism
+
+AskHole includes an intelligent retry system for handling transient errors from the Gemini API:
+
+**How it Works**:
+- Automatically retries failed requests when encountering 503 (Service Unavailable), 429 (Rate Limit), or 500 (Server Error)
+- Uses fixed 15-second intervals between retry attempts
+- Attempts up to 5 retries before reporting failure
+- Works transparently - users see slightly longer response times, not error messages
+- Applies to all Gemini API operations: chat, text generation, image generation, audio processing
+
+**User Experience**:
+- **During Retries**: Loading indicator continues, no visible errors, response delayed by ~15-75 seconds
+- **After Success**: Normal response delivered, user never knows retries occurred
+- **After Failure**: Clear error message shown only if all 5 attempts fail (~75 seconds total)
+
+**Workflow Integration**:
+- Seamlessly handles transient errors during workflow execution
+- Workflows continue after successful retry without interruption
+- SSE streaming shows "in progress" during retry attempts
+- No workflow-specific configuration needed
+
+**Technical Details**:
+- Retry decorator: `@retry_on_google_api_error()` in `backend/src/gemini_client.py`
+- Protected methods: `generate_text()`, `chat_message()`, `generate_image()`, `edit_image()`, `generate_audio()`, `process_audio_input()`
+- Max retry time: ~75 seconds (5 attempts × 15 seconds)
+- Random jitter (0-1s) prevents simultaneous retries from multiple clients
+
+See `RETRY_MECHANISM.md` and `RETRY_FIX.md` for complete technical documentation.
 
 ## Installation & Setup
 
