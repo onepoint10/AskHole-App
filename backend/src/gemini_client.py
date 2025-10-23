@@ -127,30 +127,74 @@ class GeminiClient:
             print(f"Error getting chat history for session {session_id}: {e}")
             return []
 
-    def retry_on_google_api_error(max_retries=5, initial_delay=10, backoff_factor=2):
+    def retry_on_google_api_error(max_retries=5, retry_delay=15):
         """
-        Decorator to retry Google API calls on specific errors with exponential backoff.
+        Decorator to retry Google API calls on specific errors with fixed interval retries.
+
+        Retries API calls up to max_retries times with a fixed delay between attempts.
+        Specifically handles 429 (rate limit), 500 (server error), and 503 (service unavailable).
+
+        Args:
+            max_retries: Maximum number of retry attempts (default: 5)
+            retry_delay: Fixed delay in seconds between retries (default: 15)
         """
         def decorator(func):
             def wrapper(*args, **kwargs):
-                for i in range(max_retries):
+                last_exception = None
+
+                for attempt in range(max_retries):
                     try:
                         return func(*args, **kwargs)
                     except (ResourceExhausted, InternalServerError, ServiceUnavailable) as e:
+                        last_exception = e
                         status_code = getattr(e, 'code', None)
+
                         if status_code in [429, 500, 503]:
-                            delay = initial_delay * (backoff_factor ** i) + random.uniform(0, 1)
-                            print(f"Google API error {status_code} encountered. Retrying in {delay:.2f} seconds... (Attempt {i + 1}/{max_retries})")
+                            # This is the last attempt, don't retry
+                            if attempt == max_retries - 1:
+                                error_detail = str(e)
+                                print(f"Google API error {status_code} - all retry attempts exhausted.")
+                                raise Exception(f"Gemini API error after {max_retries} retries: {error_detail}")
+
+                            # Add small random jitter (0-1 seconds) to avoid thundering herd
+                            delay = retry_delay + random.uniform(0, 1)
+                            print(f"Google API error {status_code} encountered. "
+                                  f"Retrying in {delay:.1f} seconds... "
+                                  f"(Attempt {attempt + 1}/{max_retries})")
                             time.sleep(delay)
                         else:
-                            raise  # Re-raise other exceptions
+                            # Re-raise exceptions with other status codes immediately
+                            raise
                     except Exception as e:
-                        # Catch other general exceptions that might not have a 'code' attribute
-                        # and re-raise them if they are not related to the specified status codes.
-                        # This is a fallback for unexpected error structures.
-                        print(f"An unexpected error occurred: {type(e).__name__}: {e}. Not retrying.")
-                        raise
-                raise Exception(f"Google API call failed after {max_retries} retries.")
+                        # Check if this might be a wrapped API error by examining the message
+                        error_str = str(e).lower()
+                        is_retryable = any(code in error_str for code in ['503', '429', '500']) and \
+                                     any(keyword in error_str for keyword in ['unavailable', 'overloaded', 'rate limit', 'server error'])
+
+                        if is_retryable:
+                            last_exception = e
+                            # This is the last attempt, don't retry
+                            if attempt == max_retries - 1:
+                                print(f"Retryable API error - all retry attempts exhausted.")
+                                raise Exception(f"Gemini API error after {max_retries} retries: {str(e)}")
+
+                            # Retry with delay
+                            delay = retry_delay + random.uniform(0, 1)
+                            print(f"Retryable API error encountered. "
+                                  f"Retrying in {delay:.1f} seconds... "
+                                  f"(Attempt {attempt + 1}/{max_retries})")
+                            time.sleep(delay)
+                        else:
+                            # Not a retryable error - re-raise immediately
+                            print(f"Non-retryable error occurred: {type(e).__name__}: {e}")
+                            raise
+
+                # If we've exhausted all retries, raise the last exception
+                if last_exception:
+                    raise Exception(f"Gemini API call failed after {max_retries} retries: {str(last_exception)}")
+                else:
+                    raise Exception(f"Gemini API call failed after {max_retries} retries.")
+
             return wrapper
         return decorator
 
@@ -165,18 +209,16 @@ class GeminiClient:
                 if uploaded_file:
                     content_parts.append(uploaded_file)
 
-        try:
-            response = self.client.models.generate_content(
-                model=model,
-                contents=content_parts,
-                config=GenerateContentConfig(
-                    tools=[Tool(google_search=GoogleSearch()), Tool(url_context=UrlContext)],
-                    temperature=temperature,
-                )
+        # Don't wrap exceptions - let them propagate to retry decorator
+        response = self.client.models.generate_content(
+            model=model,
+            contents=content_parts,
+            config=GenerateContentConfig(
+                tools=[Tool(google_search=GoogleSearch()), Tool(url_context=UrlContext)],
+                temperature=temperature,
             )
-            return response.text
-        except Exception as e:
-            raise Exception(f"Text generation error: {str(e)}")
+        )
+        return response.text
 
     @retry_on_google_api_error()
     def chat_message(self, session_id: str, message: str, model: str = None, files=None, temperature: float = 1.0, history_messages=None):
@@ -198,158 +240,146 @@ class GeminiClient:
                 if uploaded_file:
                     content_parts.append(uploaded_file)
 
-        try:
-            # Send message with session's original model and configuration
-            response = chat.send_message(
-                content_parts,
-                config=GenerateContentConfig(
-                    tools=[Tool(google_search=GoogleSearch()), Tool(url_context=UrlContext)],
-                    temperature=temperature,
-                )
+        # Don't wrap exceptions - let them propagate to retry decorator
+        # Send message with session's original model and configuration
+        response = chat.send_message(
+            content_parts,
+            config=GenerateContentConfig(
+                tools=[Tool(google_search=GoogleSearch()), Tool(url_context=UrlContext)],
+                temperature=temperature,
             )
+        )
 
-            # Update message count
-            self.chat_sessions[session_id]['message_count'] += 1
+        # Update message count
+        self.chat_sessions[session_id]['message_count'] += 1
 
-            print(f"Sent message to session {session_id} using model {session_model}")
-            return response.text
-
-        except Exception as e:
-            print(f"Error in chat_message for session {session_id}: {str(e)}")
-            raise Exception(f"Chat message error: {str(e)}")
+        print(f"Sent message to session {session_id} using model {session_model}")
+        return response.text
 
     @retry_on_google_api_error()
     def generate_image(self, prompt: str):
         """Generate image from text prompt"""
-        try:
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash-preview-image-generation",
-                contents=[prompt],
-                config=types.GenerateContentConfig(
-                    response_modalities=['TEXT', 'IMAGE']
-                )
+        # Don't wrap exceptions - let them propagate to retry decorator
+        response = self.client.models.generate_content(
+            model="gemini-2.0-flash-preview-image-generation",
+            contents=[prompt],
+            config=types.GenerateContentConfig(
+                response_modalities=['TEXT', 'IMAGE']
             )
+        )
 
-            images = []
-            description = ""
+        images = []
+        description = ""
 
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    description = part.text
-                elif part.inline_data is not None:
-                    # Convert to PIL Image
-                    image = Image.open(io.BytesIO(part.inline_data.data))
-                    images.append(image)
+        for part in response.candidates[0].content.parts:
+            if part.text is not None:
+                description = part.text
+            elif part.inline_data is not None:
+                # Convert to PIL Image
+                image = Image.open(io.BytesIO(part.inline_data.data))
+                images.append(image)
 
-            return images, description
-        except Exception as e:
-            raise Exception(f"Image generation error: {str(e)}")
+        return images, description
 
     @retry_on_google_api_error()
     def edit_image(self, image_path: str, instruction: str):
         """Edit image based on instruction"""
-        try:
-            uploaded_file = self._upload_file(image_path)
-            if not uploaded_file:
-                raise Exception("Failed to upload image")
+        # Don't wrap exceptions - let them propagate to retry decorator
+        uploaded_file = self._upload_file(image_path)
+        if not uploaded_file:
+            raise Exception("Failed to upload image")
 
-            response = self.client.models.generate_content(
-                model="gemini-2.0-flash-preview-image-generation",
-                contents=[instruction, uploaded_file],
-                config=types.GenerateContentConfig(
-                    response_modalities=['TEXT', 'IMAGE']
-                )
+        response = self.client.models.generate_content(
+            model="gemini-2.0-flash-preview-image-generation",
+            contents=[instruction, uploaded_file],
+            config=types.GenerateContentConfig(
+                response_modalities=['TEXT', 'IMAGE']
             )
+        )
 
-            images = []
-            description = ""
+        images = []
+        description = ""
 
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    description = part.text
-                elif part.inline_data is not None:
-                    image = Image.open(io.BytesIO(part.inline_data.data))
-                    images.append(image)
+        for part in response.candidates[0].content.parts:
+            if part.text is not None:
+                description = part.text
+            elif part.inline_data is not None:
+                image = Image.open(io.BytesIO(part.inline_data.data))
+                images.append(image)
 
-            return images, description
-        except Exception as e:
-            raise Exception(f"Image editing error: {str(e)}")
+        return images, description
 
     @retry_on_google_api_error()
     async def generate_audio(self, prompt: str):
         """Generate audio from text prompt"""
-        try:
-            config = {
-                "response_modalities": ["AUDIO"],
-                "system_instruction": "You are a helpful assistant and answer in a friendly tone.",
-            }
+        # Don't wrap exceptions - let them propagate to retry decorator
+        config = {
+            "response_modalities": ["AUDIO"],
+            "system_instruction": "You are a helpful assistant and answer in a friendly tone.",
+        }
 
-            audio_data = io.BytesIO()
+        audio_data = io.BytesIO()
 
-            async with self.client.aio.live.connect(
-                    model="gemini-2.5-flash-preview-native-audio-dialog",
-                    config=config
-            ) as session:
-                await session.send_realtime_input(text=prompt)
+        async with self.client.aio.live.connect(
+                model="gemini-2.5-flash-preview-native-audio-dialog",
+                config=config
+        ) as session:
+            await session.send_realtime_input(text=prompt)
 
-                wf = wave.open(audio_data, "wb")
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
+            wf = wave.open(audio_data, "wb")
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
 
-                async for response in session.receive():
-                    if response.data is not None:
-                        wf.writeframes(response.data)
+            async for response in session.receive():
+                if response.data is not None:
+                    wf.writeframes(response.data)
 
-                wf.close()
-                audio_data.seek(0)
+            wf.close()
+            audio_data.seek(0)
 
-            return audio_data
-        except Exception as e:
-            raise Exception(f"Audio generation error: {str(e)}")
+        return audio_data
 
     @retry_on_google_api_error()
     async def process_audio_input(self, audio_path: str):
         """Process audio input and return audio response"""
-        try:
-            # Convert audio to required format
-            y, sr = librosa.load(audio_path, sr=16000)
+        # Don't wrap exceptions - let them propagate to retry decorator
+        # Convert audio to required format
+        y, sr = librosa.load(audio_path, sr=16000)
 
-            buffer = io.BytesIO()
-            sf.write(buffer, y, sr, format='RAW', subtype='PCM_16')
-            buffer.seek(0)
-            audio_bytes = buffer.read()
+        buffer = io.BytesIO()
+        sf.write(buffer, y, sr, format='RAW', subtype='PCM_16')
+        buffer.seek(0)
+        audio_bytes = buffer.read()
 
-            config = {
-                "response_modalities": ["AUDIO"],
-                "system_instruction": "Listen to the audio input and respond appropriately in a friendly tone.",
-            }
+        config = {
+            "response_modalities": ["AUDIO"],
+            "system_instruction": "Listen to the audio input and respond appropriately in a friendly tone.",
+        }
 
-            output_buffer = io.BytesIO()
+        output_buffer = io.BytesIO()
 
-            async with self.client.aio.live.connect(
-                    model="gemini-2.5-flash-preview-native-audio-dialog",
-                    config=config
-            ) as session:
-                await session.send_realtime_input(
-                    audio=types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
-                )
+        async with self.client.aio.live.connect(
+                model="gemini-2.5-flash-preview-native-audio-dialog",
+                config=config
+        ) as session:
+            await session.send_realtime_input(
+                audio=types.Blob(data=audio_bytes, mime_type="audio/pcm;rate=16000")
+            )
 
-                wf = wave.open(output_buffer, "wb")
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
+            wf = wave.open(output_buffer, "wb")
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(24000)
 
-                async for response in session.receive():
-                    if response.data is not None:
-                        wf.writeframes(response.data)
+            async for response in session.receive():
+                if response.data is not None:
+                    wf.writeframes(response.data)
 
-                wf.close()
-                output_buffer.seek(0)
+            wf.close()
+            output_buffer.seek(0)
 
-            return output_buffer
-        except Exception as e:
-            raise Exception(f"Audio processing error: {str(e)}")
+        return output_buffer
 
     def _upload_file(self, file_path: str):
         """Upload file to Gemini API with better file handling"""

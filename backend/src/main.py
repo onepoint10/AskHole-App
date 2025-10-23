@@ -25,6 +25,7 @@ from src.routes.user import user_bp
 from src.routes.chat import chat_bp
 from src.routes.auth import auth_bp
 from src.routes.admin import admin_bp
+from src.routes.workflow_spaces import workflow_spaces_bp
 from src.exa_client import ExaClient
 from datetime import timedelta
 
@@ -86,6 +87,7 @@ def create_app():
     app.register_blueprint(user_bp, url_prefix='/api')
     app.register_blueprint(chat_bp, url_prefix='/api')
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
+    app.register_blueprint(workflow_spaces_bp, url_prefix='/api/workflow_spaces')
 
     # Exa routes
     # These are defined directly on the app, so no blueprint registration needed for them

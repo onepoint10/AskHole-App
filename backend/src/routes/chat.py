@@ -8,6 +8,7 @@ from src.openrouter_client import OpenRouterClient
 from src.custom_client import CustomClient
 from src.exa_client import ExaClient # Import ExaClient
 from src.file_converter import FileConverter
+from src.git_manager import PromptGitManager  # Import Git manager
 import uuid
 import os
 import json
@@ -119,6 +120,28 @@ gemini_client = None
 openrouter_client = None
 exa_client = None # Add ExaClient
 custom_clients = {}  # Dictionary to store custom clients by provider name
+prompt_git_manager = None  # Git manager for prompt versioning
+
+
+def get_git_author_info(user):
+    """Get Git author information from user object"""
+    author_name = user.username
+    author_email = user.email if hasattr(user, 'email') and user.email else f"{user.username}@askhole.local"
+    return author_name, author_email
+
+
+def initialize_git_manager():
+    """Initialize Git manager for prompt versioning"""
+    global prompt_git_manager
+    try:
+        if prompt_git_manager is None:
+            repo_path = os.getenv('PROMPTS_REPO_PATH',
+                                os.path.join(current_app.root_path, 'prompts_repo'))
+            prompt_git_manager = PromptGitManager(repo_path=repo_path)
+            logger.info(f"Initialized Git manager at {repo_path}")
+    except Exception as e:
+        logger.error(f"Failed to initialize Git manager: {e}")
+        # Don't raise - Git is optional feature, allow app to continue
 
 
 @chat_bp.route('/config', methods=['POST'])
@@ -910,7 +933,7 @@ def get_prompts():
 
 @chat_bp.route('/prompts', methods=['POST'])
 def create_prompt():
-    """Create a new prompt template"""
+    """Create a new prompt template with Git versioning"""
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -924,6 +947,10 @@ def create_prompt():
         return jsonify({'error': 'Content is required'}), 400
 
     try:
+        # Initialize Git manager if needed
+        initialize_git_manager()
+
+        # Create prompt object
         prompt = PromptTemplate(
             user_id=current_user.id,
             title=data['title'].strip(),
@@ -933,9 +960,34 @@ def create_prompt():
             is_public=bool(data.get('is_public', False))
         )
 
+        # Add to session and flush to get ID
         db.session.add(prompt)
-        db.session.commit()
+        db.session.flush()
 
+        # Save to Git if available
+        if prompt_git_manager:
+            try:
+                author_name, author_email = get_git_author_info(current_user)
+                commit_message = data.get('commit_message', f"Created prompt: {prompt.title}")
+
+                commit_hash = prompt_git_manager.save_prompt(
+                    prompt_id=prompt.id,
+                    content=prompt.content,
+                    commit_message=commit_message,
+                    author_name=author_name,
+                    author_email=author_email
+                )
+
+                # Store Git metadata
+                prompt.file_path = f"prompts/{prompt.id}.md"
+                prompt.current_commit = commit_hash
+                logger.info(f"Saved prompt {prompt.id} to Git: {commit_hash[:7]}")
+
+            except Exception as git_error:
+                logger.error(f"Git save failed for prompt {prompt.id}: {git_error}")
+                # Continue without Git - not a fatal error
+
+        db.session.commit()
         logger.info(f"Created prompt {prompt.id} for user {current_user.id} - public: {prompt.is_public}")
         return jsonify(prompt.to_dict()), 201
 
@@ -947,7 +999,7 @@ def create_prompt():
 
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['PUT'])
 def update_prompt(prompt_id):
-    """Update a prompt template"""
+    """Update a prompt template with Git versioning"""
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -969,6 +1021,12 @@ def update_prompt(prompt_id):
         return jsonify({'error': 'Content cannot be empty'}), 400
 
     try:
+        # Initialize Git manager if needed
+        initialize_git_manager()
+
+        # Track if content changed (for Git)
+        content_changed = 'content' in data and data['content'].strip() != prompt.content
+
         # Update fields
         if 'title' in data:
             prompt.title = data['title'].strip()
@@ -985,8 +1043,31 @@ def update_prompt(prompt_id):
                 logger.info(f"Prompt {prompt_id} public status changed: {old_public} -> {prompt.is_public}")
 
         prompt.updated_at = datetime.utcnow()
-        db.session.commit()
 
+        # Save to Git if content changed and Git is available
+        if content_changed and prompt_git_manager:
+            try:
+                author_name, author_email = get_git_author_info(current_user)
+                commit_message = data.get('commit_message', f"Updated prompt: {prompt.title}")
+
+                commit_hash = prompt_git_manager.save_prompt(
+                    prompt_id=prompt.id,
+                    content=prompt.content,
+                    commit_message=commit_message,
+                    author_name=author_name,
+                    author_email=author_email
+                )
+
+                # Update Git metadata
+                prompt.file_path = f"prompts/{prompt.id}.md"
+                prompt.current_commit = commit_hash
+                logger.info(f"Updated prompt {prompt_id} in Git: {commit_hash[:7]}")
+
+            except Exception as git_error:
+                logger.error(f"Git update failed for prompt {prompt_id}: {git_error}")
+                # Continue without Git - not a fatal error
+
+        db.session.commit()
         logger.info(f"Updated prompt {prompt_id} for user {current_user.id}")
         return jsonify(prompt.to_dict())
 
@@ -998,7 +1079,7 @@ def update_prompt(prompt_id):
 
 @chat_bp.route('/prompts/<int:prompt_id>', methods=['DELETE'])
 def delete_prompt(prompt_id):
-    """Delete a prompt template"""
+    """Delete a prompt template with Git versioning"""
     current_user = get_current_user()
     if not current_user:
         return jsonify({'error': 'Authentication required'}), 401
@@ -1012,6 +1093,28 @@ def delete_prompt(prompt_id):
         return jsonify({'error': 'Prompt not found'}), 404
 
     try:
+        # Initialize Git manager if needed
+        initialize_git_manager()
+
+        # Delete from Git if available
+        if prompt_git_manager and prompt.file_path:
+            try:
+                author_name, author_email = get_git_author_info(current_user)
+                commit_message = f"Deleted prompt: {prompt.title}"
+
+                prompt_git_manager.delete_prompt_file(
+                    prompt_id=prompt.id,
+                    commit_message=commit_message,
+                    author_name=author_name,
+                    author_email=author_email
+                )
+                logger.info(f"Deleted prompt {prompt_id} from Git")
+
+            except Exception as git_error:
+                logger.error(f"Git deletion failed for prompt {prompt_id}: {git_error}")
+                # Continue with DB deletion even if Git fails
+
+        # Delete from database
         db.session.delete(prompt)
         db.session.commit()
 
@@ -1054,6 +1157,216 @@ def use_prompt(prompt_id):
         db.session.rollback()
         logger.error(f"Error updating usage count for prompt {prompt_id}: {e}")
         return jsonify({'error': 'Failed to update usage count'}), 500
+
+
+# ============================================================================
+# Version Control Endpoints
+# ============================================================================
+
+@chat_bp.route('/prompts/<int:prompt_id>/versions', methods=['GET'])
+def get_prompt_versions(prompt_id):
+    """Get version history for a prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check access to prompt
+    prompt = PromptTemplate.query.filter(
+        PromptTemplate.id == prompt_id,
+        db.or_(
+            PromptTemplate.user_id == current_user.id,
+            PromptTemplate.is_public == True
+        )
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
+    # Initialize Git manager if needed
+    initialize_git_manager()
+
+    if not prompt_git_manager:
+        return jsonify({'error': 'Git versioning not available'}), 503
+
+    try:
+        # Get version history from Git
+        history = prompt_git_manager.get_version_history(prompt_id)
+
+        # Mark current version
+        for version in history:
+            version['is_current'] = (version['commit_hash'] == prompt.current_commit)
+
+        return jsonify({
+            'prompt_id': prompt_id,
+            'prompt_title': prompt.title,
+            'current_commit': prompt.current_commit,
+            'versions': history
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting version history for prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to get version history'}), 500
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/versions/<commit_hash>', methods=['GET'])
+def get_prompt_version_content(prompt_id, commit_hash):
+    """Get content of a specific version of a prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check access to prompt
+    prompt = PromptTemplate.query.filter(
+        PromptTemplate.id == prompt_id,
+        db.or_(
+            PromptTemplate.user_id == current_user.id,
+            PromptTemplate.is_public == True
+        )
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
+    # Initialize Git manager if needed
+    initialize_git_manager()
+
+    if not prompt_git_manager:
+        return jsonify({'error': 'Git versioning not available'}), 503
+
+    try:
+        # Get content from specific commit
+        content = prompt_git_manager.get_prompt_content(prompt_id, commit_hash)
+
+        if content is None:
+            return jsonify({'error': 'Version not found'}), 404
+
+        return jsonify({
+            'prompt_id': prompt_id,
+            'commit_hash': commit_hash,
+            'content': content,
+            'is_current': (commit_hash == prompt.current_commit)
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting version content for prompt {prompt_id} at {commit_hash}: {e}")
+        return jsonify({'error': 'Failed to get version content'}), 500
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/diff', methods=['GET'])
+def get_prompt_diff(prompt_id):
+    """Get diff between two versions of a prompt"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check access to prompt
+    prompt = PromptTemplate.query.filter(
+        PromptTemplate.id == prompt_id,
+        db.or_(
+            PromptTemplate.user_id == current_user.id,
+            PromptTemplate.is_public == True
+        )
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
+    # Get query parameters
+    from_commit = request.args.get('from_commit')
+    to_commit = request.args.get('to_commit')
+
+    if not from_commit or not to_commit:
+        return jsonify({'error': 'Both from_commit and to_commit parameters are required'}), 400
+
+    # Initialize Git manager if needed
+    initialize_git_manager()
+
+    if not prompt_git_manager:
+        return jsonify({'error': 'Git versioning not available'}), 503
+
+    try:
+        # Get diff between commits
+        diff = prompt_git_manager.get_diff(prompt_id, from_commit, to_commit)
+
+        return jsonify({
+            'prompt_id': prompt_id,
+            'from_commit': from_commit,
+            'to_commit': to_commit,
+            'diff': diff
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting diff for prompt {prompt_id} ({from_commit}..{to_commit}): {e}")
+        return jsonify({'error': 'Failed to get diff'}), 500
+
+
+@chat_bp.route('/prompts/<int:prompt_id>/rollback', methods=['POST'])
+def rollback_prompt(prompt_id):
+    """Rollback a prompt to a previous version"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Check ownership (only owner can rollback)
+    prompt = PromptTemplate.query.filter_by(
+        id=prompt_id,
+        user_id=current_user.id
+    ).first()
+
+    if not prompt:
+        return jsonify({'error': 'Prompt not found or access denied'}), 404
+
+    data = request.get_json()
+    target_commit = data.get('target_commit')
+    commit_message = data.get('commit_message')
+
+    if not target_commit:
+        return jsonify({'error': 'target_commit is required'}), 400
+
+    if not commit_message:
+        commit_message = f"Rolled back to version {target_commit[:7]}"
+
+    # Initialize Git manager if needed
+    initialize_git_manager()
+
+    if not prompt_git_manager:
+        return jsonify({'error': 'Git versioning not available'}), 503
+
+    try:
+        # Perform rollback in Git
+        author_name, author_email = get_git_author_info(current_user)
+
+        new_commit_hash = prompt_git_manager.rollback_prompt(
+            prompt_id=prompt.id,
+            target_commit=target_commit,
+            commit_message=commit_message,
+            author_name=author_name,
+            author_email=author_email
+        )
+
+        # Get the rolled-back content
+        rolled_back_content = prompt_git_manager.get_prompt_content(prompt_id)
+
+        # Update database
+        prompt.content = rolled_back_content
+        prompt.current_commit = new_commit_hash
+        prompt.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Rolled back prompt {prompt_id} to {target_commit[:7]}, new commit: {new_commit_hash[:7]}")
+
+        return jsonify({
+            'success': True,
+            'prompt': prompt.to_dict(),
+            'new_commit': new_commit_hash,
+            'target_commit': target_commit,
+            'message': 'Prompt rolled back successfully'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error rolling back prompt {prompt_id}: {e}")
+        return jsonify({'error': 'Failed to rollback prompt'}), 500
 
 
 @chat_bp.route('/public-prompts', methods=['GET'])

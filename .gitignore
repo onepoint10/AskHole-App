@@ -4,6 +4,7 @@ backend/src/models/__pycache__
 backend/src/uploads
 backend/src/static
 backend/src/database
+backend/src/prompts_repo
 frontend/node_modules
 frontend/dist
 frontend/static

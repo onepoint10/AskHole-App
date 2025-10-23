@@ -116,17 +116,18 @@ const ChatTabs = ({
                 <span>{t('no_active_chats')}</span>
               </div>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onNewSession}
+              // You can keep mx-2 or change it to ml-2 for better alignment next to the last tab/placeholder
+              className="flex-shrink-0 mx-2"
+              title={t('new_chat')}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
         </ScrollArea>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onNewSession}
-          className="flex-shrink-0 mx-2"
-          title={t('new_chat')}
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
       </div>
       
       <ContextMenu
