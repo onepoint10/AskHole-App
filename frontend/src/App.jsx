@@ -3,11 +3,14 @@ import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import AuthComponent from './components/AuthComponent';
 import AdminDashboard from './components/AdminDashboard';
+import ForgotPassword from './components/ForgotPassword';
+import ResetPassword from './components/ResetPassword';
 import ChatTabs from './components/ChatTabs';
 import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import Sidebar from './components/Sidebar';
 import SettingsDialog from './components/SettingsDialog';
+import TelegramLinkingPrompt from './components/TelegramLinkingPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppTour from './components/AppTour';
 import WorkflowSpacesSidebar from './components/WorkflowSpacesSidebar';
@@ -21,6 +24,37 @@ import { useTranslation } from 'react-i18next';
 
 function App() {
   const { t, i18n } = useTranslation();
+
+  // Simple routing state (no react-router needed)
+  const [currentPage, setCurrentPage] = useState('main'); // 'main', 'forgot-password', 'reset-password'
+  const [resetToken, setResetToken] = useState(null);
+
+  // Check URL on mount for reset password token
+  useEffect(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+
+    // Check for /reset-password/:token pattern
+    const resetMatch = path.match(/\/reset-password\/([^/]+)/);
+    if (resetMatch) {
+      setResetToken(resetMatch[1]);
+      setCurrentPage('reset-password');
+      return;
+    }
+
+    // Check for hash-based routing (for compatibility)
+    if (hash.startsWith('#/reset-password/')) {
+      const token = hash.replace('#/reset-password/', '');
+      setResetToken(token);
+      setCurrentPage('reset-password');
+      return;
+    }
+
+    if (path === '/forgot-password' || hash === '#/forgot-password') {
+      setCurrentPage('forgot-password');
+      return;
+    }
+  }, []);
 
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -44,6 +78,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsDefaultTab, setSettingsDefaultTab] = useState('api');
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
   const [messageInputContent, setMessageInputContent] = useState('');
@@ -999,9 +1034,37 @@ function App() {
     );
   }
 
+  // Show forgot password page if user navigated there
+  if (currentPage === 'forgot-password') {
+    return <ForgotPassword onBackToLogin={() => setCurrentPage('login')} />;
+  }
+
+  // Show reset password page if token is present
+  if (currentPage === 'reset-password' && resetToken) {
+    return (
+      <ResetPassword
+        token={resetToken}
+        onSuccess={() => {
+          setCurrentPage('login');
+          setResetToken(null);
+          toast.success(t('password_reset_successfully'));
+        }}
+        onBackToLogin={() => {
+          setCurrentPage('login');
+          setResetToken(null);
+        }}
+      />
+    );
+  }
+
   // Show authentication component if not logged in
   if (!isAuthenticated) {
-    return <AuthComponent onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <AuthComponent
+        onAuthSuccess={handleAuthSuccess}
+        onForgotPassword={() => setCurrentPage('forgot-password')}
+      />
+    );
   }
 
   // Show admin dashboard if admin user and admin mode is active
@@ -1126,6 +1189,17 @@ function App() {
         )}
 
         <div className="flex-1 flex flex-col main-content">
+          {/* Telegram Linking Alert */}
+          {isAuthenticated && currentUser && !currentUser.telegram_linked && (
+            <TelegramLinkingPrompt
+              currentUser={currentUser}
+              onLinkNow={() => {
+                setSettingsDefaultTab('security');
+                setIsSettingsOpen(true);
+              }}
+            />
+          )}
+
           {!isMobile && (
             <>
               <ChatTabs
@@ -1174,10 +1248,16 @@ function App() {
 
         <SettingsDialog
           isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
+          onClose={() => {
+            setIsSettingsOpen(false);
+            setSettingsDefaultTab('api'); // Reset to default
+          }}
           settings={settings}
           onUpdateSettings={updateSettings}
           availableModels={availableModels}
+          currentUser={currentUser}
+          onUserUpdate={checkAuthStatus}
+          defaultTab={settingsDefaultTab}
         />
 
         <PromptDialog

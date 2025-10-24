@@ -209,6 +209,47 @@ export const authAPI = {
       throw error;
     }
   },
+
+  // Telegram Account Linking
+  requestTelegramLink: async (language) => {
+    console.log('API Request: POST /auth/link_telegram/request');
+    return apiCall('/auth/link_telegram/request', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }, language);
+  },
+
+  unlinkTelegram: async (language) => {
+    console.log('API Request: POST /auth/unlink_telegram');
+    return apiCall('/auth/unlink_telegram', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }, language);
+  },
+
+  // Password Recovery
+  forgotPassword: async (identifier, language) => {
+    console.log('API Request: POST /auth/forgot_password');
+    // Determine if identifier is email or username
+    const isEmail = identifier.includes('@');
+    const payload = isEmail ? { email: identifier } : { username: identifier };
+
+    return apiCall('/auth/forgot_password', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }, language);
+  },
+
+  resetPassword: async (token, newPassword, language) => {
+    console.log('API Request: POST /auth/reset_password');
+    return apiCall('/auth/reset_password', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: token,
+        new_password: newPassword
+      }),
+    }, language);
+  },
 };
 
 // Configuration API

@@ -1,6 +1,15 @@
 import os
 import sys
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+# Look for .env in the backend directory (one level up from src)
+dotenv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+load_dotenv(dotenv_path)
+logger = logging.getLogger(__name__)
+logger.info(f"Loading .env from: {dotenv_path}")
+logger.info(f".env file exists: {os.path.exists(dotenv_path)}")
 
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))

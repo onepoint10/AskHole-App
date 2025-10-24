@@ -8,18 +8,18 @@ import { Eye, EyeOff, Loader2, User, Mail, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 
-const AuthComponent = ({ onAuthSuccess }) => {
+const AuthComponent = ({ onAuthSuccess, onForgotPassword }) => {
   const { t } = useTranslation();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
   const [errors, setErrors] = useState({});
-  
+
   const [loginForm, setLoginForm] = useState({
     username: '',
     password: ''
   });
-  
+
   const [registerForm, setRegisterForm] = useState({
     username: '',
     email: '',
@@ -57,18 +57,18 @@ const AuthComponent = ({ onAuthSuccess }) => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setErrors({});
-    
+
     if (!loginForm.username.trim() || !loginForm.password) {
       setErrors({ general: t('please_fill_all_fields') });
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       // Dynamic import to ensure we have the latest API
       const { authAPI } = await import('../services/api');
-      
+
       const response = await authAPI.login({
         username: loginForm.username.trim(),
         password: loginForm.password
@@ -86,7 +86,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
       }
     } catch (error) {
       console.error('Login error:', error);
-      
+
       // More specific error handling
       let errorMessage = t('login_failed');
       if (error.message.includes('Invalid username')) {
@@ -98,7 +98,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
       } else {
         errorMessage = error.message || errorMessage;
       }
-      
+
       setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
@@ -108,9 +108,9 @@ const AuthComponent = ({ onAuthSuccess }) => {
   const handleRegister = async (e) => {
     e.preventDefault();
     setErrors({});
-    
+
     const newErrors = {};
-    
+
     // Validation
     if (!registerForm.username.trim()) {
       newErrors.username = t('username_is_required');
@@ -119,18 +119,18 @@ const AuthComponent = ({ onAuthSuccess }) => {
     } else if (registerForm.username.trim().length > 80) {
       newErrors.username = t('username_max_length', { length: 80 });
     }
-    
+
     if (!registerForm.email.trim()) {
       newErrors.email = t('email_is_required');
     } else if (!validateEmail(registerForm.email)) {
       newErrors.email = t('please_enter_valid_email');
     }
-    
+
     const passwordError = validatePassword(registerForm.password);
     if (passwordError) {
       newErrors.password = passwordError;
     }
-    
+
     if (registerForm.password !== registerForm.confirmPassword) {
       newErrors.confirmPassword = t('passwords_do_not_match');
     }
@@ -141,11 +141,11 @@ const AuthComponent = ({ onAuthSuccess }) => {
     }
 
     setIsLoading(true);
-    
+
     try {
       // Dynamic import to ensure we have the latest API
       const { authAPI } = await import('../services/api');
-      
+
       const response = await authAPI.register({
         username: registerForm.username.trim(),
         email: registerForm.email.trim().toLowerCase(),
@@ -162,7 +162,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
       }
     } catch (error) {
       console.error('Registration error:', error);
-      
+
       // More specific error handling
       let errorMessage = t('registration_failed');
       if (error.message.includes('Username already exists')) {
@@ -176,7 +176,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
       } else {
         errorMessage = error.message || errorMessage;
       }
-      
+
       setErrors({ general: errorMessage });
     } finally {
       setIsLoading(false);
@@ -211,14 +211,14 @@ const AuthComponent = ({ onAuthSuccess }) => {
             {t('signin_or_create_account')}
           </CardDescription>
         </CardHeader>
-        
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">{t('login')}</TabsTrigger>
               <TabsTrigger value="register">{t('register')}</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login" className="space-y-4 mt-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -235,7 +235,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -276,9 +276,21 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     t('sign_in')
                   )}
                 </Button>
+
+                {onForgotPassword && (
+                  <div className="text-center">
+                    <button
+                      type="button"
+                      onClick={onForgotPassword}
+                      className="text-sm text-muted-foreground hover:text-primary underline-offset-4 hover:underline"
+                    >
+                      {t('forgot_password')}
+                    </button>
+                  </div>
+                )}
               </form>
             </TabsContent>
-            
+
             <TabsContent value="register" className="space-y-4 mt-6">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
@@ -298,7 +310,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <p className="text-sm text-destructive">{errors.username}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -316,7 +328,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <p className="text-sm text-destructive">{errors.email}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -343,7 +355,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -381,7 +393,7 @@ const AuthComponent = ({ onAuthSuccess }) => {
               </form>
             </TabsContent>
           </Tabs>
-          
+
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               {activeTab === 'login' ? t('dont_have_account') : t('already_have_account')}

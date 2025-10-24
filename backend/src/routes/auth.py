@@ -1,10 +1,14 @@
 from flask import Blueprint, request, jsonify, session
 from functools import wraps
 from src.database import db
-from src.models.user import User, UserSession
+from src.models.user import User, UserSession, TelegramLinkCode
+from src.token_utils import get_reset_token, verify_reset_token
+from src.telegram_utils import send_telegram_message, format_password_reset_message
 from datetime import datetime, timedelta
+from itsdangerous import SignatureExpired, BadSignature
 import re
 import uuid
+import os
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -343,9 +347,321 @@ def check_auth():
             'user': {
                 'id': current_user.id,
                 'username': current_user.username,
-                'email': current_user.email
+                'email': current_user.email,
+                'telegram_linked': current_user.telegram_chat_id is not None
             }
         })
     else:
         print("No authenticated user found")
         return jsonify({'authenticated': False}), 401
+
+
+# ============================================================================
+# TELEGRAM ACCOUNT LINKING ROUTES
+# ============================================================================
+
+@auth_bp.route('/link_telegram/request', methods=['POST'])
+def request_telegram_link():
+    """
+    Generate a temporary linking code for Telegram account linking.
+    Requires authentication.
+
+    Returns:
+        JSON with linking code and expiration time
+    """
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    try:
+        # Check if user already has Telegram linked
+        if current_user.telegram_chat_id:
+            return jsonify({
+                'error': 'Telegram account already linked',
+                'already_linked': True
+            }), 400
+
+        # Invalidate any existing unused codes for this user
+        TelegramLinkCode.query.filter_by(
+            user_id=current_user.id,
+            is_used=False
+        ).update({'is_used': True})
+        db.session.commit()
+
+        # Generate new linking code (valid for 10 minutes)
+        link_code = TelegramLinkCode.create_for_user(current_user.id, validity_minutes=10)
+        db.session.add(link_code)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'code': link_code.code,
+            'expires_at': link_code.expires_at.isoformat() + 'Z',  # Add 'Z' to indicate UTC
+            'validity_minutes': 10,
+            'message': 'Send this code to the AskHole Telegram bot to link your account'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to generate linking code: {str(e)}'}), 500
+
+
+@auth_bp.route('/link_telegram/complete', methods=['POST'])
+def complete_telegram_link():
+    """
+    Complete Telegram account linking using the verification code.
+    This endpoint is called by the Telegram bot (or can be called manually with proper auth).
+
+    Expected payload:
+        {
+            "code": "123456",
+            "telegram_chat_id": "123456789",
+            "secret_key": "internal_secret"
+        }
+
+    Returns:
+        JSON with success status and user info
+    """
+    try:
+        data = request.get_json()
+        code = data.get('code', '').strip()
+        telegram_chat_id = data.get('telegram_chat_id', '').strip()
+        secret_key = data.get('secret_key', '').strip()
+
+        # Validation
+        if not code or not telegram_chat_id:
+            return jsonify({'error': 'Code and telegram_chat_id are required'}), 400
+
+        # Verify secret key for internal security
+        expected_secret = os.environ.get('TELEGRAM_WEBHOOK_SECRET', 'change-me-in-production')
+        if secret_key != expected_secret:
+            return jsonify({'error': 'Invalid secret key'}), 403
+
+        # Find valid linking code
+        link_code = TelegramLinkCode.query.filter_by(
+            code=code,
+            is_used=False
+        ).first()
+
+        if not link_code:
+            return jsonify({'error': 'Invalid or already used code'}), 400
+
+        if link_code.is_expired():
+            return jsonify({'error': 'Code has expired'}), 400
+
+        # Get user and update Telegram chat ID
+        user = User.query.get(link_code.user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Check if this Telegram account is already linked to another user
+        existing_user = User.query.filter_by(telegram_chat_id=telegram_chat_id).first()
+        if existing_user and existing_user.id != user.id:
+            return jsonify({
+                'error': 'This Telegram account is already linked to another user'
+            }), 400
+
+        # Update user with Telegram chat ID
+        user.telegram_chat_id = telegram_chat_id
+
+        # Mark code as used
+        link_code.is_used = True
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Telegram account linked successfully',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'telegram_linked': True
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to link Telegram account: {str(e)}'}), 500
+
+
+@auth_bp.route('/unlink_telegram', methods=['POST'])
+def unlink_telegram():
+    """
+    Unlink Telegram account from user.
+    Requires authentication.
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        current_user = get_current_user()
+
+        if not current_user:
+            return jsonify({'error': 'Authentication required'}), 401        # Check if Telegram is linked
+        if not current_user.telegram_chat_id:
+            return jsonify({'error': 'No Telegram account is linked'}), 400
+
+        # Remove Telegram chat ID
+        current_user.telegram_chat_id = None
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Telegram account unlinked successfully',
+            'user': {
+                'id': current_user.id,
+                'username': current_user.username,
+                'email': current_user.email,
+                'telegram_linked': False
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to unlink Telegram account: {str(e)}'}), 500
+
+
+# ============================================================================
+# PASSWORD RESET ROUTES
+# ============================================================================
+
+@auth_bp.route('/forgot_password', methods=['POST'])
+def forgot_password():
+    """
+    Initiate password reset process via Telegram.
+    Accepts email or username and sends reset link via Telegram.
+
+    Security: Returns generic success message to prevent user enumeration.
+
+    Expected payload:
+        {
+            "email": "user@example.com"  OR  "username": "username"
+        }
+
+    Returns:
+        JSON with generic success message
+    """
+    try:
+        data = request.get_json()
+        email = data.get('email', '').strip().lower()
+        username = data.get('username', '').strip()
+
+        # Require at least one identifier
+        if not email and not username:
+            return jsonify({'error': 'Email or username is required'}), 400
+
+        # Find user by email or username
+        user = None
+        if email:
+            user = User.query.filter_by(email=email).first()
+        elif username:
+            user = User.query.filter_by(username=username).first()
+
+        # SECURITY: Always return success to prevent user enumeration
+        # But only send message if user exists and has Telegram linked
+        if user and user.telegram_chat_id:
+            # Generate password reset token (valid for 30 minutes)
+            reset_token = get_reset_token(user.id, expires_in=1800)
+
+            # Construct reset URL for frontend
+            # TODO: Make this configurable via environment variable
+            frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+            reset_url = f"{frontend_url}/reset-password/{reset_token}"
+
+            # Format message
+            message = format_password_reset_message(reset_url, user.username)
+
+            # Send via Telegram
+            success, response, error = send_telegram_message(
+                chat_id=user.telegram_chat_id,
+                message=message,
+                parse_mode='HTML'
+            )
+
+            if not success:
+                # Log error but don't expose it to user
+                print(f"Failed to send Telegram message: {error}")
+
+        # Always return success (security measure)
+        return jsonify({
+            'success': True,
+            'message': 'If your account exists and has Telegram linked, you will receive a password reset link.'
+        }), 200
+
+    except Exception as e:
+        # Log error but return generic success
+        print(f"Error in forgot_password: {str(e)}")
+        return jsonify({
+            'success': True,
+            'message': 'If your account exists and has Telegram linked, you will receive a password reset link.'
+        }), 200
+
+
+@auth_bp.route('/reset_password', methods=['POST'])
+def reset_password():
+    """
+    Complete password reset using token and new password.
+
+    Expected payload:
+        {
+            "token": "secure_token_here",
+            "new_password": "newSecurePassword123"
+        }
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        data = request.get_json()
+        token = data.get('token', '').strip()
+        new_password = data.get('new_password', '')
+
+        # Validation
+        if not token or not new_password:
+            return jsonify({'error': 'Token and new password are required'}), 400
+
+        # Validate password strength
+        valid_password, password_message = validate_password(new_password)
+        if not valid_password:
+            return jsonify({'error': password_message}), 400
+
+        # Verify token and get user
+        try:
+            user = verify_reset_token(token, max_age=1800)  # 30 minutes
+
+            if not user:
+                return jsonify({'error': 'Invalid reset token'}), 401
+
+        except SignatureExpired:
+            return jsonify({
+                'error': 'Password reset token has expired',
+                'expired': True
+            }), 401
+        except BadSignature:
+            return jsonify({
+                'error': 'Invalid password reset token',
+                'invalid': True
+            }), 401
+        except Exception as e:
+            return jsonify({
+                'error': 'Token verification failed',
+                'details': str(e)
+            }), 401
+
+        # Update password
+        user.set_password(new_password)
+        db.session.commit()
+
+        # Optional: Invalidate all existing sessions for security
+        UserSession.query.filter_by(user_id=user.id).update({'is_active': False})
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Password has been reset successfully. Please log in with your new password.'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Failed to reset password: {str(e)}'}), 500

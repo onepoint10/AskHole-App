@@ -26,6 +26,7 @@ A modern, full-stack AI chat application with Flask backend and React frontend. 
 - **Real-time Updates**: Live chat interface with typing indicators
 - **File Management**: Upload and manage files for AI analysis
 - **Automatic Error Retry**: Transparent retry mechanism for transient API errors (503, 429, 500)
+- **Telegram Password Recovery**: Secure password reset via Telegram notifications
 
 ## Architecture
 
@@ -507,6 +508,11 @@ For issues and questions:
 2. Review API documentation
 3. Check browser console for errors
 4. Verify backend logs for issues
+
+## Additional Documentation
+
+- **[Telegram Password Recovery](TELEGRAM_PASSWORD_RECOVERY.md)** - Complete guide for password reset via Telegram
+- **[Custom Providers](CUSTOM_PROVIDERS_README.md)** - How to add custom AI providers
 
 ---
 
