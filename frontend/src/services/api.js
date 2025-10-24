@@ -624,6 +624,9 @@ export const adminAPI = {
     method: 'PUT',
     body: JSON.stringify({ is_active: isActive }),
   }, language),
+  resetUserPassword: async (userId, language) => apiCall(`/admin/users/${userId}/reset_password`, {
+    method: 'POST',
+  }, language),
   getSessions: async (page = 1, per_page = 10, userId = '', model = '', language) => {
     const params = new URLSearchParams({
       page: page.toString(),

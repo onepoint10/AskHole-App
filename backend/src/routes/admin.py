@@ -8,6 +8,8 @@ from sqlalchemy import func, desc, and_, or_
 from sqlalchemy.sql import text
 import logging
 import os
+import secrets
+import string
 
 logger = logging.getLogger(__name__)
 
@@ -315,6 +317,57 @@ def update_user_status(user_id):
         logger.error(f"Error updating user {user_id}: {e}")
         db.session.rollback()
         return jsonify({'error': 'Failed to update user'}), 500
+
+
+@admin_bp.route('/users/<int:user_id>/reset_password', methods=['POST'])
+def reset_user_password(user_id):
+    """
+    Admin function to reset user password with temporary password.
+    Returns the temporary password which admin must share with user.
+    User should change it after first login.
+    """
+    current_user = get_current_user()
+    if not current_user or not is_admin_user(current_user):
+        return jsonify({'error': 'Admin access required'}), 403
+
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Prevent admin from resetting their own password this way
+        if user.id == current_user.id:
+            return jsonify({'error': 'Cannot reset your own password via admin panel'}), 400
+
+        # Generate secure temporary password (12 characters: letters, digits, and special chars)
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+        temp_password = ''.join(secrets.choice(alphabet) for _ in range(12))
+
+        # Update user password
+        user.set_password(temp_password)
+
+        # Invalidate all existing sessions for security
+        UserSession.query.filter_by(user_id=user_id).update({'is_active': False})
+
+        db.session.commit()
+
+        logger.info(f"Admin {current_user.username} (ID: {current_user.id}) reset password for user {user.username} (ID: {user.id})")
+
+        return jsonify({
+            'success': True,
+            'message': 'Password has been reset successfully',
+            'temporary_password': temp_password,
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email
+            }
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error resetting password for user {user_id}: {e}")
+        db.session.rollback()
+        return jsonify({'error': 'Failed to reset password'}), 500
 
 
 @admin_bp.route('/sessions', methods=['GET'])

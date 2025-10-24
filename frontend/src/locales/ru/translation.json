@@ -524,5 +524,16 @@
   "reset_password_resetting": "Сброс...",
   "reset_password_passwords_do_not_match": "Пароли не совпадают",
   "reset_password_failed": "Не удалось сбросить пароль",
-  "password_reset_successfully": "Пароль успешно сброшен! Теперь вы можете войти с новым паролем."
+  "password_reset_successfully": "Пароль успешно сброшен! Теперь вы можете войти с новым паролем.",
+  "admin_reset_password": "Сбросить пароль",
+  "admin_reset": "Сбросить",
+  "admin_password_reset_success": "Пароль успешно сброшен",
+  "admin_reset_password_confirm": "Вы уверены, что хотите сбросить пароль для пользователя: {{username}}?",
+  "admin_reset_password_warning": "Это создаст временный пароль и деактивирует все существующие сессии этого пользователя.",
+  "admin_reset_password_button": "Сбросить пароль",
+  "resetting": "Сброс...",
+  "admin_temp_password_generated": "Временный пароль был создан для этого пользователя:",
+  "admin_temporary_password": "Временный пароль",
+  "admin_important": "Важно",
+  "admin_share_password_securely": "Передайте этот пароль пользователю по безопасному каналу. Он должен изменить его сразу после входа."
 }

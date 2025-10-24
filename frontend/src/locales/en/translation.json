@@ -524,5 +524,16 @@
   "reset_password_resetting": "Resetting...",
   "reset_password_passwords_do_not_match": "Passwords do not match",
   "reset_password_failed": "Failed to reset password",
-  "password_reset_successfully": "Password reset successfully! You can now log in with your new password."
+  "password_reset_successfully": "Password reset successfully! You can now log in with your new password.",
+  "admin_reset_password": "Reset Password",
+  "admin_reset": "Reset",
+  "admin_password_reset_success": "Password Reset Successful",
+  "admin_reset_password_confirm": "Are you sure you want to reset the password for user: {{username}}?",
+  "admin_reset_password_warning": "This will generate a temporary password and invalidate all existing sessions for this user.",
+  "admin_reset_password_button": "Reset Password",
+  "resetting": "Resetting...",
+  "admin_temp_password_generated": "A temporary password has been generated for this user:",
+  "admin_temporary_password": "Temporary Password",
+  "admin_important": "Important",
+  "admin_share_password_securely": "Share this password with the user through a secure channel. They should change it immediately after logging in."
 }

@@ -524,5 +524,16 @@
   "reset_password_resetting": "Réinitialisation...",
   "reset_password_passwords_do_not_match": "Les mots de passe ne correspondent pas",
   "reset_password_failed": "Échec de la réinitialisation du mot de passe",
-  "password_reset_successfully": "Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter avec votre nouveau mot de passe."
+  "password_reset_successfully": "Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.",
+  "admin_reset_password": "Réinitialiser le mot de passe",
+  "admin_reset": "Réinitialiser",
+  "admin_password_reset_success": "Réinitialisation du mot de passe réussie",
+  "admin_reset_password_confirm": "Êtes-vous sûr de vouloir réinitialiser le mot de passe pour l'utilisateur : {{username}} ?",
+  "admin_reset_password_warning": "Cela générera un mot de passe temporaire et invalidera toutes les sessions existantes pour cet utilisateur.",
+  "admin_reset_password_button": "Réinitialiser le mot de passe",
+  "resetting": "Réinitialisation...",
+  "admin_temp_password_generated": "Un mot de passe temporaire a été généré pour cet utilisateur :",
+  "admin_temporary_password": "Mot de passe temporaire",
+  "admin_important": "Important",
+  "admin_share_password_securely": "Partagez ce mot de passe avec l'utilisateur via un canal sécurisé. Il devrait le changer immédiatement après s'être connecté."
 }

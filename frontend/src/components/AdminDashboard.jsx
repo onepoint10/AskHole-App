@@ -1,14 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, ResponsiveContainer } from 'recharts';
-import { Users, MessageSquare, FileText, Database, Activity, HardDrive, Cpu, Settings, Search, Filter, RefreshCw, Trash2, Eye, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Users, MessageSquare, FileText, Database, Activity, HardDrive, Cpu, Settings, Search, Filter, RefreshCw, Trash2, Eye, AlertCircle, CheckCircle, XCircle, Key, Copy } from 'lucide-react';
 import { adminAPI } from '@/services/api';
+import { useTranslation } from 'react-i18next';
 
 const AdminDashboard = () => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  
+
+  // Reset password dialog state
+  const [showResetDialog, setShowResetDialog] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [tempPassword, setTempPassword] = useState('');
+  const [resetting, setResetting] = useState(false);
+
   // Data states
   const [overviewStats, setOverviewStats] = useState({});
   const [usageStats, setUsageStats] = useState({});
@@ -17,12 +25,12 @@ const AdminDashboard = () => {
   const [sessions, setSessions] = useState([]);
   const [files, setFiles] = useState([]);
   const [systemInfo, setSystemInfo] = useState({});
-  
+
   // Pagination states
   const [usersPagination, setUsersPagination] = useState({ page: 1, per_page: 10 });
   const [sessionsPagination, setSessionsPagination] = useState({ page: 1, per_page: 10 });
   const [filesPagination, setFilesPagination] = useState({ page: 1, per_page: 10 });
-  
+
   // Filter states
   const [userSearch, setUserSearch] = useState('');
   const [activeUsersOnly, setActiveUsersOnly] = useState(false);
@@ -115,10 +123,37 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!selectedUser) return;
+
+    setResetting(true);
+    try {
+      const response = await adminAPI.resetUserPassword(selectedUser.id);
+      setTempPassword(response.data.temporary_password);
+    } catch (err) {
+      setError(`Failed to reset password: ${err.message}`);
+      setShowResetDialog(false);
+      setSelectedUser(null);
+    } finally {
+      setResetting(false);
+    }
+  };
+
+  const closeResetDialog = () => {
+    setShowResetDialog(false);
+    setSelectedUser(null);
+    setTempPassword('');
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    // Could add a toast notification here
+  };
+
   const refreshData = async () => {
     setRefreshing(true);
     setError('');
-    
+
     try {
       await Promise.all([
         loadOverviewStats(),
@@ -242,7 +277,7 @@ const AdminDashboard = () => {
               </button>
             </div>
           </div>
-          
+
           {/* Navigation Tabs */}
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
@@ -256,11 +291,10 @@ const AdminDashboard = () => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <tab.icon className="h-5 w-5 mr-2" />
                   {tab.name}
@@ -427,9 +461,8 @@ const AdminDashboard = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
                             <div className="flex-shrink-0">
-                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                                user.is_active ? 'bg-green-100' : 'bg-gray-100'
-                              }`}>
+                              <div className={`h-10 w-10 rounded-full flex items-center justify-center ${user.is_active ? 'bg-green-100' : 'bg-gray-100'
+                                }`}>
                                 <Users className={`h-5 w-5 ${user.is_active ? 'text-green-600' : 'text-gray-400'}`} />
                               </div>
                             </div>
@@ -458,12 +491,22 @@ const AdminDashboard = () => {
                               <p className="text-gray-500">Last login: {formatDate(user.last_login)}</p>
                             </div>
                             <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setShowResetDialog(true);
+                              }}
+                              className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 flex items-center gap-1"
+                              title={t('admin_reset_password')}
+                            >
+                              <Key className="h-3 w-3" />
+                              {t('admin_reset')}
+                            </button>
+                            <button
                               onClick={() => toggleUserStatus(user.id, user.is_active)}
-                              className={`px-3 py-1 text-xs font-medium rounded-full ${
-                                user.is_active
-                                  ? 'bg-red-100 text-red-800 hover:bg-red-200'
-                                  : 'bg-green-100 text-green-800 hover:bg-green-200'
-                              }`}
+                              className={`px-3 py-1 text-xs font-medium rounded-full ${user.is_active
+                                ? 'bg-red-100 text-red-800 hover:bg-red-200'
+                                : 'bg-green-100 text-green-800 hover:bg-green-200'
+                                }`}
                             >
                               {user.is_active ? 'Deactivate' : 'Activate'}
                             </button>
@@ -661,21 +704,21 @@ const AdminDashboard = () => {
                         <span className="text-gray-900">{systemInfo.cpu.usage.toFixed(1)}%</span>
                       </div>
                       <div className="mt-1 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full" 
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
                           style={{ width: `${systemInfo.cpu.usage}%` }}
                         ></div>
                       </div>
                     </div>
-                    
+
                     <div>
                       <div className="flex justify-between text-sm">
                         <span className="font-medium text-gray-500">Memory Usage</span>
                         <span className="text-gray-900">{systemInfo.memory.percentage.toFixed(1)}%</span>
                       </div>
                       <div className="mt-1 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-green-600 h-2 rounded-full" 
+                        <div
+                          className="bg-green-600 h-2 rounded-full"
                           style={{ width: `${systemInfo.memory.percentage}%` }}
                         ></div>
                       </div>
@@ -684,15 +727,15 @@ const AdminDashboard = () => {
                         <span>{formatBytes(systemInfo.memory.total)} total</span>
                       </div>
                     </div>
-                    
+
                     <div>
                       <div className="flex justify-between text-sm">
                         <span className="font-medium text-gray-500">Disk Usage</span>
                         <span className="text-gray-900">{systemInfo.disk.percentage.toFixed(1)}%</span>
                       </div>
                       <div className="mt-1 bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-orange-600 h-2 rounded-full" 
+                        <div
+                          className="bg-orange-600 h-2 rounded-full"
                           style={{ width: `${systemInfo.disk.percentage}%` }}
                         ></div>
                       </div>
@@ -719,6 +762,109 @@ const AdminDashboard = () => {
           </div>
         )}
       </div>
+
+      {/* Reset Password Dialog */}
+      {showResetDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {tempPassword ? t('admin_password_reset_success') : t('admin_reset_password')}
+                </h3>
+                <button
+                  onClick={closeResetDialog}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+
+              {!tempPassword ? (
+                <>
+                  <div className="mb-6">
+                    <p className="text-sm text-gray-600 mb-2">
+                      {t('admin_reset_password_confirm', { username: selectedUser?.username })}
+                    </p>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mt-3">
+                      <div className="flex">
+                        <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0" />
+                        <p className="text-sm text-yellow-800">
+                          {t('admin_reset_password_warning')}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3">
+                    <button
+                      onClick={closeResetDialog}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200"
+                      disabled={resetting}
+                    >
+                      {t('cancel')}
+                    </button>
+                    <button
+                      onClick={handleResetPassword}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+                      disabled={resetting}
+                    >
+                      {resetting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          {t('resetting')}
+                        </>
+                      ) : (
+                        <>
+                          <Key className="h-4 w-4 mr-2" />
+                          {t('admin_reset_password_button')}
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <p className="text-sm text-gray-600 mb-4">
+                      {t('admin_temp_password_generated')}
+                    </p>
+                    <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <p className="text-xs text-green-600 mb-1">{t('admin_temporary_password')}</p>
+                          <p className="text-lg font-mono font-bold text-green-900 break-all">{tempPassword}</p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(tempPassword)}
+                          className="ml-3 p-2 text-green-600 hover:text-green-800 hover:bg-green-100 rounded"
+                          title={t('copy')}
+                        >
+                          <Copy className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>{t('admin_important')}:</strong> {t('admin_share_password_securely')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={closeResetDialog}
+                      className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    >
+                      {t('close')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
