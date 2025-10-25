@@ -117,6 +117,50 @@ def update_user(user_id):
         return jsonify({'error': f'Update failed: {str(e)}'}), 500
 
 
+@user_bp.route('/users/<int:user_id>/change_password', methods=['POST'])
+def change_password(user_id):
+    """Change user password"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    # Users can only change their own password
+    if current_user.id != user_id:
+        return jsonify({'error': 'Access denied'}), 403
+
+    user = User.query.get_or_404(user_id)
+    data = request.json
+
+    # Validate request data
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+
+    # Validate required fields
+    current_password = data.get('current_password', '')
+    new_password = data.get('new_password', '')
+
+    if not current_password or not new_password:
+        return jsonify({'error': 'Current password and new password are required'}), 400
+
+    # Verify current password
+    if not user.check_password(current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 401
+
+    # Validate new password strength
+    from src.routes.auth import validate_password
+    valid_password, password_message = validate_password(new_password)
+    if not valid_password:
+        return jsonify({'error': password_message}), 400
+
+    try:
+        user.set_password(new_password)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Password changed successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Password change failed: {str(e)}'}), 500
+
+
 @user_bp.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
     """Delete user account"""

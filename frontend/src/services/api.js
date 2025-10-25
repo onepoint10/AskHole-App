@@ -605,6 +605,17 @@ export const usersAPI = {
       method: 'DELETE',
     }, language);
   },
+
+  changePassword: async (userId, currentPassword, newPassword, language) => {
+    console.log('API Request: POST /users/' + userId + '/change_password');
+    return apiCall(`/users/${userId}/change_password`, {
+      method: 'POST',
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword
+      }),
+    }, language);
+  },
 };
 
 export const adminAPI = {

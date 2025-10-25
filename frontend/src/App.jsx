@@ -10,6 +10,7 @@ import MessageList from './components/MessageList';
 import MessageInput from './components/MessageInput';
 import Sidebar from './components/Sidebar';
 import SettingsDialog from './components/SettingsDialog';
+import UserAccountDialog from './components/UserAccountDialog';
 import TelegramLinkingPrompt from './components/TelegramLinkingPrompt';
 import ErrorBoundary from './components/ErrorBoundary';
 import AppTour from './components/AppTour';
@@ -78,6 +79,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUserAccountOpen, setIsUserAccountOpen] = useState(false);
   const [settingsDefaultTab, setSettingsDefaultTab] = useState('api');
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
@@ -1152,6 +1154,7 @@ function App() {
             onEditPrompt={updatePrompt}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onLogout={handleLogout}
+            onOpenUserAccount={() => setIsUserAccountOpen(true)}
             isAdmin={isAdmin}
             onOpenAdmin={() => setShowAdminDashboard(true)}
           />
@@ -1176,6 +1179,7 @@ function App() {
                 onEditPrompt={updatePrompt}
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onLogout={handleLogout}
+                onOpenUserAccount={() => setIsUserAccountOpen(true)}
                 isMobileOverlay={true}
                 onRequestClose={() => setIsSidebarOpen(false)}
                 isAdmin={isAdmin}
@@ -1258,6 +1262,21 @@ function App() {
           currentUser={currentUser}
           onUserUpdate={checkAuthStatus}
           defaultTab={settingsDefaultTab}
+        />
+
+        <UserAccountDialog
+          isOpen={isUserAccountOpen}
+          onClose={() => setIsUserAccountOpen(false)}
+          currentUser={currentUser}
+          onUserUpdate={checkAuthStatus}
+          onLogout={handleLogout}
+          settings={settings}
+          onUpdateSettings={updateSettings}
+          onDeleteAccount={async () => {
+            setIsUserAccountOpen(false);
+            await handleLogout();
+            toast.success(t('user_account_delete_success'));
+          }}
         />
 
         <PromptDialog
