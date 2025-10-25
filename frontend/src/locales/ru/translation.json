@@ -464,7 +464,7 @@
   "forgot_password": "Забыли пароль?",
   "telegram_linking": "Связывание аккаунта Telegram",
   "telegram_linking_description": "Свяжите ваш аккаунт Telegram, чтобы включить восстановление пароля через сообщения Telegram.",
-  "telegram_bot_username": "Имя пользователя бота",
+  "telegram_bot_username": "AskHoleRecoveryBot",
   "telegram_link_status_not_linked": "Не привязан",
   "telegram_link_status_linked": "Привязан",
   "telegram_generate_code": "Сгенерировать код привязки",

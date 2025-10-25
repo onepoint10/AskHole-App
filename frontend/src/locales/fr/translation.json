@@ -464,7 +464,7 @@
   "forgot_password": "Mot de passe oublié ?",
   "telegram_linking": "Liaison du compte Telegram",
   "telegram_linking_description": "Liez votre compte Telegram pour activer la récupération de mot de passe via les messages Telegram.",
-  "telegram_bot_username": "Nom d'utilisateur du bot",
+  "telegram_bot_username": "AskHoleRecoveryBot",
   "telegram_link_status_not_linked": "Non lié",
   "telegram_link_status_linked": "Lié",
   "telegram_generate_code": "Générer un code de liaison",

@@ -464,7 +464,7 @@
   "forgot_password": "Forgot Password?",
   "telegram_linking": "Telegram Account Linking",
   "telegram_linking_description": "Link your Telegram account to enable password recovery via Telegram messages.",
-  "telegram_bot_username": "Bot Username",
+  "telegram_bot_username": "AskHoleRecoveryBot",
   "telegram_link_status_not_linked": "Not linked",
   "telegram_link_status_linked": "Linked",
   "telegram_generate_code": "Generate Linking Code",
