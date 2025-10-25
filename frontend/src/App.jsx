@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import AuthComponent from './components/AuthComponent';
@@ -77,6 +77,8 @@ function App() {
     custom: []
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false); // Track if message is being sent
+  const abortControllerRef = useRef(null); // Store AbortController for canceling requests
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUserAccountOpen, setIsUserAccountOpen] = useState(false);
@@ -544,11 +546,18 @@ function App() {
       }
     }
 
+    // Create AbortController for this request
+    abortControllerRef.current = new AbortController();
+
+    // Track if we're creating a new session for cleanup on abort
+    let isNewSession = false;
+
     // If no active session, generate a new session ID for backend auto-creation
     let targetSessionId = activeSessionId;
     if (!activeSessionId) {
       // Generate a new UUID for the session
       targetSessionId = crypto.randomUUID();
+      isNewSession = true;
       console.log('No active session, generated new session ID for auto-creation:', targetSessionId);
 
       // Set as active immediately so UI shows it
@@ -574,6 +583,7 @@ function App() {
     // Immediately add user message to chat
     setCurrentMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
+    setIsSending(true);
 
     try {
       // Upload files if any
@@ -663,7 +673,7 @@ function App() {
         search_mode: searchMode, // Pass the searchMode flag
         model: currentSessionData?.model || settings.defaultModel, // Pass model for auto-creation
         temperature: currentSessionData?.temperature || settings.temperature, // Pass temperature for auto-creation
-      }, i18n.language);
+      }, i18n.language, abortControllerRef.current.signal);
 
       // Replace temporary message with real messages from server
       setCurrentMessages(prev => {
@@ -708,7 +718,39 @@ function App() {
       // Remove the temporary user message on error
       setCurrentMessages(prev => prev.filter(msg => msg.id !== tempUserMessageId));
 
-      // More specific error messages
+      // Handle abort specifically - user stopped the request
+      if (error.name === 'AbortError' || error.message === 'Request aborted') {
+        toast.info(t('request_stopped'));
+
+        // Clean up based on whether this was a new session
+        try {
+          if (isNewSession) {
+            // Delete the entire session if it was just created
+            console.log('Deleting newly created session:', targetSessionId);
+            await sessionsAPI.deleteSession(targetSessionId, i18n.language);
+
+            // Remove from UI state
+            setSessions(prev => prev.filter(s => s.id !== targetSessionId));
+            setOpenTabIds(prev => prev.filter(id => id !== targetSessionId));
+
+            // Clear active session if it was this one
+            if (activeSessionId === targetSessionId) {
+              setActiveSessionId(null);
+              setCurrentMessages([]);
+            }
+          } else {
+            // Just cleanup the messages for existing session
+            await sessionsAPI.cleanupAbortedMessages(targetSessionId, i18n.language);
+            console.log('Cleaned up aborted messages from existing session');
+          }
+        } catch (cleanupError) {
+          console.error('Failed to cleanup after abort:', cleanupError);
+          // Don't show error to user, it's a background cleanup
+        }
+
+        // Return error with the original message to restore in input
+        return { success: false, originalMessage: message, originalFiles: files };
+      }      // More specific error messages
       let errorMessage = t('failed_to_send_message');
       if (error.message.includes('Authentication required')) {
         errorMessage = t('session_expired_login_again');
@@ -731,8 +773,18 @@ function App() {
       return { success: false, originalMessage: message, originalFiles: files };
     } finally {
       setIsLoading(false);
+      setIsSending(false);
+      abortControllerRef.current = null;
     }
   }, [activeSessionId, sessions, settings.defaultModel, settings.temperature, setIsAuthenticated, t, clearUploadedFileIds, i18n.language]);
+
+  // Stop sending function
+  const stopSending = useCallback(() => {
+    if (abortControllerRef.current) {
+      console.log('Aborting request...');
+      abortControllerRef.current.abort();
+    }
+  }, []);
 
   const generateImage = useCallback(async (prompt) => {
     if (!prompt || !prompt.trim()) {
@@ -1237,9 +1289,11 @@ function App() {
 
           <MessageInput
             onSendMessage={sendMessage}
+            onStopSending={stopSending}
             onImageGeneration={generateImage}
             onAddAssistantMessage={addAssistantMessage} // Pass the new function
             isLoading={isLoading}
+            isSending={isSending}
             disabled={!isConfigured}
             availableModels={availableModels}
             currentSession={currentSession}

@@ -887,6 +887,79 @@ def delete_message(session_id, message_id):
     return jsonify({'success': True})
 
 
+@chat_bp.route('/sessions/<session_id>/messages/cleanup-aborted', methods=['DELETE'])
+def cleanup_aborted_messages(session_id):
+    """
+    Clean up messages from an aborted request.
+    Deletes the most recent user and assistant message pair if they were created within the last 30 seconds.
+    This handles cases where the frontend aborted a request but the backend already saved messages.
+    """
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    session = ChatSession.query.filter_by(
+        id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
+        return jsonify({'error': 'Session not found or access denied'}), 404
+
+    try:
+        # Get the most recent user message
+        recent_user_msg = ChatMessage.query.filter_by(
+            session_id=session_id,
+            role='user'
+        ).order_by(ChatMessage.created_at.desc()).first()
+
+        if not recent_user_msg:
+            return jsonify({'success': True, 'deleted': 0, 'message': 'No messages to clean up'})
+
+        # Check if the message was created recently (within last 30 seconds)
+        time_diff = (datetime.utcnow() - recent_user_msg.created_at).total_seconds()
+        if time_diff > 30:
+            return jsonify({'success': True, 'deleted': 0, 'message': 'No recent messages to clean up'})
+
+        # Delete the user message
+        db.session.delete(recent_user_msg)
+        deleted_count = 1
+
+        # Also delete the corresponding assistant message if it exists and was created right after
+        recent_assistant_msg = ChatMessage.query.filter_by(
+            session_id=session_id,
+            role='assistant'
+        ).order_by(ChatMessage.created_at.desc()).first()
+
+        if recent_assistant_msg:
+            # Check if assistant message was created close to the user message (within 30 seconds)
+            assistant_time_diff = (datetime.utcnow() - recent_assistant_msg.created_at).total_seconds()
+            if assistant_time_diff <= 30:
+                db.session.delete(recent_assistant_msg)
+                deleted_count += 1
+
+        # Clear client session history if applicable
+        if session.client_type == 'gemini' and gemini_client:
+            gemini_client.clear_chat_session(session_id)
+        elif session.client_type == 'openrouter' and openrouter_client:
+            openrouter_client.clear_chat_session(session_id)
+
+        session.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Cleaned up {deleted_count} aborted messages from session {session_id}")
+        return jsonify({
+            'success': True,
+            'deleted': deleted_count,
+            'message': f'Cleaned up {deleted_count} message(s)'
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error cleaning up aborted messages for session {session_id}: {e}")
+        return jsonify({'error': 'Failed to clean up messages'}), 500
+
+
 @chat_bp.route('/sessions/<session_id>/clear', methods=['POST'])
 def clear_session(session_id):
     """Clear all messages in a session"""

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, ImageIcon, Search } from 'lucide-react';
+import { Send, Paperclip, X, ImageIcon, Search, StopCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import ModelSelector from './ModelSelector';
@@ -8,7 +8,9 @@ import { exaAPI } from '../services/api'; // Import exaAPI
 
 const MessageInput = ({
   onSendMessage,
+  onStopSending,
   isLoading,
+  isSending = false,
   disabled,
   availableModels,
   currentSession,
@@ -163,8 +165,11 @@ const MessageInput = ({
           textareaRef.current.style.height = 'auto';
         }
       } else if (result && !result.success) {
-        // On error, restore the original message and files
+        // On error or abort, restore the original message and files
         setMessage(result.originalMessage || message);
+        if (result.originalFiles) {
+          setAttachedFiles(result.originalFiles);
+        }
       }
     }
   };
@@ -413,16 +418,29 @@ const MessageInput = ({
                 disabled={isImageGenerationMode || isExaSearchMode} // Disable file input when in image generation or EXA search mode
               />
 
-              {/* Send button - positioned in reserved bottom area */}
-              <Button
-                type="submit"
-                variant="ghost"
-                size="sm"
-                disabled={(!message.trim() && attachedFiles.length === 0 && !isImageGenerationMode && !isExaSearchMode) || ((isImageGenerationMode || isExaSearchMode) && !message.trim()) || disabled || isLoading}
-                className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
+              {/* Send/Stop button - positioned in reserved bottom area */}
+              {isSending ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onStopSending}
+                  className={`absolute bottom-2 h-9 w-9 p-0 bg-muted/80 hover:text-destructive z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
+                  title={t('stop_generation')}
+                >
+                  <StopCircle className="h-5 w-5 text-destructive" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  size="sm"
+                  disabled={(!message.trim() && attachedFiles.length === 0 && !isImageGenerationMode && !isExaSearchMode) || ((isImageGenerationMode || isExaSearchMode) && !message.trim()) || disabled || isLoading}
+                  className={`absolute bottom-2 h-9 w-9 p-0 hover:bg-muted/80 hover:text-primary z-10 ${isMobileDevice ? 'right-0 ' : 'right-6 '}`}
+                >
+                  <Send className="h-5 w-5" />
+                </Button>
+              )}
             </div>
           </div>
         </form>

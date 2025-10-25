@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     Dialog,
@@ -38,6 +38,7 @@ import {
     Copy,
     Download,
     AlertCircle,
+    StopCircle,
 } from 'lucide-react';
 
 /**
@@ -59,6 +60,9 @@ export function WorkflowExecutionDialog({
     availableModels = { gemini: [], openrouter: [], custom: [] }, // Default value for safety
 }) {
     const { t, i18n } = useTranslation();
+
+    // Abort controller ref for stopping execution
+    const abortControllerRef = useRef(null);
 
     // Execution configuration
     const [config, setConfig] = useState({
@@ -115,6 +119,9 @@ export function WorkflowExecutionDialog({
             toast.error(t('Please enable at least one step to execute'));
             return;
         }
+
+        // Create new AbortController for this execution
+        abortControllerRef.current = new AbortController();
 
         setIsExecuting(true);
         setResults([]);
@@ -199,6 +206,13 @@ export function WorkflowExecutionDialog({
                             console.log('Workflow completed:', eventData);
                             break;
 
+                        case 'aborted':
+                            // Workflow was stopped by user
+                            setIsExecuting(false);
+                            toast.info(t('workflow_execution_stopped'));
+                            console.log('Workflow execution stopped by user');
+                            break;
+
                         case 'error':
                             // Fatal error occurred
                             setError(eventData.error || 'Unknown error');
@@ -211,15 +225,33 @@ export function WorkflowExecutionDialog({
                             console.log('Unknown event type:', eventData.event_type, eventData);
                     }
                 },
-                i18n.language
+                i18n.language,
+                abortControllerRef.current.signal // Pass abort signal
             );
 
         } catch (err) {
             console.error('Workflow execution error:', err);
+
+            // Don't show error if it was aborted
+            if (err.name === 'AbortError') {
+                return;
+            }
+
             const errorMessage = err.response?.data?.error || err.message || 'Failed to execute workflow';
             setError(errorMessage);
             setIsExecuting(false);
             toast.error(t('Execution error: {{error}}', { error: errorMessage }));
+        } finally {
+            // Cleanup abort controller
+            abortControllerRef.current = null;
+        }
+    };
+
+    // Stop workflow execution
+    const handleStopExecution = () => {
+        if (abortControllerRef.current) {
+            console.log('Stopping workflow execution...');
+            abortControllerRef.current.abort();
         }
     };
 
@@ -442,28 +474,28 @@ export function WorkflowExecutionDialog({
                                 </Label>
                             </div>
 
-                            {/* Execute Button */}
-                            <Button
-                                onClick={handleExecute}
-                                disabled={isExecuting || prompts.length === 0}
-                                className="w-full mt-6"
-                                size="lg"
-                            >
-                                {isExecuting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        {t('Executing Step {{current}} of {{total}}...', {
-                                            current: currentStep + 1,
-                                            total: prompts.length,
-                                        })}
-                                    </>
-                                ) : (
-                                    <>
-                                        <Play className="mr-2 h-5 w-5" />
-                                        {t('Execute Workflow')}
-                                    </>
-                                )}
-                            </Button>
+                            {/* Execute/Stop Button */}
+                            {isExecuting ? (
+                                <Button
+                                    onClick={handleStopExecution}
+                                    variant="destructive"
+                                    className="w-full mt-6"
+                                    size="lg"
+                                >
+                                    <StopCircle className="mr-2 h-5 w-5" />
+                                    {t('stop_workflow_execution')}
+                                </Button>
+                            ) : (
+                                <Button
+                                    onClick={handleExecute}
+                                    disabled={prompts.length === 0}
+                                    className="w-full mt-6"
+                                    size="lg"
+                                >
+                                    <Play className="mr-2 h-5 w-5" />
+                                    {t('Execute Workflow')}
+                                </Button>
+                            )}
                         </div>
                     </TabsContent>
 
