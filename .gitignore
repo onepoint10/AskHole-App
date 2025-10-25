@@ -14,3 +14,15 @@ backend/src/database/app.db
 frontend/package-lock.json
 .env
 backend/.env
+backend/.DS_Store
+backend/__pycache__/test_git_manager.cpython-313-pytest-8.4.2.pyc
+backend/__pycache__/test_retry_logic.cpython-313-pytest-8.4.2.pyc
+backend/__pycache__/test_telegram_recovery.cpython-313-pytest-8.4.2.pyc
+backend/src/.DS_Store
+backend/tests/.DS_Store
+backend/tests/__pycache__/test_example.cpython-313-pytest-8.4.2.pyc
+frontend/.DS_Store
+frontend/src/.DS_Store
+frontend/src/components/.DS_Store
+frontend/src/locales/.DS_Store
+.DS_Store
