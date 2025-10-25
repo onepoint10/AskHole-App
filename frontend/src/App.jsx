@@ -80,6 +80,7 @@ function App() {
   const [uploadedFileIds, setUploadedFileIds] = useState([]); // Track uploaded file IDs for status checking
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isUserAccountOpen, setIsUserAccountOpen] = useState(false);
+  const [userAccountDefaultTab, setUserAccountDefaultTab] = useState('profile');
   const [settingsDefaultTab, setSettingsDefaultTab] = useState('api');
   const [isPromptDialogOpen, setIsPromptDialogOpen] = useState(false);
   const [promptInitialContent, setPromptInitialContent] = useState('');
@@ -1198,8 +1199,8 @@ function App() {
             <TelegramLinkingPrompt
               currentUser={currentUser}
               onLinkNow={() => {
-                setSettingsDefaultTab('security');
-                setIsSettingsOpen(true);
+                setUserAccountDefaultTab('security');
+                setIsUserAccountOpen(true);
               }}
             />
           )}
@@ -1272,6 +1273,7 @@ function App() {
           onLogout={handleLogout}
           settings={settings}
           onUpdateSettings={updateSettings}
+          defaultTab={userAccountDefaultTab}
           onDeleteAccount={async () => {
             setIsUserAccountOpen(false);
             await handleLogout();

@@ -58,9 +58,10 @@ const UserAccountDialog = ({
     onDeleteAccount,
     settings,
     onUpdateSettings,
+    defaultTab = 'profile',
 }) => {
     const { t, i18n } = useTranslation();
-    const [activeTab, setActiveTab] = useState('profile');
+    const [activeTab, setActiveTab] = useState(defaultTab);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -82,6 +83,13 @@ const UserAccountDialog = ({
             setEmail(currentUser.email || '');
         }
     }, [currentUser]);
+
+    // Reset to default tab when dialog opens
+    useEffect(() => {
+        if (isOpen) {
+            setActiveTab(defaultTab);
+        }
+    }, [isOpen, defaultTab]);
 
     // Clear messages when tab changes
     useEffect(() => {
