@@ -58,6 +58,7 @@ const Sidebar = ({
   onEditPrompt,
   onOpenSettings,
   onLogout,
+  onOpenUserAccount,
   isMobileOverlay = false,
   onRequestClose,
   isAdmin,
@@ -975,9 +976,18 @@ const Sidebar = ({
                   <HelpCircle className="h-4 w-4" />
                 </Button>
                 {currentUser && (
-                  <span className="text-xs text-muted-foreground truncate">
-                    {currentUser.username}
-                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onOpenUserAccount}
+                    className="hover:bg-sidebar-accent flex-shrink-0 px-2"
+                    title={t('user_account_title')}
+                  >
+                    <User className="h-4 w-4 mr-1" />
+                    <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+                      {currentUser.username}
+                    </span>
+                  </Button>
                 )}
               </div>
               <Button

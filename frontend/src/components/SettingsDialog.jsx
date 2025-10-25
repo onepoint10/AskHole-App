@@ -9,13 +9,11 @@ import {
   Sun,
   Monitor,
   Plus,
-  Trash2,
-  Shield
+  Trash2
 } from 'lucide-react';
 import AddProviderDialog from './AddProviderDialog';
 import AddModelDialog from './AddModelDialog';
 import ExaSettings from './ExaSettings';
-import TelegramLinkingCard from './TelegramLinkingCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,10 +122,9 @@ const SettingsDialog = ({
         </DialogHeader>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="api">{t('api_keys')}</TabsTrigger>
             <TabsTrigger value="models">{t('models')}</TabsTrigger>
-            <TabsTrigger value="security">{t('security')}</TabsTrigger>
             <TabsTrigger value="appearance">{t('appearance')}</TabsTrigger>
             <TabsTrigger value="advanced">{t('advanced')}</TabsTrigger>
             <TabsTrigger value="exa">EXA Search</TabsTrigger>
@@ -314,20 +311,6 @@ const SettingsDialog = ({
                   </p>
                 )}
               </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="security" className="space-y-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Shield className="h-4 w-4" />
-                <h3 className="text-lg font-medium">{t('security')}</h3>
-              </div>
-
-              <TelegramLinkingCard
-                currentUser={currentUser}
-                onLinked={onUserUpdate}
-              />
             </div>
           </TabsContent>
 
