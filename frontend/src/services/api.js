@@ -35,7 +35,7 @@ const setCookie = (name, value, days = 30) => {
 };
 
 // Helper function for making API calls with proper error handling
-const apiCall = async (url, options = {}, language = 'en') => {
+const apiCall = async (url, options = {}, language = 'en', signal = null) => {
   // FIXED: Get session ID from multiple sources with better priority
   const sessionIdFromStorage = localStorage.getItem('session_id');
   const sessionIdFromCookie = getCookie('session');
@@ -61,18 +61,19 @@ const apiCall = async (url, options = {}, language = 'en') => {
     },
   };
 
-  // Create AbortController for timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), defaultOptions.timeout);
+  // Create AbortController for timeout or use provided signal
+  const controller = signal ? null : new AbortController();
+  const timeoutId = signal ? null : setTimeout(() => controller.abort(), defaultOptions.timeout);
+  const abortSignal = signal || controller?.signal;
 
   try {
     const response = await fetch(`${API_BASE_URL}${url}`, {
       ...defaultOptions,
       ...options,
-      signal: controller.signal,
+      signal: abortSignal,
     });
 
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
 
     // Handle different response types
     let data;
@@ -116,10 +117,10 @@ const apiCall = async (url, options = {}, language = 'en') => {
     return { data, headers: response.headers };
 
   } catch (error) {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      throw new Error('Request timeout');
+      throw new Error('Request aborted');
     }
 
     // Log errors for debugging
@@ -327,7 +328,7 @@ export const sessionsAPI = {
     return apiCall(`/search?q=${encodeURIComponent(query)}`, {}, language);
   },
 
-  sendMessage: async (sessionId, messageData, language) => {
+  sendMessage: async (sessionId, messageData, language, signal = null) => {
     console.log('API Request: POST /sessions/' + sessionId + '/messages');
 
     // Validate message data before sending, unless in search_mode with potentially empty message
@@ -338,12 +339,19 @@ export const sessionsAPI = {
     return apiCall(`/sessions/${sessionId}/messages`, {
       method: 'POST',
       body: JSON.stringify(messageData),
-    }, language);
+    }, language, signal);
   },
 
   deleteMessage: async (sessionId, messageId, language) => {
     console.log('API Request: DELETE /sessions/' + sessionId + '/messages/' + messageId);
     return apiCall(`/sessions/${sessionId}/messages/${messageId}`, {
+      method: 'DELETE',
+    }, language);
+  },
+
+  cleanupAbortedMessages: async (sessionId, language) => {
+    console.log('API Request: DELETE /sessions/' + sessionId + '/messages/cleanup-aborted');
+    return apiCall(`/sessions/${sessionId}/messages/cleanup-aborted`, {
       method: 'DELETE',
     }, language);
   },
@@ -830,7 +838,7 @@ export const workflowSpacesAPI = {
   },
 
   // Workflow Execution with SSE Streaming (Real-time Progress)
-  executeWorkflowStream: async (id, config, onEvent, language = 'en') => {
+  executeWorkflowStream: async (id, config, onEvent, language = 'en', signal = null) => {
     console.log('API Request: POST /workflow_spaces/' + id + '/execute-stream (SSE)');
 
     // Get API keys from localStorage
@@ -861,6 +869,7 @@ export const workflowSpacesAPI = {
         },
         credentials: 'include',
         body: JSON.stringify(requestBody),
+        signal: signal, // Add abort signal support
       });
 
       if (!response.ok) {
@@ -910,6 +919,17 @@ export const workflowSpacesAPI = {
 
     } catch (error) {
       console.error('SSE stream error:', error);
+
+      // Check if this was an abort
+      if (error.name === 'AbortError') {
+        // Emit abort event to callback
+        onEvent({
+          event_type: 'aborted',
+          message: 'Workflow execution stopped by user'
+        });
+        return; // Don't throw, just return
+      }
+
       // Emit error event to callback
       onEvent({
         event_type: 'error',
