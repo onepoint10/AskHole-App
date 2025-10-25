@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import AddProviderDialog from './AddProviderDialog';
 import AddModelDialog from './AddModelDialog';
-import ExaSettings from './ExaSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -122,12 +121,11 @@ const SettingsDialog = ({
         </DialogHeader>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="api">{t('api_keys')}</TabsTrigger>
             <TabsTrigger value="models">{t('models')}</TabsTrigger>
             <TabsTrigger value="appearance">{t('appearance')}</TabsTrigger>
             <TabsTrigger value="advanced">{t('advanced')}</TabsTrigger>
-            <TabsTrigger value="exa">EXA Search</TabsTrigger>
           </TabsList>
 
           <TabsContent value="api" className="space-y-4">
@@ -147,7 +145,15 @@ const SettingsDialog = ({
                   placeholder={t('enter_gemini_api_key')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {t('get_api_key_gemini')}
+                  {t('get_api_key_gemini')}{' '}
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('get_api_key_link')}
+                  </a>
                 </p>
               </div>
 
@@ -161,7 +167,37 @@ const SettingsDialog = ({
                   placeholder={t('enter_openrouter_api_key')}
                 />
                 <p className="text-xs text-muted-foreground">
-                  {t('get_api_key_openrouter')}
+                  {t('get_api_key_openrouter')}{' '}
+                  <a
+                    href="https://openrouter.ai/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('get_api_key_link')}
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="exa-key">{t('exa.api_key')}</Label>
+                <Input
+                  id="exa-key"
+                  type="password"
+                  value={localSettings.exaApiKey || ''}
+                  onChange={(e) => updateSetting('exaApiKey', e.target.value)}
+                  placeholder={t('exa.enter_api_key')}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t('exa.api_key_hint')}{' '}
+                  <a
+                    href="https://dashboard.exa.ai/home"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {t('get_api_key_link')}
+                  </a>
                 </p>
               </div>
 
@@ -452,10 +488,6 @@ const SettingsDialog = ({
                 </p>
               </div>
             </div>
-          </TabsContent>
-
-          <TabsContent value="exa" className="space-y-4">
-            <ExaSettings settings={localSettings} onUpdateSettings={onUpdateSettings} />
           </TabsContent>
         </Tabs>
 
